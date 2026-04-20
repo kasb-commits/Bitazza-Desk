@@ -31,15 +31,22 @@ async function getDevToken(apiUrl: string): Promise<string> {
     // New user — clear any cached conversation so a fresh one is created
     localStorage.removeItem('csbot_session');
   }
-  const res = await fetch(`${apiUrl}/mock/auth/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id: userId }),
-  });
-  if (!res.ok) throw new Error(`mock token failed for ${userId}: ${res.status}`);
-  const data = await res.json();
-  console.debug(`[csbot-dev] signed in as mock user ${userId}`);
-  return data.token as string;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3000);
+  try {
+    const res = await fetch(`${apiUrl}/mock/auth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId }),
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`mock token failed for ${userId}: ${res.status}`);
+    const data = await res.json();
+    console.debug(`[csbot-dev] signed in as mock user ${userId}`);
+    return data.token as string;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function mount() {
@@ -68,8 +75,12 @@ async function mount() {
   );
 }
 
+function safeMount() {
+  mount().catch((e) => console.error('[csbot] mount failed:', e));
+}
+
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', mount);
+  document.addEventListener('DOMContentLoaded', safeMount);
 } else {
-  mount();
+  safeMount();
 }

@@ -78,9 +78,7 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(start_auto_transition_loop())
     asyncio.create_task(_email_safety_net_loop())
     asyncio.create_task(start_report_scheduler_loop())
-    _activate_gmail_watch()
-    # Seed the history cursor from the watch() response so the first poll
-    # doesn't start from scratch on a fresh server start
+    asyncio.create_task(asyncio.to_thread(_activate_gmail_watch))
     yield
 
 
