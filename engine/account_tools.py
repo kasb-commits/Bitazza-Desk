@@ -62,7 +62,7 @@ def _user_api_get(param: str, value: str) -> dict:
             return {"error": f"unknown param: {param}"}
         if profile is None:
             return {"error": "user_not_found"}
-        return profile.model_dump()
+        return profile.model_dump(mode="json")
 
     prefix = ""
     url = f"{_USER_API_BASE}{prefix}/user"
@@ -135,7 +135,7 @@ def get_account_restrictions(user_id: str) -> dict:
         if result is None:
             return {"user_id": user_id, "has_restrictions": False, "restrictions": [],
                     "trading_available": True, "trading_block_reason": None}
-        return result.model_dump()
+        return result.model_dump(mode="json")
 
     url = f"{_USER_API_BASE}/restrictions"
     try:

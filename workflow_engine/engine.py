@@ -310,7 +310,9 @@ class WorkflowExecutionEngine:
                 waiting_for=execution.waiting_for,
                 variables=execution.variables,
             )
-        except Exception:
+            logger.info("_persist_execution: updated %s status=%s", execution.id, execution.status)
+        except Exception as update_err:
+            logger.info("_persist_execution: update failed (%s), trying create", update_err)
             # On first save (execution doesn't exist yet), create it
             try:
                 create_execution(
@@ -323,6 +325,7 @@ class WorkflowExecutionEngine:
                     channel=execution.channel,
                     category=execution.category,
                 )
+                logger.info("_persist_execution: created %s", execution.id)
             except Exception:
                 logger.exception("Failed to persist execution %s", execution.id)
 

@@ -104,6 +104,12 @@ def workflow_interceptor(
     router = WorkflowRouter()
     route_result = router.route(message)
 
+    logger.info(
+        "interceptor: conv=%s category=%s fallthrough=%s matched=%s",
+        conversation_id, message.category, route_result.fallthrough,
+        route_result.matched_workflow.name if route_result.matched_workflow else None,
+    )
+
     if route_result.fallthrough:
         return legacy_agent_chat(
             conversation_id=conversation_id,

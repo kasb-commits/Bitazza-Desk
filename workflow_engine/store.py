@@ -230,7 +230,7 @@ def update_execution_status(
     variables_json = json.dumps(variables) if variables is not None else None
     try:
         if hasattr(c, "execute"):
-            c.execute("""
+            cur = c.execute("""
                 UPDATE workflow_executions
                 SET status = ?,
                     current_node_id = COALESCE(?, current_node_id),
@@ -240,6 +240,8 @@ def update_execution_status(
                 WHERE id = ?
             """, (status.value, current_node_id, waiting_for,
                   variables_json, execution_id))
+            if cur.rowcount == 0:
+                raise LookupError(f"No execution row with id {execution_id}")
             c.commit()
         else:
             with c.cursor() as cur:
@@ -253,7 +255,11 @@ def update_execution_status(
                     WHERE id = %s
                 """, (status.value, current_node_id, waiting_for,
                       variables_json, execution_id))
+                if cur.rowcount == 0:
+                    raise LookupError(f"No execution row with id {execution_id}")
             c.commit()
+    except LookupError:
+        raise
     except Exception:
         logger.exception("update_execution_status failed for %s", execution_id)
         raise
