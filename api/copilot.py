@@ -2,7 +2,7 @@
 import json
 import logging
 
-from config.settings import GEMINI_API_KEY
+from config.settings import GEMINI_API_KEY, MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ async def _call(prompt: str) -> str:
         return ""
     try:
         resp = _client.models.generate_content(
-            model="gemini-2.0-flash",
+            model=MODEL,
             contents=prompt,
         )
         return resp.text.strip()

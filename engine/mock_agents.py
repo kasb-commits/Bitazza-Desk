@@ -5,6 +5,7 @@ Used to simulate a real agent handoff when escalation triggers.
 import logging
 import random
 import time
+from config.settings import MODEL
 
 
 def _call_with_retry(fn, max_attempts: int = 3, base_delay: float = 0.5):
@@ -162,7 +163,7 @@ def classify_message_with_gemini(message: str) -> str | None:
         client = genai.Client(api_key=GEMINI_API_KEY)
         result = _call_with_retry(
             lambda: client.models.generate_content(
-                model="gemini-2.0-flash",
+                model=MODEL,
                 contents=_GEMINI_CLASSIFY_PROMPT.format(message=message),
                 config={"temperature": 0, "max_output_tokens": 20},
             )
