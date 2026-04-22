@@ -29,7 +29,7 @@ tests/         Pytest test suite
 
 ### Project-Specific Invariants
 - Secrets live in `.env` only — never hardcode API keys
-- All LLM calls use `gemini-2.0-flash` unless specified otherwise
+- All LLM calls use the model set in `config/settings.py` (`MODEL`) which reads from the `MODEL` env var — never hardcode a model string
 - RAG always cites source chunk metadata in responses
 - Escalation threshold: confidence < 0.6 OR explicit trigger keywords
 - Language: auto-detect EN/TH on every message; use matching prompt template
@@ -50,7 +50,20 @@ tests/         Pytest test suite
 - When fixing a bug in `engine/` or `api/`, grep test files to check for encoded business rules before editing — don't read them speculatively
 
 ## Env Vars (see .env.example)
-`GEMINI_API_KEY` · `FRESHDESK_API_KEY` · `FRESHDESK_SUBDOMAIN` · `YELLOWAI_API_KEY` · `DATABASE_URL` · `CHROMA_PATH` · `JWT_SECRET`
+`GEMINI_API_KEY` · `FRESHDESK_API_KEY` · `FRESHDESK_SUBDOMAIN` · `YELLOWAI_API_KEY` · `DATABASE_URL` · `CHROMA_PATH` · `JWT_SECRET` · `MODEL`
+
+## Changing the Gemini Model
+When switching models, update ALL of the following — missing any one will cause silent failures:
+
+| What | Location | Notes |
+|------|----------|-------|
+| Railway env var | `MODEL` in Railway → csbot-api service | Primary control — do this first |
+| Fallback default | `config/settings.py` line 9 | Update the hardcoded fallback string |
+| classify_tickets script | `scripts/classify_tickets.py` line 18 | Local/one-off only, not production |
+| reclassify script | `scripts/reclassify_ai_handling.py` line 28 | Local/one-off only, not production |
+| Embedding model | `db/vector_store.py` line 23 `_EMBED_MODEL` | Separate from chat model — versioned independently |
+
+Files already reading from `config.settings.MODEL` correctly (no change needed): `engine/agent.py`, `engine/mock_agents.py`, `api/copilot.py`
 
 ## Commands
 ```bash
