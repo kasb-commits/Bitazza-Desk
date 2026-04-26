@@ -39,11 +39,8 @@ class EscalateNode:
 
         # Build specialist handoff message
         from engine.prompt_templates import build_handoff_message
-        from engine.mock_agents import pick_agent, get_intro_message
         handoff = build_handoff_message(category, language)
-        agent   = pick_agent(category)
-        intro   = get_intro_message(agent, language, category)
-        reply   = f"{handoff}\n\n{intro}"
+        reply   = handoff
 
         return NodeResult(
             output={

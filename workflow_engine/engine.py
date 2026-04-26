@@ -268,7 +268,6 @@ class WorkflowExecutionEngine:
         if execution.escalated and not escalate_node_ran:
             try:
                 from engine.prompt_templates import build_handoff_message
-                from engine.mock_agents import pick_agent, get_intro_message
                 from db.conversation_store import (
                     get_ticket_id_by_conversation,
                     update_ticket_status,
@@ -276,9 +275,7 @@ class WorkflowExecutionEngine:
                 category = execution.variables.get("category")
                 language = execution.variables.get("language", "en")
                 handoff  = build_handoff_message(category, language)
-                agent    = pick_agent(category)
-                intro    = get_intro_message(agent, language, category)
-                suffix   = f"\n\n{handoff}\n\n{intro}"
+                suffix   = f"\n\n{handoff}"
                 execution.output_reply = (execution.output_reply or "") + suffix
                 status = "Escalated" if execution.channel == "email" else "pending_human"
                 ticket_id = get_ticket_id_by_conversation(execution.conversation_id)
