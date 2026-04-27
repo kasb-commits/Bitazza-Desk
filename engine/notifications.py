@@ -106,3 +106,20 @@ def mark_all_read(user_id: str) -> int:
             (user_id,),
         )
         return cur.rowcount
+
+
+def notification_recently_exists(ticket_id: str, notif_type: str, within_seconds: int = 3600) -> bool:
+    """Return True if a notification of the given type for this ticket was created recently."""
+    with _conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT 1 FROM notifications
+            WHERE ticket_id = %s AND type = %s
+              AND created_at > NOW() - (%s * INTERVAL '1 second')
+            LIMIT 1
+            """,
+            (ticket_id, notif_type, within_seconds),
+        )
+        return cur.fetchone() is not None
+

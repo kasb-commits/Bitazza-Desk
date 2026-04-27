@@ -299,8 +299,14 @@ export const api = {
   markNotificationRead: (id: string) =>
     req(`/api/notifications/${id}/read`, { method: 'PATCH' }),
 
+  markNotificationUnread: (id: string) =>
+    req(`/api/notifications/${id}/unread`, { method: 'PATCH' }),
+
   markAllNotificationsRead: () =>
     req('/api/notifications/read-all/mark', { method: 'PATCH' }),
+
+  bulkMarkNotifications: (ids: string[], read: boolean) =>
+    req('/api/notifications/bulk', { method: 'PATCH', body: JSON.stringify({ ids, read }) }),
 
   // FR-09: Core API — live customer profile from Bitazza backend (5s timeout)
   getCoreProfile: async (bitazzaUid: string) => {

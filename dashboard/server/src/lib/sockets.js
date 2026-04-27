@@ -1,6 +1,8 @@
 // Socket.io server — all real-time events
 const jwt = require('jsonwebtoken');
 const { setAgentSession, deleteAgentSession, getAgentSession } = require('./redis');
+const pool = require('../db/pg');
+const { v4: uuidv4 } = require('uuid');
 require('dotenv').config();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change-me-in-production';
@@ -102,6 +104,36 @@ function init(httpServer) {
         // Grace expired — force Offline
         await setAgentSession(agentId, { state: 'Offline', socket_id: '' });
         io.to('supervisors').emit('agent_presence', { agentId, state: 'Offline' });
+
+        // Notify supervisors if agent had open tickets assigned
+        try {
+          const { rows: openTickets } = await pool.query(
+            `SELECT id FROM tickets WHERE assigned_to = $1
+             AND status NOT IN ('Closed_Resolved','Closed_Unresponsive','Orphaned')`,
+            [agentId]
+          );
+          if (openTickets.length > 0) {
+            const { rows: supervisors } = await pool.query(
+              `SELECT id FROM users WHERE role IN ('supervisor','admin','super_admin') AND active = TRUE`
+            );
+            const agentName = socket.user.name || agentId;
+            const title = `Agent offline — ${agentName}`;
+            const body = `${openTickets.length} open ticket${openTickets.length > 1 ? 's' : ''} left unattended`;
+            for (const sup of supervisors) {
+              const id = uuidv4();
+              const { rows } = await pool.query(
+                `INSERT INTO notifications (id, user_id, role, type, priority, title, body)
+                 VALUES ($1,$2,'supervisor','agent_offline','high',$3,$4)
+                 RETURNING id, user_id, role, type, priority, title, body, ticket_id, read, created_at`,
+                [id, sup.id, title, body]
+              );
+              emitToSupervisors('notification:new', { notification: rows[0] });
+            }
+          }
+        } catch (err) {
+          console.error('[sockets] agent_offline notification error:', err.message);
+        }
+
         // TODO: re-queue orphaned chats (Phase 2)
       }, DISCONNECT_GRACE_MS);
     });

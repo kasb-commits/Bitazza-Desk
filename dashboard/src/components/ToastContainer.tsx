@@ -109,7 +109,7 @@ export function ToastContainer({ toasts, onDismiss, onOpenTicket }: ToastContain
 
   return (
     <div className="fixed bottom-5 right-5 z-[60] flex flex-col gap-2 items-end">
-      {toasts.slice(0, 3).map(toast => (
+      {toasts.map(toast => (
         <ToastItem
           key={toast.id}
           toast={toast}

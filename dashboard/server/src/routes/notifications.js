@@ -13,7 +13,7 @@ router.get('/', authenticate, async (req, res) => {
        FROM notifications
        WHERE user_id = $1
        ORDER BY created_at DESC
-       LIMIT 50`,
+       LIMIT 200`,
       [req.user.id]
     );
     res.json(rows);
@@ -38,6 +38,21 @@ router.patch('/:id/read', authenticate, async (req, res) => {
   }
 });
 
+// ── PATCH /api/notifications/:id/unread ──────────────────────────────────────
+router.patch('/:id/unread', authenticate, async (req, res) => {
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE notifications SET read = FALSE WHERE id = $1 AND user_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    res.json({ status: 'unread' });
+  } catch (err) {
+    console.error('[notifications] PATCH unread error:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // ── PATCH /api/notifications/read-all/mark ───────────────────────────────────
 router.patch('/read-all/mark', authenticate, async (req, res) => {
   try {
@@ -48,6 +63,24 @@ router.patch('/read-all/mark', authenticate, async (req, res) => {
     res.json({ updated: rowCount });
   } catch (err) {
     console.error('[notifications] PATCH read-all error:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ── PATCH /api/notifications/bulk ────────────────────────────────────────────
+// Body: { ids: string[], read: boolean }
+router.patch('/bulk', authenticate, async (req, res) => {
+  const { ids, read } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids required' });
+  if (typeof read !== 'boolean') return res.status(400).json({ error: 'read must be boolean' });
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE notifications SET read = $1 WHERE id = ANY($2::uuid[]) AND user_id = $3`,
+      [read, ids, req.user.id]
+    );
+    res.json({ updated: rowCount });
+  } catch (err) {
+    console.error('[notifications] PATCH bulk error:', err.message);
     res.status(500).json({ error: 'Server error' });
   }
 });

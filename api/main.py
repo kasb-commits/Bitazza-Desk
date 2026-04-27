@@ -18,6 +18,7 @@ from api.routes.notifications import router as notifications_router
 from db.conversation_store import init_db
 from engine.auto_transitions import start_auto_transition_loop
 from engine.report_sender import start_report_scheduler_loop
+from engine.notification_scanner import start_notification_scanner_loop
 
 
 def _activate_gmail_watch() -> None:
@@ -79,6 +80,8 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(_email_safety_net_loop())
     asyncio.create_task(start_report_scheduler_loop())
     asyncio.create_task(asyncio.to_thread(_activate_gmail_watch))
+    from api.ws_manager import manager as ws_manager
+    asyncio.create_task(start_notification_scanner_loop(ws_manager))
     yield
 
 

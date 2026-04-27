@@ -8,6 +8,7 @@ from db.conversation_store import (
     assign_ai_persona, get_ai_persona, is_human_handling,
     update_ticket_category, count_consecutive_low_confidence,
     get_customer_id_for_user, get_customer_tickets, get_open_ticket_for_customer,
+    get_ticket_by_id,
 )
 from workflow_engine.interceptor import workflow_interceptor as chat
 from engine.mock_agents import pick_agent
@@ -149,7 +150,7 @@ def greet(body: GreetRequest, user_id: str = Depends(get_user_id)):
 
 
 @router.post("/message", response_model=MessageResponse)
-def send_message(body: MessageRequest, user_id: str = Depends(get_user_id)):
+async def send_message(body: MessageRequest, user_id: str = Depends(get_user_id)):
     if not body.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
@@ -160,6 +161,22 @@ def send_message(body: MessageRequest, user_id: str = Depends(get_user_id)):
     # reply=None tells the widget to suppress the bot bubble entirely;
     # the human agent's response will arrive via WebSocket.
     if is_human_handling(body.conversation_id):
+        # Notify the assigned agent that the customer sent a new message
+        ticket = get_ticket_by_id(body.conversation_id)
+        assigned_to = str(ticket["assigned_to"]) if ticket and ticket.get("assigned_to") else None
+        if assigned_to:
+            from engine.notifications import create_notification
+            snippet = body.message[:80] + ("…" if len(body.message) > 80 else "")
+            notif = create_notification(
+                user_id=assigned_to,
+                role="agent",
+                type="customer_reply",
+                priority="high",
+                title=f"Customer replied — Ticket #{body.conversation_id[:8]}",
+                body=snippet,
+                ticket_id=body.conversation_id,
+            )
+            await manager.broadcast_all({"type": "notification:new", "notification": notif})
         return MessageResponse(
             reply=None,
             language="en",

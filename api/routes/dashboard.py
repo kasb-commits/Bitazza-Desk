@@ -27,6 +27,7 @@ from db.conversation_store import (
 from api.ws_manager import manager
 from api.copilot import suggest_reply, summarize_conversation, classify_sentiment, find_related_tickets
 from engine.notifications import create_notification, fan_out_to_supervisors
+from engine.notification_scanner import _SLA_TARGETS, _SLA_WARNING_PCT
 # USERS_BY_ID is kept for legacy imports but is always empty; agent info is fetched from DB instead
 # from api.routes.auth import USERS_BY_ID  # reverted if needed
 
@@ -588,12 +589,34 @@ def delete_role(name: str, user_id: str = Depends(get_user_id)):
 def supervisor_live(user_id: str = Depends(get_user_id)):
     tickets = get_open_tickets()
     now = int(time.time())
+
+    # Compute SLA at-risk tickets (>= 80% of target elapsed, not yet breached)
+    # Notifications for these are fired by the background scanner, not here.
+    sla_at_risk = []
+    for t in tickets:
+        priority = t.get("priority") or 3
+        target = _SLA_TARGETS.get(priority, _SLA_TARGETS[3])
+        created_at = t.get("created_at")
+        if not created_at:
+            continue
+        elapsed = now - created_at
+        pct = elapsed / target
+        if _SLA_WARNING_PCT <= pct < 1.0:
+            sla_at_risk.append({
+                "ticket_id": t["id"],
+                "priority": priority,
+                "elapsed_seconds": int(elapsed),
+                "target_seconds": target,
+                "pct": round(pct, 3),
+                "customer": t.get("customer"),
+            })
+
     return {
         "agents": db_get_agents(),
         "queue": [
             {"channel": "web", "priority": "high", "count": len([t for t in tickets if t.get("status") not in ("resolved", "closed", "spam")])},
         ],
-        "sla_at_risk": [],  # Stub — populate when sla_breach_at column added
+        "sla_at_risk": sla_at_risk,
         "stats": {
             "opened_today": len(tickets),
             "resolved_today": 0,

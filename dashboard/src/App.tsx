@@ -934,10 +934,28 @@ export default function App() {
         if (e.type === 'notification:new') {
           const n = e.notification;
           setNotifications(prev => [n, ...prev]);
+          // Play alert sound for all new notifications
+          try {
+            const ctx = new AudioContext();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            // Short two-tone chime: higher pitch for critical/high
+            const freq = (n.priority === 'critical' || n.priority === 'high') ? 880 : 660;
+            osc.frequency.setValueAtTime(freq, ctx.currentTime);
+            osc.frequency.setValueAtTime(freq * 1.25, ctx.currentTime + 0.08);
+            gain.gain.setValueAtTime(0.18, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.35);
+            osc.onended = () => ctx.close();
+          } catch { /* AudioContext blocked (e.g. no user gesture yet) — silent */ }
           if (n.priority === 'critical' || n.priority === 'high') {
             setToasts(prev => {
-              const next = [{ id: n.id, notification: n }, ...prev];
-              return next.slice(0, 3);
+              // Prepend new toast; deduplicate by id; keep newest 5 (drop oldest)
+              const next = [{ id: n.id, notification: n }, ...prev.filter(t => t.id !== n.id)];
+              return next.slice(0, 5);
             });
           }
           return;
@@ -1008,7 +1026,9 @@ export default function App() {
             notifications={notifications}
             onClose={() => setNotifPanelOpen(false)}
             onMarkRead={(id) => setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))}
+            onMarkUnread={(id) => setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: false } : n))}
             onMarkAllRead={() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))}
+            onBulkMark={(ids, read) => setNotifications(prev => prev.map(n => ids.includes(n.id) ? { ...n, read } : n))}
             onOpenTicket={handleSelectAndNavigate}
           />
         )}

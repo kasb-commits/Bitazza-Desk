@@ -363,6 +363,31 @@ router.patch('/:id/assign', requirePermission('inbox.assign'), async (req, res) 
       agentName,
       agentAvatarUrl,
     });
+
+    // Notify the newly assigned agent
+    if (assigned_to && assigned_to !== prevAgent) {
+      const { rows: ticketInfo } = await pool.query(
+        `SELECT c.name as customer_name, t.channel
+         FROM tickets t JOIN customers c ON t.customer_id = c.id
+         WHERE t.id = $1`, [req.params.id]
+      );
+      const customerName = ticketInfo[0]?.customer_name || 'A customer';
+      const channel = ticketInfo[0]?.channel || 'web';
+      const notifId = uuidv4();
+      const { rows: notifRows } = await pool.query(
+        `INSERT INTO notifications (id, user_id, role, type, priority, title, body, ticket_id)
+         VALUES ($1,$2,'agent','assigned','medium',$3,$4,$5)
+         RETURNING id, user_id, role, type, priority, title, body, ticket_id, read, created_at`,
+        [
+          notifId, assigned_to,
+          `Ticket #${req.params.id.slice(0, 8)} assigned to you`,
+          `From ${customerName} — ${channel} channel`,
+          req.params.id,
+        ]
+      );
+      emitToAgent(assigned_to, 'notification:new', { notification: notifRows[0] });
+    }
+
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
