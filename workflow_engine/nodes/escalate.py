@@ -37,10 +37,14 @@ class EscalateNode:
             if ticket_id:
                 update_ticket_status(ticket_id, status)
 
-        # Build specialist handoff message
+        # Build specialist handoff message.
+        # If the ai_reply node already generated an explanation (e.g. "your account is
+        # frozen because X — a specialist will review"), preserve it and append the
+        # handoff so customers see both the explanation and the transition message.
         from engine.prompt_templates import build_handoff_message
-        handoff = build_handoff_message(category, language)
-        reply   = handoff
+        handoff     = build_handoff_message(category, language)
+        prior_reply = ctx.variables.get("reply", "").strip()
+        reply       = f"{prior_reply}\n\n{handoff}" if len(prior_reply) > 20 else handoff
 
         return NodeResult(
             output={
