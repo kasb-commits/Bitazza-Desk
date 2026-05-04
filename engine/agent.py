@@ -223,8 +223,9 @@ def chat(
             _escalation_status = "Escalated" if platform == "email" else "pending_human"
             update_ticket_status(ticket_id, _escalation_status)
         effective_category = detect_category_from_message(user_message) or category
+        reply_text = "" if suppress_handoff else build_handoff_message(effective_category, language)
         return AgentResponse(
-            text=build_handoff_message(effective_category, language),
+            text=reply_text,
             language=language, escalated=True,
             escalation_reason=reason, ticket_id=ticket_id,
         )
@@ -306,8 +307,9 @@ def chat(
             _escalation_status = "Escalated" if platform == "email" else "pending_human"
             update_ticket_status(ticket_id, _escalation_status)
         effective_category = detect_category_from_message(user_message) or category
+        reply_text = "" if suppress_handoff else build_handoff_message(effective_category, language)
         return AgentResponse(
-            text=build_handoff_message(effective_category, language),
+            text=reply_text,
             language=language, escalated=True,
             escalation_reason="ai_service_unavailable", ticket_id=ticket_id,
         )
@@ -374,8 +376,9 @@ def chat(
                 _escalation_status = "Escalated" if platform == "email" else "pending_human"
                 update_ticket_status(ticket_id, _escalation_status)
             effective_category = detect_category_from_message(user_message) or category
+            reply_text = "" if suppress_handoff else build_handoff_message(effective_category, language)
             return AgentResponse(
-                text=build_handoff_message(effective_category, language),
+                text=reply_text,
                 language=language, escalated=True,
                 escalation_reason="ai_service_unavailable", ticket_id=ticket_id,
             )

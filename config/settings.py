@@ -6,7 +6,7 @@ load_dotenv()
 
 # AI
 GEMINI_API_KEY: str = os.environ["GEMINI_API_KEY"]
-MODEL: str = os.getenv("MODEL", "gemini-2.5-flash-preview-04-17")
+MODEL: str = os.getenv("MODEL", "gemini-2.5-flash")
 MAX_TOKENS: int = 1024
 MAX_RAG_CHUNKS: int = int(os.getenv("MAX_RAG_CHUNKS", "5"))
 
