@@ -25,7 +25,6 @@ from db.conversation_store import (
     update_role as db_update_role, delete_role as db_delete_role,
 )
 from api.ws_manager import manager
-from api.copilot import suggest_reply, summarize_conversation, classify_sentiment, find_related_tickets
 from engine.notifications import create_notification, fan_out_to_supervisors
 from engine.notification_scanner import _SLA_TARGETS, _SLA_WARNING_PCT
 # USERS_BY_ID is kept for legacy imports but is always empty; agent info is fetched from DB instead
@@ -79,12 +78,6 @@ class AgentStatusRequest(BaseModel):
 
 class TagsRequest(BaseModel):
     tags: list[str]
-
-class CopilotRequest(BaseModel):
-    conversation_id: str
-
-class SentimentRequest(BaseModel):
-    message: str
 
 class CannedResponseCreate(BaseModel):
     title: str
@@ -992,44 +985,6 @@ def add_tag(body: CreateTagRequest, user_id: str = Depends(get_user_id)):
 def remove_tag(name: str, user_id: str = Depends(get_user_id)):
     delete_tag(name)
     return {"tags": get_all_tags()}
-
-
-# ---------------------------------------------------------------------------
-# Copilot
-# ---------------------------------------------------------------------------
-
-@router.post("/copilot/suggest-reply")
-async def copilot_suggest(body: CopilotRequest, user_id: str = Depends(get_user_id)):
-    conv = get_conversation_with_history(body.conversation_id)
-    if not conv:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    draft = await suggest_reply(conv["history"][-10:])
-    return {"draft": draft}
-
-
-@router.post("/copilot/summarize")
-async def copilot_summarize(body: CopilotRequest, user_id: str = Depends(get_user_id)):
-    conv = get_conversation_with_history(body.conversation_id)
-    if not conv:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    summary = await summarize_conversation(conv["history"])
-    return {"summary": summary}
-
-
-@router.post("/copilot/sentiment")
-async def copilot_sentiment(body: SentimentRequest, user_id: str = Depends(get_user_id)):
-    sentiment = await classify_sentiment(body.message)
-    return {"sentiment": sentiment}
-
-
-@router.post("/copilot/related-tickets")
-async def copilot_related(body: CopilotRequest, user_id: str = Depends(get_user_id)):
-    conv = get_conversation_with_history(body.conversation_id)
-    if not conv:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    first_message = next((m["content"] for m in conv.get("history", []) if m["role"] == "user"), "")
-    tickets = await find_related_tickets(first_message)
-    return {"tickets": tickets}
 
 
 # ---------------------------------------------------------------------------
