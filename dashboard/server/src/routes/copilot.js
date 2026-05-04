@@ -7,7 +7,8 @@ require('dotenv').config();
 
 router.use(authenticate);
 
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+const GEMINI_MODEL = process.env.MODEL || 'gemini-2.0-flash';
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${process.env.GEMINI_API_KEY}`;
 const TIMEOUT_MS = 8000;
 
 async function callGemini(prompt) {
