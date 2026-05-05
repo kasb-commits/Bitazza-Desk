@@ -186,8 +186,11 @@ async def send_message(body: MessageRequest, user_id: str = Depends(get_user_id)
     # Compute consecutive low-confidence count server-side — not trusted from client
     consecutive_low = count_consecutive_low_confidence(body.conversation_id)
 
-    # Run agent
-    result = chat(
+    # Run agent — workflow_interceptor is sync+blocking (Gemini HTTP calls inside);
+    # run in a thread pool to avoid blocking the event loop.
+    import asyncio as _asyncio
+    result = await _asyncio.to_thread(
+        chat,
         conversation_id=body.conversation_id,
         user_id=user_id,
         user_message=body.message,
