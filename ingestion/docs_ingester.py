@@ -6,6 +6,7 @@ Usage: python ingestion/docs_ingester.py --dir path/to/docs
 import argparse, uuid
 from pathlib import Path
 from db.vector_store import upsert_documents, collection_count
+from db.conversation_store import create_knowledge_item
 
 CHUNK_SIZE = 800   # characters per chunk
 CHUNK_OVERLAP = 100
@@ -49,22 +50,38 @@ def main():
         print(f"ERROR: {docs_dir} does not exist")
         return
 
-    all_chunks = []
     for path in docs_dir.rglob("*"):
         if path.suffix.lower() not in {".pdf", ".txt", ".md"}:
             continue
         print(f"  Reading {path.name}...")
         text = read_file(path)
-        if text:
-            all_chunks.extend(chunk_text(text, source=path.name))
+        if not text:
+            continue
 
-    if not all_chunks:
-        print("No documents found.")
-        return
+        chunks = chunk_text(text, source=path.name)
+        if not chunks:
+            continue
 
-    print(f"Ingesting {len(all_chunks)} chunks from {docs_dir}...")
-    for i in range(0, len(all_chunks), 500):
-        upsert_documents(all_chunks[i:i+500])
+        # Register in PostgreSQL so the dashboard KB list shows it
+        title = path.stem.replace("_", " ").replace("-", " ").title()
+        # source_type must be one of: url, pdf, docx (DB constraint)
+        src_type = "pdf" if path.suffix.lower() in {".md", ".txt", ".pdf"} else "docx"
+        item = create_knowledge_item(
+            title=title,
+            source_type=src_type,
+            source_ref=str(path),
+            chunk_count=len(chunks),
+            created_by=None,
+        )
+        item_id = str(item["id"])
+
+        # Tag each chunk with the knowledge_item_id so the dashboard can preview/delete it
+        for chunk in chunks:
+            chunk["metadata"]["knowledge_item_id"] = item_id
+
+        upsert_documents(chunks)
+        print(f"    ✓ {path.name} → {len(chunks)} chunks (kb_item={item_id})")
+
     print(f"Done. Vector DB now has {collection_count()} documents.")
 
 

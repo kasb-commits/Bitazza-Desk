@@ -6,6 +6,7 @@ import uuid, time, re
 import requests
 from bs4 import BeautifulSoup
 from db.vector_store import upsert_documents, collection_count
+from db.conversation_store import create_knowledge_item
 
 CHUNK_SIZE = 700
 CHUNK_OVERLAP = 100
@@ -14,21 +15,10 @@ BLOG_SOURCES = [
     {
         "name": "bitazza_blog",
         "index_urls": [
-            "https://bitazza.com/en/blog",
-            "https://bitazza.com/th/blog",
+            "https://blog.bitazza.com/blog",
         ],
         "article_selector": "a[href*='/blog/']",
-        "base_url": "https://bitazza.com",
-        "content_selector": "article, .blog-content, .post-content, main",
-    },
-    {
-        "name": "freedom_blog",
-        "index_urls": [
-            "https://freedom.co.th/blog",
-            "https://freedom.co.th/en/blog",
-        ],
-        "article_selector": "a[href*='/blog/']",
-        "base_url": "https://freedom.co.th",
+        "base_url": "https://blog.bitazza.com",
         "content_selector": "article, .blog-content, .post-content, main",
     },
 ]
@@ -128,9 +118,21 @@ def ingest_source(source: dict) -> int:
 
             chunks = chunk_text(text, source["name"], url)
             if chunks:
+                # Register in PostgreSQL so the dashboard KB list shows it
+                title = url.rstrip("/").split("/")[-1].replace("-", " ").title()
+                item = create_knowledge_item(
+                    title=title[:255],
+                    source_type="url",   # blog posts are web URLs
+                    source_ref=url,
+                    chunk_count=len(chunks),
+                    created_by=None,
+                )
+                item_id = str(item["id"])
+                for chunk in chunks:
+                    chunk["metadata"]["knowledge_item_id"] = item_id
                 upsert_documents(chunks)
                 total_docs += len(chunks)
-                print(f"    ✓ {url} → {len(chunks)} chunks")
+                print(f"    ✓ {url} → {len(chunks)} chunks (kb_item={item_id})")
 
             time.sleep(0.5)  # polite crawl delay
 
