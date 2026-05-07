@@ -8,7 +8,7 @@ from db.conversation_store import (
     assign_ai_persona, get_ai_persona, is_human_handling,
     update_ticket_category, count_consecutive_low_confidence,
     get_customer_id_for_user, get_customer_tickets, get_open_ticket_for_customer,
-    get_ticket_by_id,
+    get_ticket_by_id, update_ticket_status, get_ticket_id_by_conversation,
 )
 from workflow_engine.interceptor import workflow_interceptor as chat
 from engine.mock_agents import pick_agent
@@ -186,6 +186,12 @@ async def send_message(body: MessageRequest, user_id: str = Depends(get_user_id)
     # Compute consecutive low-confidence count server-side — not trusted from client
     consecutive_low = count_consecutive_low_confidence(body.conversation_id)
 
+    # Mark ticket In_Progress while the AI is actively processing this turn.
+    # This distinguishes "AI is working" from "waiting on customer" in the queue.
+    _ticket_id = get_ticket_id_by_conversation(body.conversation_id)
+    if _ticket_id:
+        update_ticket_status(_ticket_id, "in_progress")
+
     # Run agent — workflow_interceptor is sync+blocking (Gemini HTTP calls inside);
     # run in a thread pool to avoid blocking the event loop.
     import asyncio as _asyncio
@@ -212,6 +218,11 @@ async def send_message(body: MessageRequest, user_id: str = Depends(get_user_id)
         "escalation_reason": result.escalation_reason,
         "confidence": result.confidence,
     })
+
+    # After the AI replies, move status to Pending_Customer (ball is in customer's court).
+    # Skip if the AI escalated — agent.py already wrote the correct Escalated status.
+    if not result.escalated and _ticket_id:
+        update_ticket_status(_ticket_id, "pending_customer")
 
     return MessageResponse(
         reply=result.text,

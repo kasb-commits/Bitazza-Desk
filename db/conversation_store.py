@@ -682,7 +682,8 @@ def update_ticket_status(ticket_id: str, status: str, agent_id: str | None = Non
     # Map Python status names → dashboard status enum
     STATUS_MAP = {
         "ai_handling": "Open_Live",
-        "pending_human": "Open_Live",
+        "pending_human": "Escalated",
+        "unresponsive": "Closed_Unresponsive",
         "assigned": "In_Progress",
         "pending_customer": "Pending_Customer",
         "pending_internal": "Pending_Customer",
@@ -1013,7 +1014,7 @@ def get_tickets_for_auto_transition() -> dict:
         cur.execute("""
             SELECT * FROM tickets
             WHERE status = 'Pending_Customer'
-              AND updated_at < NOW() - INTERVAL '48 hours'
+              AND updated_at < NOW() - INTERVAL '2 hours'
         """)
         pending_customer_expired = [dict(r) for r in cur.fetchall()]
 

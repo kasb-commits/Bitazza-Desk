@@ -27,7 +27,7 @@ def is_workflow_active(ticket_id: str, **kwargs) -> bool:
 
 logger = logging.getLogger(__name__)
 
-INTERVAL_SECONDS = 300        # run every 5 minutes
+INTERVAL_SECONDS = 900        # run every 15 minutes
 EMAIL_POLL_MESSAGES = 20      # how many recent inbox messages to check each poll
 
 
@@ -40,20 +40,14 @@ async def run_auto_transitions() -> None:
             if is_workflow_active(ticket["id"]):
                 logger.debug("Skipping auto-transition for ticket %s — workflow active", ticket["id"])
                 continue
-            # Email tickets with no customer reply after 48h → auto-resolve
-            # Widget/other channel tickets → snooze (existing behaviour)
-            if ticket.get("channel") == "email":
-                update_ticket_status(ticket["id"], "Resolved")
-                logger.info(
-                    "Auto-resolved email ticket %s (no customer reply after 48h)",
-                    ticket["id"],
-                )
-            else:
-                update_ticket_status(ticket["id"], "snoozed")
-                logger.info(
-                    "Auto-snoozed ticket %s (pending_customer 48h timeout)",
-                    ticket["id"],
-                )
+            # All channels: customer dropped off without responding → Closed_Unresponsive.
+            # Closed_Unresponsive is distinct from Closed_Resolved (which requires
+            # explicit CSAT confirmation) — this keeps resolution metrics honest.
+            update_ticket_status(ticket["id"], "unresponsive")
+            logger.info(
+                "Auto-closed ticket %s as Closed_Unresponsive (no customer reply after 2h, channel=%s)",
+                ticket["id"], ticket.get("channel", "unknown"),
+            )
 
         for ticket in buckets.get("snoozed_expired", []):
             if is_workflow_active(ticket["id"]):
