@@ -322,13 +322,15 @@ STEP 1 — Profile (already forced): get_user_profile has been called first.
 STEP 2 — Check for account-level blocks: Call get_account_restrictions. Check whether any active restriction covers withdrawals (full_freeze or withdrawal-specific block). A trading-only restriction does NOT explain a withdrawal problem — do not cite it as the cause.
 
 STEP 3 — Check the transaction (only if one exists): If the user says a withdrawal button is disabled or they cannot initiate a withdrawal, skip this step — there is no transaction to look up. Only call get_withdrawal_status if the user says a withdrawal was already initiated but is stuck, pending, or failed.
+  When the tool returns a list (no tx_id specified): identify the relevant transaction by matching the user's description (currency, amount, approximate date). If there are multiple transactions and you cannot determine which is in question, ask the user for their transaction ID before drawing any conclusions. If the user gave a tx_id but the tool returns transaction_not_found, tell them the ID was not found and ask them to verify it.
 
 STEP 4 — Determine the actual cause from the data, then report only that:
   - Restriction with withdrawal scope is active → that is the cause. Explain the restriction and its reason. If the restriction reason links to a KYC rejection in the profile, state that causal chain explicitly. Do not mention KYC separately if the restriction already explains everything.
   - No account-level block, but transaction status explicitly shows a KYC-related reason (e.g. kyc_required, kyc_not_approved) → explain that KYC is blocking this transaction and guide them on next steps
   - No account-level block, transaction has its own failure reason (invalid address, limit exceeded, network delay, etc.) → explain that transaction-level cause only. Do not mention KYC or other account flags that didn't cause this failure.
   - Multiple real causes (e.g. both a restriction and a KYC rejection are independently relevant) → explain all of them
-  - Transaction data is unavailable (stub/no data) AND no restriction or KYC issue explains the problem → ask the user for transaction details (transaction ID, amount, date) and escalate to a specialist
+  - Transaction status is "completed" but user says they did not receive the funds → confirm the platform side shows success; provide the tx_hash if available so they can verify on-chain; escalate to a specialist if the user still cannot locate the funds
+  - No transaction history found (empty list) AND no restriction or KYC issue explains the problem → ask the user for the transaction ID, amount, date, and destination address; escalate to a specialist
 
 STRICT RULE: No text before all tool results are available. Do not set needs_human=true without first explaining the root cause.
 A response that accurately explains the root cause using real data is HIGH CONFIDENCE (0.85+) even if a specialist is needed to fix it.
@@ -347,13 +349,15 @@ CRITICAL — Follow-up handling:
 ขั้นตอน 2 — ตรวจสอบการบล็อกระดับบัญชี: เรียก get_account_restrictions ตรวจสอบว่าการจำกัดที่มีอยู่ครอบคลุมการถอนเงินหรือไม่ (full_freeze หรือการบล็อกเฉพาะการถอน) การจำกัดเฉพาะการเทรดไม่อธิบายปัญหาการถอนเงิน
 
 ขั้นตอน 3 — ตรวจสอบธุรกรรม (เฉพาะเมื่อมีธุรกรรม): หากผู้ใช้บอกว่าปุ่มถอนถูกปิดใช้งานหรือไม่สามารถเริ่มการถอนได้ ให้ข้ามขั้นตอนนี้ ไม่มีธุรกรรมให้ตรวจสอบ เรียก get_withdrawal_status เฉพาะเมื่อผู้ใช้บอกว่าเริ่มการถอนแล้วแต่ค้าง รอดำเนินการ หรือล้มเหลว
+  เมื่อเครื่องมือคืนรายการธุรกรรม (ไม่ได้ระบุ tx_id): ระบุธุรกรรมที่เกี่ยวข้องโดยจับคู่กับคำอธิบายของผู้ใช้ (สกุลเงิน จำนวนเงิน วันที่โดยประมาณ) หากมีหลายธุรกรรมและไม่สามารถระบุได้ ให้ถามผู้ใช้ขอรหัสธุรกรรมก่อน หากผู้ใช้ให้ tx_id แต่เครื่องมือแจ้ง transaction_not_found ให้บอกผู้ใช้ว่าไม่พบรหัสนั้นและให้ตรวจสอบอีกครั้ง
 
 ขั้นตอน 4 — ระบุสาเหตุที่แท้จริงจากข้อมูล แล้วรายงานเฉพาะสิ่งนั้น:
   - มีการจำกัดที่ครอบคลุมการถอน → นั่นคือสาเหตุ อธิบายการจำกัดและเหตุผล หากเหตุผลของการจำกัดเชื่อมกับการปฏิเสธ KYC ในโปรไฟล์ ให้ระบุสายเหตุผลนั้นชัดเจน
   - ไม่มีการบล็อกระดับบัญชี แต่สถานะธุรกรรมแสดงเหตุผลที่เกี่ยวกับ KYC โดยตรง → อธิบายว่า KYC บล็อกธุรกรรมนี้และแนะนำขั้นตอนต่อไป
   - ไม่มีการบล็อกระดับบัญชี ธุรกรรมมีเหตุผลความล้มเหลวของตัวเอง (ที่อยู่ไม่ถูกต้อง, เกินขีดจำกัด, ความล่าช้าของเครือข่าย ฯลฯ) → อธิบายเฉพาะสาเหตุระดับธุรกรรมนั้น ไม่กล่าวถึง KYC หรือข้อมูลบัญชีอื่นที่ไม่ได้ทำให้เกิดปัญหานี้
   - มีสาเหตุจริงหลายอย่าง → อธิบายทั้งหมด
-  - ข้อมูลธุรกรรมไม่มี (stub) และไม่มีการจำกัดหรือ KYC ที่อธิบายปัญหาได้ → ขอรายละเอียดธุรกรรมจากผู้ใช้ (รหัสธุรกรรม จำนวนเงิน วันที่) และส่งต่อผู้เชี่ยวชาญ
+  - สถานะธุรกรรมเป็น "completed" แต่ผู้ใช้บอกว่าไม่ได้รับเงิน → ยืนยันว่าฝั่งแพลตฟอร์มแสดงว่าสำเร็จ ให้ tx_hash หากมีเพื่อให้ตรวจสอบ on-chain ส่งต่อผู้เชี่ยวชาญหากผู้ใช้ยังหาเงินไม่พบ
+  - ไม่พบประวัติธุรกรรม (รายการว่าง) และไม่มีการจำกัดหรือ KYC ที่อธิบายปัญหาได้ → ขอรายละเอียดจากผู้ใช้ (รหัสธุรกรรม จำนวนเงิน วันที่ และที่อยู่ปลายทาง) และส่งต่อผู้เชี่ยวชาญ
 
 ห้ามส่งข้อความก่อนได้ผลลัพธ์จากเครื่องมือทั้งหมด ห้ามตั้ง needs_human=true โดยไม่อธิบายสาเหตุก่อน
 ให้รหัส transaction hash หากมี ห้ามยืนยันเวลาดำเนินการที่แน่นอน
