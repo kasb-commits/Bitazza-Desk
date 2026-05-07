@@ -116,19 +116,26 @@ class TestWorkflowGuard:
         assert result.escalation_reason == "no_active_workflow"
         mock_base.models.generate_content.assert_not_called()
 
-    def test_deposit_issue_bypasses_workflow_guard(self, mock_base):
+    def test_deposit_issue_no_workflow_escalates_immediately(self, mock_base):
         """
-        'deposit_issue' is NOT in _ACCOUNT_CATEGORIES — it bypasses the workflow guard
-        entirely and falls through to the Gemini path with no forced tool call.
-        GAP: deposit issues have no structured investigation path.
+        'deposit_issue' is in _ACCOUNT_CATEGORIES — without an active workflow it escalates
+        immediately, same as withdrawal_issue / kyc_verification / account_restriction.
         """
-        mock_base.models.generate_content.return_value = _text_response(
-            _json_payload("Please describe your deposit issue in detail.", confidence=0.8)
-        )
-        from engine.agent import chat
-        result = chat("conv-wg-4", "USR-001", "My deposit didn't arrive", category="deposit_issue")
-        mock_base.models.generate_content.assert_called_once()
-        assert result.escalated is False
+        with _NO_WORKFLOW:
+            from engine.agent import chat
+            result = chat("conv-wg-4", "USR-001", "My deposit didn't arrive", category="deposit_issue")
+        assert result.escalated is True
+        assert result.escalation_reason == "no_active_workflow"
+        mock_base.models.generate_content.assert_not_called()
+
+    def test_trade_issue_no_workflow_escalates_immediately(self, mock_base):
+        """'trade_issue' is in _ACCOUNT_CATEGORIES — escalates immediately with no active workflow."""
+        with _NO_WORKFLOW:
+            from engine.agent import chat
+            result = chat("conv-wg-6", "USR-001", "My order was not filled", category="trade_issue")
+        assert result.escalated is True
+        assert result.escalation_reason == "no_active_workflow"
+        mock_base.models.generate_content.assert_not_called()
 
     def test_other_category_bypasses_workflow_guard(self, mock_base):
         """'other' category bypasses the workflow guard and tools are omitted from the Gemini call."""
@@ -179,6 +186,36 @@ class TestTurn1ToolForcing:
             ]
             from engine.agent import chat
             result = chat("conv-t1-2", "USR-001", "Why is my account restricted?", category="account_restriction")
+
+        assert mock_base.models.generate_content.call_count == 2
+        assert result.escalated is False
+
+    def test_deposit_issue_turn1_forces_get_user_profile(self, mock_base):
+        with (
+            _HAS_WORKFLOW,
+            patch("engine.agent.TOOLS", {"get_user_profile": _mock_tool(_FAKE_PROFILE)}),
+        ):
+            mock_base.models.generate_content.side_effect = [
+                _fn_call_response("get_user_profile"),
+                _text_response(_json_payload("Your account looks fine, let me check your deposit.", confidence=0.85)),
+            ]
+            from engine.agent import chat
+            result = chat("conv-t1-4", "USR-001", "My deposit didn't arrive", category="deposit_issue")
+
+        assert mock_base.models.generate_content.call_count == 2
+        assert result.escalated is False
+
+    def test_trade_issue_turn1_forces_get_user_profile(self, mock_base):
+        with (
+            _HAS_WORKFLOW,
+            patch("engine.agent.TOOLS", {"get_user_profile": _mock_tool(_FAKE_PROFILE)}),
+        ):
+            mock_base.models.generate_content.side_effect = [
+                _fn_call_response("get_user_profile"),
+                _text_response(_json_payload("Let me check your trading status.", confidence=0.85)),
+            ]
+            from engine.agent import chat
+            result = chat("conv-t1-5", "USR-001", "My order was not filled", category="trade_issue")
 
         assert mock_base.models.generate_content.call_count == 2
         assert result.escalated is False
@@ -257,6 +294,34 @@ class TestTurn2NoForcedTool:
             )
 
         # Two Gemini calls: first is forced fn_call, second returns text after tool result
+        assert mock_base.models.generate_content.call_count == 2
+        assert result.escalated is False
+
+    def test_tx_id_forces_deposit_lookup_at_any_turn(self, mock_base):
+        """
+        When the user mentions a transaction ID at any turn in a deposit_issue conversation,
+        get_deposit_status is forced regardless of prior replies.
+        """
+        prior_history = [
+            {"role": "assistant", "content": _json_payload("Let me check your deposit.", 0.85)}
+        ]
+        with (
+            patch("engine.agent.get_history", return_value=prior_history),
+            patch("db.conversation_store.has_successful_bot_reply", return_value=True),
+            patch("engine.agent.TOOLS", {"get_deposit_status": _mock_tool({"transactions": [], "total": 0})}),
+            _HAS_WORKFLOW,
+        ):
+            mock_base.models.generate_content.side_effect = [
+                _fn_call_response("get_deposit_status"),
+                _text_response(_json_payload("I checked that deposit transaction.", confidence=0.85)),
+            ]
+            from engine.agent import chat
+            result = chat(
+                "conv-t2-3", "USR-001",
+                "The transaction ID is TXN-9999",
+                category="deposit_issue",
+            )
+
         assert mock_base.models.generate_content.call_count == 2
         assert result.escalated is False
 

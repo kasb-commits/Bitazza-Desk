@@ -101,6 +101,14 @@ _UPGRADE_TRANSITION_MESSAGES: dict[str, dict[str, str]] = {
         "en": "Account restriction cases need a senior specialist — let me bring in {specialist} who can investigate and take action on your account directly. They'll be right with you! 🔒",
         "th": "เคสบัญชีถูกระงับต้องใช้ผู้เชี่ยวชาญอาวุโสค่ะ ขอให้ {specialist} มาช่วยซึ่งสามารถตรวจสอบและดำเนินการกับบัญชีของคุณได้โดยตรงเลยนะคะ 🔒",
     },
+    "deposit_issue": {
+        "en": "Deposit problems are handled by {specialist} — our deposits specialist who can trace your transaction directly. Passing you over now, they'll have everything we've discussed! 💳",
+        "th": "เรื่องการฝากเงินให้ {specialist} ผู้เชี่ยวชาญด้านการฝากเงินของเราจัดการดีกว่าค่ะ เขาสามารถติดตามธุรกรรมได้โดยตรงเลย กำลังส่งต่อให้เดี๋ยวนี้เลยค่ะ 💳",
+    },
+    "trade_issue": {
+        "en": "For trading and order issues, let me bring in {specialist} — our trading specialist who can pull up your order history and investigate directly. One moment! 📊",
+        "th": "สำหรับปัญหาการเทรดและออเดอร์ ขอให้ {specialist} ผู้เชี่ยวชาญด้านการเทรดของเรามาช่วยค่ะ เขาสามารถดึงประวัติออเดอร์และตรวจสอบได้โดยตรงเลย รอสักครู่นะคะ 📊",
+    },
 }
 
 
@@ -113,9 +121,16 @@ _UPGRADE_KEYWORDS: dict[str, list[str]] = {
                             "ระงับ", "บล็อก", "account status", "why is my account"],
     "withdrawal_issue":    ["withdraw", "withdrawal", "transfer out", "stuck withdrawal", "pending withdrawal",
                             "ถอน", "โอนเงิน", "my withdrawal"],
+    "deposit_issue":       ["deposit", "top up", "topped up", "deposit failed", "deposit stuck",
+                            "deposit not arrived", "didn't receive", "transfer in", "incoming transfer",
+                            "ฝาก", "โอนเข้า", "เงินฝาก", "ฝากไม่เข้า", "ฝากค้าง"],
+    "trade_issue":         ["trade", "trading", "order", "spot order", "futures", "position",
+                            "buy order", "sell order", "limit order", "market order", "liquidat",
+                            "margin call", "pnl", "profit and loss",
+                            "เทรด", "ซื้อขาย", "ออเดอร์", "คำสั่งซื้อ", "คำสั่งขาย", "ฟิวเจอร์ส"],
 }
 
-_UPGRADEABLE_FROM = {"other"}  # only upgrade when current category is one of these
+_UPGRADEABLE_FROM = {"other", "deposit_issue", "trade_issue"}  # upgrade from generic/new categories; specialist categories locked
 
 # Matches platform transaction IDs (TXN-001, TXN-9999) and blockchain tx hashes (0x…).
 # Used to detect when a user provides a specific transaction reference mid-conversation
@@ -125,13 +140,16 @@ _TX_ID_RE = re.compile(r'\bTXN-\w[\w-]*|0x[0-9a-fA-F]{10,}', re.IGNORECASE)
 
 def _detect_upgrade(message: str, current_category: str | None) -> str | None:
     """
-    If the user is in a generic category and their message clearly signals a specific
+    If the user is in an upgradeable category and their message clearly signals a different
     account domain, return the target category key. Otherwise return None.
+    Never returns the same category the user is already in.
     """
     if current_category not in _UPGRADEABLE_FROM:
         return None
     msg = message.lower()
     for category, keywords in _UPGRADE_KEYWORDS.items():
+        if category == current_category:
+            continue  # never upgrade to the current category
         if any(kw in msg for kw in keywords):
             return category
     return None
@@ -145,6 +163,7 @@ def chat(
     consecutive_low_confidence: int = 0,
     category: str | None = None,
     suppress_handoff: bool = False,
+    _skip_upgrade: bool = False,
 ) -> AgentResponse:
     """
     Process a user message and return an AgentResponse.
@@ -173,7 +192,7 @@ def chat(
     # These categories require live account data; without a workflow providing structured
     # guardrails, the safe action is to hand off rather than let free-form AI handle it.
     # suppress_handoff=True means we're called from inside a workflow node — skip this guard.
-    _ACCOUNT_CATEGORIES = {"kyc_verification", "account_restriction", "withdrawal_issue"}
+    _ACCOUNT_CATEGORIES = {"kyc_verification", "account_restriction", "withdrawal_issue", "deposit_issue", "trade_issue"}
     if category in _ACCOUNT_CATEGORIES and not suppress_handoff:
         # Check if a published workflow exists for this category — if so, let it run instead.
         try:
@@ -195,9 +214,10 @@ def chat(
             )
 
     # 3a. Mid-conversation category upgrade detection
-    # If the user is in "other" but asks about KYC / withdrawals / account restrictions,
+    # If the user is in an upgradeable category and asks about a different account domain,
     # transparently re-route to the dedicated specialist agent for that category.
-    upgrade = _detect_upgrade(user_message, category)
+    # _skip_upgrade prevents infinite recursion when this function calls itself recursively.
+    upgrade = None if _skip_upgrade else _detect_upgrade(user_message, category)
     if upgrade:
         from engine.mock_agents import pick_agent as _pick_agent
         specialist = _pick_agent(upgrade)
@@ -209,6 +229,7 @@ def chat(
             platform=platform,
             consecutive_low_confidence=consecutive_low_confidence,
             category=upgrade,
+            _skip_upgrade=True,
         )
         upgraded_result.upgraded_category = upgrade
         upgraded_result.agent_name = specialist["name"]
@@ -262,11 +283,13 @@ def chat(
     # block may be caused by a KYC rejection, and a restriction may stem from a
     # suspicious withdrawal pattern. Starting from the profile lets Gemini see the
     # full picture and connect root causes before calling any secondary tools.
-    _FORCE_TOOL_CATEGORIES = {"kyc_verification", "account_restriction", "withdrawal_issue"}
+    _FORCE_TOOL_CATEGORIES = {"kyc_verification", "account_restriction", "withdrawal_issue", "deposit_issue", "trade_issue"}
     _FORCE_TOOL_NAMES = {
         "kyc_verification": "get_user_profile",
         "account_restriction": "get_user_profile",
         "withdrawal_issue": "get_user_profile",
+        "deposit_issue": "get_user_profile",
+        "trade_issue": "get_user_profile",
     }
     # Force tool call if the category requires account data AND no successful (non-escalated)
     # bot reply exists yet. This handles retries where the first turn escalated before
@@ -279,15 +302,20 @@ def chat(
         else None
     )
 
-    # If the user mentions a transaction ID at any turn in a withdrawal conversation,
-    # force get_withdrawal_status so Gemini is guaranteed to look it up.
-    # This overrides the prior_successful_reply guard for tx_id messages only.
+    # If the user mentions a transaction ID at any turn, force the relevant status tool
+    # so Gemini is guaranteed to look it up regardless of prior replies.
     if (
         not force_tool_name
         and category == "withdrawal_issue"
         and _TX_ID_RE.search(user_message)
     ):
         force_tool_name = "get_withdrawal_status"
+    if (
+        not force_tool_name
+        and category == "deposit_issue"
+        and _TX_ID_RE.search(user_message)
+    ):
+        force_tool_name = "get_deposit_status"
 
     # For "other" category, omit account tools entirely so Gemini cannot call them.
     is_other_category = category == "other"
