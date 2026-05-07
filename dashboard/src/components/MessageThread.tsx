@@ -158,9 +158,10 @@ function MessageBubble({ msg, showTs }: BubbleProps) {
     );
   }
 
-  const isRight = (type as string) === 'customer' || (type as string) === 'user';
-  const isBot   = type === 'bot' || type === 'ai' || type === 'assistant';
-  const label   = isRight ? (msg.agent_name || 'Customer') : isBot ? 'Bot' : (msg.agent_name || 'Agent');
+  const isCustomer = (type as string) === 'customer' || (type as string) === 'user';
+  const isBot      = type === 'bot' || type === 'ai' || type === 'assistant';
+  const isRight    = !isCustomer; // agents and bots on the right
+  const label      = isCustomer ? (msg.agent_name || 'Customer') : isBot ? 'Bot' : (msg.agent_name || 'Agent');
 
   return (
     <div className={`flex flex-col max-w-[72%] ${isRight ? 'self-end items-end' : 'self-start items-start'}`}>
@@ -169,11 +170,11 @@ function MessageBubble({ msg, showTs }: BubbleProps) {
       )}
       <div className={`
         px-3.5 py-2.5 text-sm whitespace-pre-wrap break-words leading-relaxed
-        ${isRight
-          ? 'bg-surface-3 text-text-primary rounded-xl rounded-tr-sm ring-1 ring-surface-5'
+        ${isCustomer
+          ? 'bg-surface-3 text-text-primary rounded-xl rounded-tl-sm ring-1 ring-surface-5'
           : isBot
-          ? 'bg-surface-2 text-text-secondary italic ring-1 ring-surface-5 rounded-xl rounded-tl-sm'
-          : 'bg-brand/8 text-text-primary ring-1 ring-brand/15 rounded-xl rounded-tl-sm'
+          ? 'bg-surface-2 text-text-secondary italic ring-1 ring-surface-5 rounded-xl rounded-tr-sm'
+          : 'bg-brand/8 text-text-primary ring-1 ring-brand/15 rounded-xl rounded-tr-sm'
         }
       `}>
         {isBot && <span className="font-semibold not-italic text-text-muted text-xs mr-1.5">Bot</span>}
