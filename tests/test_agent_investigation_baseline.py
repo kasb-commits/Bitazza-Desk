@@ -203,16 +203,13 @@ class TestTurn1ToolForcing:
 
 class TestTurn2NoForcedTool:
     """
-    After the first successful bot reply (prior_successful_reply=True), no tool is forced
-    on any subsequent turn. This is intentional to avoid infinite tool-forcing loops, but
-    it means if the user provides a tx_id at any point in the conversation — message 2,
-    5, or 50 — the agent is never forced to look it up.
-
-    GAP: Whether get_withdrawal_status is called after a tx_id is mentioned is left
-    entirely to Gemini's discretion, on every turn after the first.
+    After the first successful bot reply (prior_successful_reply=True):
+    - Generic messages (no tx_id): no tool is forced — Gemini decides freely.
+    - Messages containing a tx_id: get_withdrawal_status is forced regardless of turn.
     """
 
-    def test_no_forced_tool_after_first_successful_reply(self, mock_base):
+    def test_no_forced_tool_for_generic_message_after_first_reply(self, mock_base):
+        """When no tx_id is present, no tool is forced after the first successful reply."""
         prior_history = [
             {"role": "assistant", "content": _json_payload("Here's what I found about your account.", 0.85)}
         ]
@@ -227,12 +224,40 @@ class TestTurn2NoForcedTool:
             from engine.agent import chat
             result = chat(
                 "conv-t2-1", "USR-001",
-                "The transaction ID is TXN-9999",  # could be any turn, not just turn 2
+                "My withdrawal is still not working",  # no tx_id
                 category="withdrawal_issue",
             )
 
-        # Single Gemini call — no tool forced once a prior successful reply exists
         assert mock_base.models.generate_content.call_count == 1
+        assert result.escalated is False
+
+    def test_tx_id_forces_withdrawal_lookup_at_any_turn(self, mock_base):
+        """
+        When the user mentions a transaction ID at any turn — message 2, 5, 50 — the agent
+        is forced to call get_withdrawal_status before replying, regardless of prior replies.
+        """
+        prior_history = [
+            {"role": "assistant", "content": _json_payload("Here's what I found about your account.", 0.85)}
+        ]
+        with (
+            patch("engine.agent.get_history", return_value=prior_history),
+            patch("db.conversation_store.has_successful_bot_reply", return_value=True),
+            patch("engine.agent.TOOLS", {"get_withdrawal_status": _mock_tool({"transactions": [], "total": 0})}),
+            _HAS_WORKFLOW,
+        ):
+            mock_base.models.generate_content.side_effect = [
+                _fn_call_response("get_withdrawal_status"),
+                _text_response(_json_payload("I checked that transaction.", confidence=0.85)),
+            ]
+            from engine.agent import chat
+            result = chat(
+                "conv-t2-2", "USR-001",
+                "The transaction ID is TXN-9999",
+                category="withdrawal_issue",
+            )
+
+        # Two Gemini calls: first is forced fn_call, second returns text after tool result
+        assert mock_base.models.generate_content.call_count == 2
         assert result.escalated is False
 
 

@@ -117,6 +117,11 @@ _UPGRADE_KEYWORDS: dict[str, list[str]] = {
 
 _UPGRADEABLE_FROM = {"other"}  # only upgrade when current category is one of these
 
+# Matches platform transaction IDs (TXN-001, TXN-9999) and blockchain tx hashes (0x…).
+# Used to detect when a user provides a specific transaction reference mid-conversation
+# so the agent can be forced to look it up regardless of conversation turn.
+_TX_ID_RE = re.compile(r'\bTXN-\w[\w-]*|0x[0-9a-fA-F]{10,}', re.IGNORECASE)
+
 
 def _detect_upgrade(message: str, current_category: str | None) -> str | None:
     """
@@ -273,6 +278,16 @@ def chat(
         if category in _FORCE_TOOL_CATEGORIES and not prior_successful_reply
         else None
     )
+
+    # If the user mentions a transaction ID at any turn in a withdrawal conversation,
+    # force get_withdrawal_status so Gemini is guaranteed to look it up.
+    # This overrides the prior_successful_reply guard for tx_id messages only.
+    if (
+        not force_tool_name
+        and category == "withdrawal_issue"
+        and _TX_ID_RE.search(user_message)
+    ):
+        force_tool_name = "get_withdrawal_status"
 
     # For "other" category, omit account tools entirely so Gemini cannot call them.
     is_other_category = category == "other"
