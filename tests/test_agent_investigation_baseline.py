@@ -274,38 +274,52 @@ class TestCategoryUpgrade:
 
 class TestStubData:
     """
-    get_deposit_status and get_withdrawal_status return hardcoded stub dicts.
-    They do NOT call engine.mock_api.trading (unlike get_account_restrictions which
-    correctly calls engine.mock_api.restrictions).
-
-    GAP: Gemini receives null/stub values and cannot investigate real transactions.
-    The overlay's "no data" path fires on every single conversation for these categories.
+    get_deposit_status and get_withdrawal_status now call the mock store (same pattern
+    as get_account_restrictions), returning real transaction data instead of stubs.
     """
 
-    def test_get_deposit_status_returns_stub_not_mock_store(self):
+    def test_get_deposit_status_returns_real_transactions(self):
+        """get_deposit_status returns real mock store data — not a stub."""
         from engine.account_tools import get_deposit_status
         result = get_deposit_status("USR-000001")
-        assert result["status"] == "stub"
-        assert result["amount"] is None
-        assert result["currency"] is None
+        assert "transactions" in result
+        assert result["total"] > 0
+        first = result["transactions"][0]
+        assert first["type"] == "deposit"
+        assert first["status"] in ("completed", "pending", "failed", "cancelled")
+        assert first["currency"] is not None
+        assert first["amount"] is not None
 
-    def test_get_withdrawal_status_returns_stub_not_mock_store(self):
+    def test_get_withdrawal_status_returns_real_transactions(self):
+        """get_withdrawal_status returns real mock store data — not a stub."""
         from engine.account_tools import get_withdrawal_status
         result = get_withdrawal_status("USR-000001")
-        assert result["status"] == "stub"
-        assert result["amount"] is None
-        assert result["currency"] is None
+        assert "transactions" in result
+        assert result["total"] > 0
+        first = result["transactions"][0]
+        assert first["type"] == "withdrawal"
+        assert first["status"] in ("completed", "pending", "failed", "cancelled")
 
-    def test_get_deposit_status_stub_regardless_of_tx_id(self):
-        """Even with a specific tx_id, the lookup returns stub — tx_id is ignored."""
+    def test_get_deposit_status_with_valid_tx_id(self):
+        """A known tx_id returns that specific transaction."""
         from engine.account_tools import get_deposit_status
-        result = get_deposit_status("USR-000001", tx_id="TXN-12345")
-        assert result["status"] == "stub"
+        result = get_deposit_status("USR-000001", tx_id="TXN-001-001")
+        assert result["transaction_id"] == "TXN-001-001"
+        assert result["type"] == "deposit"
 
-    def test_get_withdrawal_status_stub_regardless_of_tx_id(self):
+    def test_get_deposit_status_with_unknown_tx_id(self):
+        """An unknown tx_id returns a not-found error."""
+        from engine.account_tools import get_deposit_status
+        result = get_deposit_status("USR-000001", tx_id="TXN-DOES-NOT-EXIST")
+        assert result.get("error") == "transaction_not_found"
+
+    def test_get_withdrawal_status_with_valid_tx_id(self):
+        """A known withdrawal tx_id returns that specific transaction."""
         from engine.account_tools import get_withdrawal_status
-        result = get_withdrawal_status("USR-000001", tx_id="TXN-12345")
-        assert result["status"] == "stub"
+        result = get_withdrawal_status("USR-000001", tx_id="TXN-001-004")
+        assert result["transaction_id"] == "TXN-001-004"
+        assert result["type"] == "withdrawal"
+        assert result["status"] == "failed"
 
     def test_get_account_restrictions_uses_mock_store_not_stub(self):
         """

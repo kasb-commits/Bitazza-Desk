@@ -102,20 +102,57 @@ def get_kyc_status(user_id: str) -> dict:
     return profile.get("kyc", {"error": "kyc data missing from profile"})
 
 
+def _lookup_transactions(user_id: str, tx_type: str, tx_id: str | None) -> dict:
+    """
+    Shared logic for deposit/withdrawal lookups against the mock transaction store.
+    tx_type: 'deposit' or 'withdrawal'
+    Matches tx_id against transaction_id, tx_hash, or bank_ref.
+    """
+    from engine.mock_api import trading as trading_store
+    from engine.mock_api.models import TransactionType
+    t_enum = TransactionType.deposit if tx_type == "deposit" else TransactionType.withdrawal
+    all_txns = [t for t in trading_store.get_transactions(user_id) if t.type == t_enum]
+    if tx_id:
+        match = next(
+            (t for t in all_txns
+             if t.transaction_id == tx_id or t.tx_hash == tx_id or t.bank_ref == tx_id),
+            None,
+        )
+        if match is None:
+            return {"error": "transaction_not_found", "tx_id": tx_id}
+        return match.model_dump(mode="json")
+    if not all_txns:
+        return {"transactions": [], "total": 0}
+    return {
+        "transactions": [t.model_dump(mode="json") for t in all_txns[:5]],
+        "total": len(all_txns),
+    }
+
+
 def get_deposit_status(user_id: str, tx_id: str | None = None) -> dict:
     """
-    Returns recent deposit status or a specific deposit by tx_id.
-    Expected: {status: pending|completed|failed, amount: float, currency: str, updated_at: str}
+    Returns recent deposit transactions or a specific deposit by tx_id.
+    In mock mode, calls the in-process store directly to avoid HTTP self-call deadlock.
+    Response keys: transactions (list) + total, or a single transaction if tx_id is given.
+    Each transaction: transaction_id, type, status, currency, amount, fee,
+                      network, tx_hash, bank_ref, created_at, completed_at.
     """
+    if _USE_MOCK:
+        return _lookup_transactions(user_id, "deposit", tx_id)
     # return _get(BITAZZA_API_URL, f"/internal/users/{user_id}/deposits" + (f"/{tx_id}" if tx_id else ""))
     return {"status": "stub", "amount": None, "currency": None, "updated_at": ""}
 
 
 def get_withdrawal_status(user_id: str, tx_id: str | None = None) -> dict:
     """
-    Returns recent withdrawal status or a specific withdrawal by tx_id.
-    Expected: {status: pending|completed|failed|on_hold, amount: float, currency: str, updated_at: str}
+    Returns recent withdrawal transactions or a specific withdrawal by tx_id.
+    In mock mode, calls the in-process store directly to avoid HTTP self-call deadlock.
+    Response keys: transactions (list) + total, or a single transaction if tx_id is given.
+    Each transaction: transaction_id, type, status, currency, amount, fee,
+                      network, tx_hash, bank_ref, created_at, completed_at.
     """
+    if _USE_MOCK:
+        return _lookup_transactions(user_id, "withdrawal", tx_id)
     # return _get(BITAZZA_API_URL, f"/internal/users/{user_id}/withdrawals" + (f"/{tx_id}" if tx_id else ""))
     return {"status": "stub", "amount": None, "currency": None, "updated_at": ""}
 
