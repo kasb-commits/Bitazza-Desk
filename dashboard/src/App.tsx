@@ -830,6 +830,16 @@ export default function App() {
   const [wsSocket, setWsSocket] = useState<WebSocket | null>(null);
   const loadTicketsRef = useRef<() => void>(() => {});
 
+  // Refresh permissions from server on mount (ensures stale localStorage is patched)
+  useEffect(() => {
+    if (!user) return;
+    api.me().then(fresh => {
+      const updated: AuthUser = { ...user, permissions: fresh.permissions, role: fresh.role as Role };
+      setUser(updated);
+      setAuthUser(updated);
+    }).catch(() => {});
+  }, []);
+
   // Load real agent status from DB on mount
   useEffect(() => {
     if (!user) return;
