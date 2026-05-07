@@ -65,7 +65,7 @@ async function signToken(user) {
       permissions,
     },
     JWT_SECRET,
-    { expiresIn: '12h' }
+    { expiresIn: '7d' }
   );
 }
 

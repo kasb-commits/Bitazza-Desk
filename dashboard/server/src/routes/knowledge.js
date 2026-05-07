@@ -61,7 +61,10 @@ router.post('/url', async (req, res) => {
   try {
     const pyRes = await fetch(`${PYTHON_API}/api/knowledge/url`, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': req.headers['authorization'] ?? '',
+      },
       body: JSON.stringify({ url }),
     });
     const data = await pyJson(pyRes);
@@ -82,8 +85,11 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     form.append('file', new Blob([req.file.buffer], { type: req.file.mimetype }), req.file.originalname);
 
     const pyRes = await fetch(`${PYTHON_API}/api/knowledge/upload`, {
-      method: 'POST',
-      body:   form,
+      method:  'POST',
+      headers: {
+        'Authorization': req.headers['authorization'] ?? '',
+      },
+      body: form,
     });
     const data = await pyJson(pyRes);
     res.json(toItem(data));

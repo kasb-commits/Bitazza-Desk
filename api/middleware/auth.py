@@ -4,11 +4,13 @@ from jose import jwt, JWTError
 from config.settings import JWT_SECRET, JWT_ALGORITHM, ENV
 
 
-def get_user_id(authorization: str = Header(default="")) -> str:
+def get_user_id(
+    authorization: str = Header(default=""),
+) -> str:
     """
     Extract user_id from Authorization: Bearer <token>.
 
-    - Production (ENV=production): token is mandatory; no fallback.
+    - Production (ENV=production): JWT token is mandatory; no fallback.
     - Development: missing token falls back to 'dev_user' for easy local testing.
     """
     if not authorization:
@@ -21,7 +23,7 @@ def get_user_id(authorization: str = Header(default="")) -> str:
         if scheme.lower() != "bearer":
             raise HTTPException(status_code=401, detail="Invalid auth scheme")
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        user_id = payload.get("sub") or payload.get("user_id")
+        user_id = payload.get("sub") or payload.get("user_id") or payload.get("id")
         if not user_id:
             raise HTTPException(status_code=401, detail="Token missing user id")
         return str(user_id)
