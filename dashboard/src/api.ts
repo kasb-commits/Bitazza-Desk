@@ -64,6 +64,11 @@ export const api = {
       { method: 'POST', body: JSON.stringify({ email, password }) }
     ),
 
+  me: () =>
+    req<{ id: string; name: string; email: string; avatar_url?: string; role: string; team: string; permissions: string[] }>(
+      '/api/auth/me'
+    ),
+
   // Tickets
   getTickets: (view: InboxView = 'all_open', search = '', statusFilter: StatusFilter = 'all') =>
     req<Ticket[]>(`/api/tickets?view=${view}&search=${encodeURIComponent(search)}&status_filter=${statusFilter}`),
