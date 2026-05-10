@@ -1,25 +1,23 @@
 #!/bin/bash
 set -e
 
-# Auto-ingest KB articles into ChromaDB on first boot (or after volume reset)
-# Checks if the collection is empty before running to avoid duplicate ingestion
-echo "Checking ChromaDB state..."
-CHUNK_COUNT=$(PYTHONPATH=. python3 -c "
-try:
-    from db.vector_store import collection_count
-    print(collection_count())
-except Exception as e:
-    print(0)
-" 2>/dev/null || echo 0)
+# Auto-ingest KB articles into ChromaDB on every boot.
+# Uses a checksum file to track which articles are already ingested —
+# only re-ingests when kb_articles/ content has changed since last run.
 
-echo "ChromaDB has $CHUNK_COUNT chunks"
+CHECKSUM_FILE="/data/chroma/.kb_checksum"
+CURRENT_CHECKSUM=$(find kb_articles/ -name "*.md" -exec md5sum {} \; 2>/dev/null | sort | md5sum | awk '{print $1}')
 
-if [ "$CHUNK_COUNT" -lt 10 ]; then
-    echo "Collection is empty — running KB ingestion..."
+echo "Checking KB state..."
+
+if [ -f "$CHECKSUM_FILE" ] && [ "$(cat $CHECKSUM_FILE)" = "$CURRENT_CHECKSUM" ]; then
+    echo "KB articles unchanged since last ingestion — skipping."
+else
+    echo "KB articles changed (or first boot) — running ingestion..."
     PYTHONPATH=. python3 ingestion/docs_ingester.py --dir kb_articles/ && echo "KB articles ingested."
     PYTHONPATH=. python3 ingestion/blog_ingester.py && echo "Blog posts ingested."
-else
-    echo "Collection already populated — skipping ingestion."
+    echo "$CURRENT_CHECKSUM" > "$CHECKSUM_FILE"
+    echo "Checksum saved."
 fi
 
 echo "Starting API server..."
