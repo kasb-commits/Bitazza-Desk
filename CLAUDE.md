@@ -20,6 +20,7 @@ tests/         Pytest test suite
 ## Critical Rules
 
 ### Correctness
+- You're not permitted to assume anything. Read necessary files in regards to user's message and always respond with 100% accurate answers. Assumptions is neither accepted nor tolerated.
 - Read a file before editing it
 - If a file was edited earlier in this session, re-read it before making further edits
 - Before changing a function signature, grep all callers first

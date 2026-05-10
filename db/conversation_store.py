@@ -675,7 +675,7 @@ def is_human_handling(conversation_id: str) -> bool:
         row = cur.fetchone()
     if not row:
         return False
-    return row["status"] in ("Escalated", "In_Progress", "Pending_Customer") or row["assigned_to"] is not None
+    return row["status"] == "Escalated" or row["assigned_to"] is not None
 
 
 def update_ticket_status(ticket_id: str, status: str, agent_id: str | None = None) -> None:

@@ -199,6 +199,70 @@ def get_trading_availability(user_id: str) -> dict:
     }
 
 
+def get_spot_orders(user_id: str, order_id: str | None = None) -> dict:
+    """
+    Returns recent spot orders for the authenticated user, or a specific order by order_id.
+    In mock mode, calls the in-process store directly to avoid HTTP self-call deadlock.
+    Response keys (list): orders (list) + total.
+    Response keys (single): order_id, symbol, side, order_type, status, price, quantity,
+                             filled_qty, fee, fee_currency, created_at, updated_at.
+    """
+    if _USE_MOCK:
+        from engine.mock_api import trading as trading_store
+        all_orders = trading_store.get_spot_trades(user_id)
+        if order_id:
+            match = next((o for o in all_orders if o.order_id == order_id), None)
+            if match is None:
+                return {"error": "order_not_found", "order_id": order_id}
+            return match.model_dump(mode="json")
+        if not all_orders:
+            return {"orders": [], "total": 0}
+        return {
+            "orders": [o.model_dump(mode="json") for o in all_orders[:5]],
+            "total": len(all_orders),
+        }
+    return {"status": "stub", "orders": []}
+
+
+def get_futures_positions(user_id: str, position_id: str | None = None) -> dict:
+    """
+    Returns recent futures positions for the authenticated user, or a specific position by position_id.
+    In mock mode, calls the in-process store directly to avoid HTTP self-call deadlock.
+    Response keys (list): positions (list) + total.
+    Response keys (single): position_id, symbol, side, status, leverage, entry_price, exit_price,
+                             quantity, pnl, fee, liquidation_price, created_at, closed_at.
+    """
+    if _USE_MOCK:
+        from engine.mock_api import trading as trading_store
+        all_positions = trading_store.get_futures_trades(user_id)
+        if position_id:
+            match = next((p for p in all_positions if p.position_id == position_id), None)
+            if match is None:
+                return {"error": "position_not_found", "position_id": position_id}
+            return match.model_dump(mode="json")
+        if not all_positions:
+            return {"positions": [], "total": 0}
+        return {
+            "positions": [p.model_dump(mode="json") for p in all_positions[:5]],
+            "total": len(all_positions),
+        }
+    return {"status": "stub", "positions": []}
+
+
+def get_account_balance(user_id: str) -> dict:
+    """
+    Returns current balances for all currencies held by the authenticated user.
+    In mock mode, calls the in-process store directly to avoid HTTP self-call deadlock.
+    Response keys: user_id, balances (list of {currency, available, locked}).
+    'locked' represents funds held in open orders.
+    """
+    if _USE_MOCK:
+        from engine.mock_api import balances as balance_store
+        result = balance_store.get_balances(user_id)
+        return result.model_dump(mode="json")
+    return {"status": "stub", "balances": []}
+
+
 # ── Tool registry for agent.py ───────────────────────────────────────────────
 
 TOOLS = {
@@ -208,6 +272,9 @@ TOOLS = {
     "get_withdrawal_status": get_withdrawal_status,
     "get_account_restrictions": get_account_restrictions,
     "get_trading_availability": get_trading_availability,
+    "get_spot_orders": get_spot_orders,
+    "get_futures_positions": get_futures_positions,
+    "get_account_balance": get_account_balance,
 }
 
 # Gemini function declarations (for function calling)
@@ -269,6 +336,48 @@ TOOL_DEFINITIONS = [
     {
         "name": "get_trading_availability",
         "description": "Check whether trading is currently available for the authenticated user.",
+        "parameters": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "get_spot_orders",
+        "description": (
+            "Get recent spot orders (buy/sell) for the authenticated user. Optionally specify an order_id "
+            "to look up a specific order. "
+            "Call this AFTER get_account_restrictions and get_trading_availability have confirmed there is "
+            "no account-level block — use it to investigate order-specific problems such as a stuck, "
+            "cancelled, or partially filled order, or an unexpected fill price. "
+            "Each order includes: order_id, symbol, side, order_type, status, price, quantity, "
+            "filled_qty, fee, fee_currency, created_at, updated_at."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {"order_id": {"type": "string", "description": "Optional spot order ID (e.g. SPT-001-001)"}},
+        },
+    },
+    {
+        "name": "get_futures_positions",
+        "description": (
+            "Get recent futures positions for the authenticated user. Optionally specify a position_id "
+            "to look up a specific position. "
+            "Call this AFTER get_account_restrictions and get_trading_availability have confirmed there is "
+            "no account-level block — use it to investigate futures-specific issues such as an unexpected "
+            "liquidation, wrong P&L, or a position that appears missing. "
+            "Each position includes: position_id, symbol, side, status, leverage, entry_price, exit_price, "
+            "quantity, pnl, fee, liquidation_price, created_at, closed_at."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {"position_id": {"type": "string", "description": "Optional futures position ID (e.g. FUT-002-001)"}},
+        },
+    },
+    {
+        "name": "get_account_balance",
+        "description": (
+            "Get the current balance for all currencies held by the authenticated user. "
+            "Call this when the user reports a missing balance, unexpected locked funds, or a discrepancy "
+            "between expected and actual holdings. 'locked' means funds are held in open orders. "
+            "Cross-reference with get_spot_orders (open orders lock funds) to explain locked amounts."
+        ),
         "parameters": {"type": "object", "properties": {}},
     },
 ]

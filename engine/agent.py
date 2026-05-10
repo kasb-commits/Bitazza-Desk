@@ -137,6 +137,11 @@ _UPGRADEABLE_FROM = {"other", "deposit_issue", "trade_issue"}  # upgrade from ge
 # so the agent can be forced to look it up regardless of conversation turn.
 _TX_ID_RE = re.compile(r'\bTXN-\w[\w-]*|0x[0-9a-fA-F]{10,}', re.IGNORECASE)
 
+# Matches spot order IDs (SPT-xxx) and futures position IDs (FUT-xxx).
+# Used to force the relevant trading tool when a user quotes a specific order/position reference.
+_SPOT_ORDER_RE = re.compile(r'\bSPT-\w[\w-]*', re.IGNORECASE)
+_FUTURES_POS_RE = re.compile(r'\bFUT-\w[\w-]*', re.IGNORECASE)
+
 
 def _detect_upgrade(message: str, current_category: str | None) -> str | None:
     """
@@ -192,7 +197,7 @@ def chat(
     # These categories require live account data; without a workflow providing structured
     # guardrails, the safe action is to hand off rather than let free-form AI handle it.
     # suppress_handoff=True means we're called from inside a workflow node — skip this guard.
-    _ACCOUNT_CATEGORIES = {"kyc_verification", "account_restriction", "withdrawal_issue", "deposit_issue", "trade_issue"}
+    _ACCOUNT_CATEGORIES = {"kyc_verification", "account_restriction", "withdrawal_issue", "deposit_issue", "trade_issue", "fraud_security"}
     if category in _ACCOUNT_CATEGORIES and not suppress_handoff:
         # Check if a published workflow exists for this category — if so, let it run instead.
         try:
@@ -283,13 +288,15 @@ def chat(
     # block may be caused by a KYC rejection, and a restriction may stem from a
     # suspicious withdrawal pattern. Starting from the profile lets Gemini see the
     # full picture and connect root causes before calling any secondary tools.
-    _FORCE_TOOL_CATEGORIES = {"kyc_verification", "account_restriction", "withdrawal_issue", "deposit_issue", "trade_issue"}
+    _FORCE_TOOL_CATEGORIES = {"kyc_verification", "account_restriction", "withdrawal_issue", "deposit_issue", "trade_issue", "fraud_security", "password_2fa_reset"}
     _FORCE_TOOL_NAMES = {
         "kyc_verification": "get_user_profile",
         "account_restriction": "get_user_profile",
         "withdrawal_issue": "get_user_profile",
         "deposit_issue": "get_user_profile",
         "trade_issue": "get_user_profile",
+        "fraud_security": "get_user_profile",
+        "password_2fa_reset": "get_user_profile",
     }
     # Force tool call if the category requires account data AND no successful (non-escalated)
     # bot reply exists yet. This handles retries where the first turn escalated before
@@ -316,6 +323,18 @@ def chat(
         and _TX_ID_RE.search(user_message)
     ):
         force_tool_name = "get_deposit_status"
+    if (
+        not force_tool_name
+        and category == "trade_issue"
+        and _SPOT_ORDER_RE.search(user_message)
+    ):
+        force_tool_name = "get_spot_orders"
+    if (
+        not force_tool_name
+        and category == "trade_issue"
+        and _FUTURES_POS_RE.search(user_message)
+    ):
+        force_tool_name = "get_futures_positions"
 
     # For "other" category, omit account tools entirely so Gemini cannot call them.
     is_other_category = category == "other"

@@ -154,6 +154,27 @@ async def send_message(body: MessageRequest, user_id: str = Depends(get_user_id)
     if not body.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
+    # Intent resolution: on the first user turn, refine the picked category using
+    # the message content so that deposit_issue / trade_issue (which have no widget
+    # card) and mis-picked categories are routed correctly from the very start.
+    # Only runs once — subsequent turns use the category stored in the ticket.
+    _prior_history = get_history(body.conversation_id, limit=10)
+    _first_user_turn = not any(m["role"] == "user" for m in _prior_history)
+    _intent_resolved_agent: dict | None = None
+    effective_category = body.category
+    if _first_user_turn and body.category:
+        from engine.intent_resolver import classify_intent
+        effective_category = classify_intent(body.category, body.message)
+        if effective_category != body.category:
+            update_ticket_category(body.conversation_id, effective_category)
+            _intent_resolved_agent = pick_agent(effective_category)
+            assign_ai_persona(
+                body.conversation_id,
+                _intent_resolved_agent["name"],
+                _intent_resolved_agent["avatar"],
+                _intent_resolved_agent["avatar_url"],
+            )
+
     # Persist user message
     add_message(body.conversation_id, "user", body.message)
 
@@ -201,7 +222,7 @@ async def send_message(body: MessageRequest, user_id: str = Depends(get_user_id)
         user_id=user_id,
         user_message=body.message,
         consecutive_low_confidence=consecutive_low,
-        category=body.category,
+        category=effective_category,
     )
 
     # If the agent detected a mid-conversation category upgrade, update the DB persona
@@ -224,17 +245,24 @@ async def send_message(body: MessageRequest, user_id: str = Depends(get_user_id)
     if not result.escalated and _ticket_id:
         update_ticket_status(_ticket_id, "pending_customer")
 
+    # Merge intent-resolver agent update with any mid-conversation upgrade from the agent.
+    # result fields take precedence (agent upgrade is more specific).
+    _final_agent_name = result.agent_name or (_intent_resolved_agent["name"] if _intent_resolved_agent else None)
+    _final_agent_avatar = result.agent_avatar or (_intent_resolved_agent["avatar"] if _intent_resolved_agent else None)
+    _final_agent_avatar_url = result.agent_avatar_url or (_intent_resolved_agent["avatar_url"] if _intent_resolved_agent else None)
+    _final_upgraded_category = result.upgraded_category or (effective_category if _intent_resolved_agent else None)
+
     return MessageResponse(
         reply=result.text,
         language=result.language,
         escalated=result.escalated,
         ticket_id=result.ticket_id,
-        agent_name=result.agent_name,
-        agent_avatar=result.agent_avatar,
-        agent_avatar_url=result.agent_avatar_url,
+        agent_name=_final_agent_name,
+        agent_avatar=_final_agent_avatar,
+        agent_avatar_url=_final_agent_avatar_url,
         offer_resolution=result.resolved,
         specialist_intro=result.specialist_intro,
-        upgraded_category=result.upgraded_category,
+        upgraded_category=_final_upgraded_category,
         transition_message=getattr(result, 'transition_message', None),
     )
 
