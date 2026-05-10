@@ -678,6 +678,21 @@ def is_human_handling(conversation_id: str) -> bool:
     return row["status"] == "Escalated" or row["assigned_to"] is not None
 
 
+def has_human_agent_replied(conversation_id: str) -> bool:
+    """
+    Returns True if a human agent has sent at least one real reply on this conversation.
+    Internal notes do not count — only sender_type='agent' messages.
+    Used to determine when the AI should go permanently silent after escalation.
+    """
+    with _conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT 1 FROM messages WHERE ticket_id = %s AND sender_type = 'agent' LIMIT 1",
+            (conversation_id,),
+        )
+        return cur.fetchone() is not None
+
+
 def update_ticket_status(ticket_id: str, status: str, agent_id: str | None = None) -> None:
     # Map Python status names → dashboard status enum
     STATUS_MAP = {

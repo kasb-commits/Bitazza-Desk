@@ -5,7 +5,7 @@ from api.middleware.auth import get_user_id
 from api.ws_manager import manager
 from db.conversation_store import (
     init_db, create_conversation, add_message, get_history, get_paginated_history,
-    assign_ai_persona, get_ai_persona, is_human_handling,
+    assign_ai_persona, get_ai_persona, is_human_handling, has_human_agent_replied,
     update_ticket_category, count_consecutive_low_confidence,
     get_customer_id_for_user, get_customer_tickets, get_open_ticket_for_customer,
     get_ticket_by_id, update_ticket_status, get_ticket_id_by_conversation,
@@ -178,10 +178,11 @@ async def send_message(body: MessageRequest, user_id: str = Depends(get_user_id)
     # Persist user message
     add_message(body.conversation_id, "user", body.message)
 
-    # Guard: once handed off to a human agent, the AI must not reply.
-    # reply=None tells the widget to suppress the bot bubble entirely;
-    # the human agent's response will arrive via WebSocket.
-    if is_human_handling(body.conversation_id):
+    # Guard: once a human agent has sent their first reply, the AI must not reply.
+    # Before that first reply, even escalated tickets can still get AI answers —
+    # the customer may ask follow-up questions while waiting for the agent.
+    # reply=None tells the widget to suppress the bot bubble entirely.
+    if is_human_handling(body.conversation_id) and has_human_agent_replied(body.conversation_id):
         # Notify the assigned agent that the customer sent a new message
         ticket = get_ticket_by_id(body.conversation_id)
         assigned_to = str(ticket["assigned_to"]) if ticket and ticket.get("assigned_to") else None
@@ -203,6 +204,24 @@ async def send_message(body: MessageRequest, user_id: str = Depends(get_user_id)
             language="en",
             escalated=True,
         )
+
+    # If escalated but no human reply yet — still notify the agent but let the AI continue.
+    if is_human_handling(body.conversation_id):
+        ticket = get_ticket_by_id(body.conversation_id)
+        assigned_to = str(ticket["assigned_to"]) if ticket and ticket.get("assigned_to") else None
+        if assigned_to:
+            from engine.notifications import create_notification
+            snippet = body.message[:80] + ("…" if len(body.message) > 80 else "")
+            notif = create_notification(
+                user_id=assigned_to,
+                role="agent",
+                type="customer_reply",
+                priority="high",
+                title=f"Customer replied — Ticket #{body.conversation_id[:8]}",
+                body=snippet,
+                ticket_id=body.conversation_id,
+            )
+            await manager.broadcast_all({"type": "notification:new", "notification": notif})
 
     # Compute consecutive low-confidence count server-side — not trusted from client
     consecutive_low = count_consecutive_low_confidence(body.conversation_id)
