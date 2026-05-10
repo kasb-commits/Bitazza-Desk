@@ -1,8 +1,17 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const tailwindcss = require('tailwindcss');
+const autoprefixer = require('autoprefixer');
 
 export default defineConfig({
+  css: {
+    postcss: {
+      plugins: [tailwindcss(), autoprefixer()],
+    },
+  },
   plugins: [
     react(),
     VitePWA({
@@ -29,7 +38,6 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
         runtimeCaching: [
           {
-            // Never cache real-time supervisor or live endpoints
             urlPattern: /^\/api\/supervisor\//,
             handler: 'NetworkOnly',
           },
@@ -56,7 +64,7 @@ export default defineConfig({
       '/uploads': 'http://127.0.0.1:4000',
       '/socket.io': {
         target: 'http://127.0.0.1:4000',
-        ws: true,   // upgrade to WebSocket
+        ws: true,
       },
     },
   },
