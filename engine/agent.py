@@ -16,7 +16,7 @@ from engine.account_tools import TOOLS, TOOL_DEFINITIONS, get_user_profile
 from engine.security_filter import pre_filter, post_filter, contains_financial_advice_request
 from engine.escalation import should_escalate
 from engine.prompt_templates import (
-    get_system_prompt, build_user_message,
+    get_system_prompt, get_guest_system_prompt, build_user_message,
     build_handoff_message, ESCALATION_MESSAGES, UNABLE_TO_HELP_MESSAGES,
 )
 from engine.mock_agents import pick_agent, detect_category_from_message, get_intro_message
@@ -24,8 +24,10 @@ from db.conversation_store import (
     get_history, add_message, create_ticket,
     get_ai_persona, update_ticket_status,
     get_ticket_id_by_conversation, update_customer_from_profile,
+    get_ticket_meta,
 )
 from db.vector_store import collection_count
+from engine.assignment_client import trigger_auto_assign
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 
@@ -162,7 +164,7 @@ def _detect_upgrade(message: str, current_category: str | None) -> str | None:
 
 def chat(
     conversation_id: str,
-    user_id: str,
+    user_id: str | None,
     user_message: str,
     platform: str = "web",
     consecutive_low_confidence: int = 0,
@@ -197,8 +199,9 @@ def chat(
     # These categories require live account data; without a workflow providing structured
     # guardrails, the safe action is to hand off rather than let free-form AI handle it.
     # suppress_handoff=True means we're called from inside a workflow node — skip this guard.
+    # Guests (user_id=None) skip this block — they get KB-based guidance instead.
     _ACCOUNT_CATEGORIES = {"kyc_verification", "account_restriction", "withdrawal_issue", "deposit_issue", "trade_issue", "fraud_security"}
-    if category in _ACCOUNT_CATEGORIES and not suppress_handoff:
+    if category in _ACCOUNT_CATEGORIES and not suppress_handoff and user_id is not None:
         # Check if a published workflow exists for this category — if so, let it run instead.
         try:
             from workflow_engine.store import get_published_workflows_by_trigger
@@ -210,6 +213,9 @@ def chat(
             if ticket_id:
                 _escalation_status = "Escalated" if platform == "email" else "pending_human"
                 update_ticket_status(ticket_id, _escalation_status)
+                _meta = get_ticket_meta(ticket_id)
+                if _meta.get("customer_id"):
+                    trigger_auto_assign(ticket_id, category, _meta["priority"], str(_meta["customer_id"]))
             return AgentResponse(
                 text=build_handoff_message(category, language),
                 language=language,
@@ -253,6 +259,9 @@ def chat(
         if ticket_id:
             _escalation_status = "Escalated" if platform == "email" else "pending_human"
             update_ticket_status(ticket_id, _escalation_status)
+            _meta = get_ticket_meta(ticket_id)
+            if _meta.get("customer_id"):
+                trigger_auto_assign(ticket_id, category, _meta["priority"], str(_meta["customer_id"]))
         effective_category = detect_category_from_message(user_message) or category
         reply_text = "" if suppress_handoff else build_handoff_message(effective_category, language)
         return AgentResponse(
@@ -268,7 +277,12 @@ def chat(
     history = get_history(conversation_id, limit=10)
 
     # 6. Build messages for Gemini
-    system_prompt = get_system_prompt(language, category, platform=platform)
+    _persona = get_ai_persona(conversation_id)
+    _agent_name = _persona.get("name") or "Kai"
+    if user_id is None:
+        system_prompt = get_guest_system_prompt(language, agent_name=_agent_name)
+    else:
+        system_prompt = get_system_prompt(language, category, platform=platform, agent_name=_agent_name)
     augmented_message = build_user_message(user_message, rag_chunks, {})
 
     # Convert history to Gemini format
@@ -298,47 +312,50 @@ def chat(
         "fraud_security": "get_user_profile",
         "password_2fa_reset": "get_user_profile",
     }
-    # Force tool call if the category requires account data AND no successful (non-escalated)
-    # bot reply exists yet. This handles retries where the first turn escalated before
-    # the tool could answer — without this, Gemini skips the tool and gives a holding message.
-    from db.conversation_store import has_successful_bot_reply
-    prior_successful_reply = has_successful_bot_reply(conversation_id) if history else False
-    force_tool_name = (
-        _FORCE_TOOL_NAMES.get(category)
-        if category in _FORCE_TOOL_CATEGORIES and not prior_successful_reply
-        else None
-    )
+    # For guests (user_id=None), skip all tool-forcing — no account data available.
+    # For authenticated users, force tool call if the category requires account data AND
+    # no successful (non-escalated) bot reply exists yet.
+    is_guest_session = user_id is None
+    force_tool_name = None
+    if not is_guest_session:
+        from db.conversation_store import has_successful_bot_reply
+        prior_successful_reply = has_successful_bot_reply(conversation_id) if history else False
+        force_tool_name = (
+            _FORCE_TOOL_NAMES.get(category)
+            if category in _FORCE_TOOL_CATEGORIES and not prior_successful_reply
+            else None
+        )
 
-    # If the user mentions a transaction ID at any turn, force the relevant status tool
-    # so Gemini is guaranteed to look it up regardless of prior replies.
-    if (
-        not force_tool_name
-        and category == "withdrawal_issue"
-        and _TX_ID_RE.search(user_message)
-    ):
-        force_tool_name = "get_withdrawal_status"
-    if (
-        not force_tool_name
-        and category == "deposit_issue"
-        and _TX_ID_RE.search(user_message)
-    ):
-        force_tool_name = "get_deposit_status"
-    if (
-        not force_tool_name
-        and category == "trade_issue"
-        and _SPOT_ORDER_RE.search(user_message)
-    ):
-        force_tool_name = "get_spot_orders"
-    if (
-        not force_tool_name
-        and category == "trade_issue"
-        and _FUTURES_POS_RE.search(user_message)
-    ):
-        force_tool_name = "get_futures_positions"
+        # If the user mentions a transaction ID at any turn, force the relevant status tool
+        # so Gemini is guaranteed to look it up regardless of prior replies.
+        if (
+            not force_tool_name
+            and category == "withdrawal_issue"
+            and _TX_ID_RE.search(user_message)
+        ):
+            force_tool_name = "get_withdrawal_status"
+        if (
+            not force_tool_name
+            and category == "deposit_issue"
+            and _TX_ID_RE.search(user_message)
+        ):
+            force_tool_name = "get_deposit_status"
+        if (
+            not force_tool_name
+            and category == "trade_issue"
+            and _SPOT_ORDER_RE.search(user_message)
+        ):
+            force_tool_name = "get_spot_orders"
+        if (
+            not force_tool_name
+            and category == "trade_issue"
+            and _FUTURES_POS_RE.search(user_message)
+        ):
+            force_tool_name = "get_futures_positions"
 
-    # For "other" category, omit account tools entirely so Gemini cannot call them.
+    # For "other" category or guest sessions, omit account tools so Gemini cannot call them.
     is_other_category = category == "other"
-    tools = [] if is_other_category else [genai_types.Tool(function_declarations=TOOL_DEFINITIONS)]
+    tools = [] if (is_other_category or is_guest_session) else [genai_types.Tool(function_declarations=TOOL_DEFINITIONS)]
     tool_config = (
         genai_types.ToolConfig(
             function_calling_config=genai_types.FunctionCallingConfig(
@@ -368,6 +385,9 @@ def chat(
         if ticket_id:
             _escalation_status = "Escalated" if platform == "email" else "pending_human"
             update_ticket_status(ticket_id, _escalation_status)
+            _meta = get_ticket_meta(ticket_id)
+            if _meta.get("customer_id"):
+                trigger_auto_assign(ticket_id, category, _meta["priority"], str(_meta["customer_id"]))
         effective_category = detect_category_from_message(user_message) or category
         reply_text = "" if suppress_handoff else build_handoff_message(effective_category, language)
         return AgentResponse(
@@ -437,6 +457,9 @@ def chat(
             if ticket_id:
                 _escalation_status = "Escalated" if platform == "email" else "pending_human"
                 update_ticket_status(ticket_id, _escalation_status)
+                _meta = get_ticket_meta(ticket_id)
+                if _meta.get("customer_id"):
+                    trigger_auto_assign(ticket_id, category, _meta["priority"], str(_meta["customer_id"]))
             effective_category = detect_category_from_message(user_message) or category
             reply_text = "" if suppress_handoff else build_handoff_message(effective_category, language)
             return AgentResponse(
@@ -470,11 +493,18 @@ def chat(
     if not reason:
         reason = "low_confidence" if confidence < 0.6 else "model_requested"
 
+    # Guests: suppress single-turn low confidence only — everything else escalates normally.
+    if escalate and is_guest_session and reason == "low_confidence":
+        escalate = False
+
     if escalate:
         ticket_id = get_ticket_id_by_conversation(conversation_id)
         if ticket_id:
             _escalation_status = "Escalated" if platform == "email" else "pending_human"
             update_ticket_status(ticket_id, _escalation_status)
+            _meta = get_ticket_meta(ticket_id)
+            if _meta.get("customer_id"):
+                trigger_auto_assign(ticket_id, category, _meta["priority"], str(_meta["customer_id"]))
         effective_category = detect_category_from_message(user_message) or category
         if suppress_handoff:
             # Workflow mode: the Escalate node handles the handoff message — don't append it here.
