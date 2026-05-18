@@ -55,8 +55,12 @@ async function mount() {
     apiUrl: import.meta.env.VITE_API_URL ?? 'http://localhost:8000',
   };
 
-  // Inject a mock token when running in dev without a real JWT
-  if (!rawCfg.token) {
+  // Inject a mock token when running in dev without a real JWT.
+  // Skip when ?guest=1 is in the URL — lets devs test the guest widget flow locally.
+  const forceGuest = new URLSearchParams(window.location.search).get('guest') === '1';
+  if (forceGuest) {
+    rawCfg.guestMode = true;
+  } else if (!rawCfg.token) {
     try {
       rawCfg.token = await getDevToken(rawCfg.apiUrl);
     } catch (e) {

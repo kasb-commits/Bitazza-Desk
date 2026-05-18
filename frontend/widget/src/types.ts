@@ -75,6 +75,7 @@ export interface CSBotConfig {
   token?: string;        // JWT from host app, optional
   primaryColor?: string; // hex, default #1a56db
   lang?: 'en' | 'th';   // override auto-detect
+  guestMode?: boolean;   // true = skip token fetch, show GuestIdentityForm
 }
 
 declare global {

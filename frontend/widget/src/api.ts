@@ -21,6 +21,7 @@ export interface StoredSession {
   lang?: 'en' | 'th';
   category?: string;
   agent?: StoredAgent;
+  isGuest?: boolean;
 }
 
 export function clearStoredSession() {
@@ -45,18 +46,18 @@ export function getStoredSession(): StoredSession | null {
   try {
     const raw = localStorage.getItem(SESSION_KEY);
     if (!raw) return null;
-    const { id, ts, lang, category, agent } = JSON.parse(raw);
+    const { id, ts, lang, category, agent, isGuest } = JSON.parse(raw);
     if (Date.now() - ts > SESSION_TTL_MS) {
       localStorage.removeItem(SESSION_KEY);
       return null;
     }
-    return { id, lang, category, agent } as StoredSession;
+    return { id, lang, category, agent, isGuest: !!isGuest } as StoredSession;
   } catch {
     return null;
   }
 }
 
-function storeSession(id: string, lang?: 'en' | 'th', category?: string, agent?: StoredAgent) {
+function storeSession(id: string, lang?: 'en' | 'th', category?: string, agent?: StoredAgent, isGuest?: boolean) {
   const existing = getStoredSession();
   localStorage.setItem(SESSION_KEY, JSON.stringify({
     id,
@@ -64,6 +65,7 @@ function storeSession(id: string, lang?: 'en' | 'th', category?: string, agent?:
     lang: lang ?? existing?.lang,
     category: category ?? existing?.category,
     agent: agent ?? existing?.agent,
+    isGuest: isGuest ?? existing?.isGuest ?? false,
   }));
 }
 
@@ -84,7 +86,11 @@ export function storeSessionAgent(agent: StoredAgent) {
 
 let _startPromise: Promise<string> | null = null;
 
-export async function startConversation(cfg: CSBotConfig): Promise<string> {
+export async function startConversation(
+  cfg: CSBotConfig,
+  guestName?: string,
+  guestEmail?: string,
+): Promise<string> {
   const cached = getStoredSession();
   if (cached) return cached.id;
 
@@ -96,12 +102,17 @@ export async function startConversation(cfg: CSBotConfig): Promise<string> {
     const res = await fetch(`${cfg.apiUrl}/chat/start`, {
       method: 'POST',
       headers: getHeaders(cfg),
-      body: JSON.stringify({ platform: cfg.platform }),
+      body: JSON.stringify({
+        platform: cfg.platform,
+        ...(guestName ? { guest_name: guestName } : {}),
+        ...(guestEmail ? { guest_email: guestEmail } : {}),
+      }),
     });
     if (!res.ok) throw new Error(`start failed: ${res.status}`);
     const data = await res.json();
-    storeSession(data.conversation_id);
-    if (data.customer_id) storeCustomerId(data.customer_id);
+    const isGuest: boolean = data.is_guest ?? false;
+    storeSession(data.conversation_id, undefined, undefined, undefined, isGuest);
+    if (data.customer_id && !isGuest) storeCustomerId(data.customer_id);
     return data.conversation_id as string;
   })().finally(() => { _startPromise = null; });
   return _startPromise;

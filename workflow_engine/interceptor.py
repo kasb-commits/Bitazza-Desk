@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 def legacy_agent_chat(
     conversation_id: str,
-    user_id: str,
+    user_id: str | None,
     user_message: str,
     platform: str = "web",
     category: str | None = None,
@@ -49,7 +49,7 @@ def _execution_to_agent_response(execution) -> AgentResponse:
 
 def workflow_interceptor(
     conversation_id: str,
-    user_id: str,
+    user_id: str | None,
     user_message: str,
     platform: str = "web",
     category: str | None = None,
@@ -86,7 +86,9 @@ def workflow_interceptor(
 
     # If no category was sent (or "other"), ask Gemini what the message is about.
     # This lets a published workflow fire even when the widget sends no category.
-    if not category or category.lower() == "other":
+    # Guest sessions (user_id=None) must NOT be routed to account workflows — they
+    # always stay on "other" and fall through to legacy_agent_chat with the guest prompt.
+    if (not category or category.lower() == "other") and user_id is not None:
         try:
             from engine.mock_agents import classify_message_with_gemini
             detected = classify_message_with_gemini(user_message)

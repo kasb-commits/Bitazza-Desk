@@ -22,7 +22,7 @@ class ChannelMessage:
     channel: str          # "widget" | "email"
     category: str
     language: str
-    user_id: str
+    user_id: str | None   # None for guest (unauthenticated) sessions
     conversation_id: str
     metadata: dict[str, Any]   # thread_id, message_id, from_email, subject (email only)
     reply_fn: Callable[[str], None] | None = field(default=None, repr=False)
@@ -34,7 +34,7 @@ class WidgetAdapter:
         self,
         text: str,
         conversation_id: str,
-        user_id: str,
+        user_id: str | None,
         category: str,
         language: str | None,
         metadata: dict[str, Any],
@@ -68,7 +68,7 @@ class EmailAdapter:
         self,
         parsed_email: Any,
         conversation_id: str,
-        user_id: str,
+        user_id: str | None,
         category: str,
         reply_fn: Callable[[str], None] | None = None,
     ) -> ChannelMessage:
