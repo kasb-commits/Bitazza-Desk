@@ -491,7 +491,7 @@ def chat(
     keyword_escalate, reason = should_escalate(user_message, confidence, consecutive_low_confidence)
     escalate = needs_human or keyword_escalate
     if not reason:
-        reason = "low_confidence" if confidence < 0.6 else "model_requested"
+        reason = "model_requested" if needs_human else ("low_confidence" if confidence < 0.6 else "model_requested")
 
     # Guests: suppress single-turn low confidence only — everything else escalates normally.
     if escalate and is_guest_session and reason == "low_confidence":

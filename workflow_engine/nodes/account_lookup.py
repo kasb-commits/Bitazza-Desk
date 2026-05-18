@@ -82,8 +82,22 @@ class AccountLookupNode:
 
     def run(self, node: WorkflowNode, ctx: ExecutionContext) -> NodeResult:
         tool_name = node.config.get("tool", "get_user_profile")
-        user_id   = ctx.user_id  # always from authenticated context
+        user_id   = ctx.user_id
         api_url   = node.config.get("api_url", "").strip()
+
+        # Guest session: no account data available — return a helpful fallback
+        # so the workflow can continue to AiReplyNode which will use the KB.
+        if user_id is None:
+            return NodeResult(
+                output={
+                    "guest_session": True,
+                    "message": (
+                        "User is not authenticated. Provide general guidance from the "
+                        "knowledge base. Tell the user to log in for account-specific details."
+                    ),
+                },
+                next_node_id=node.next_node_id,
+            )
         api_key   = node.config.get("api_key", "").strip()
         store_as  = node.config.get("store_as", tool_name)
 

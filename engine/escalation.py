@@ -1,5 +1,20 @@
 """
 Escalation engine — decides when to hand off to a human agent.
+
+There are 5 escalation triggers in total:
+
+  1. user_requested_human    — message matches a phrase in ESCALATION_HUMAN_PHRASES
+                               (e.g. "talk to a human", "live agent", "ต่อสาย")
+  2. sensitive_keyword       — message contains a word in ESCALATION_KEYWORDS
+                               (e.g. "fraud", "hack", "police")
+  3. low_confidence          — estimated confidence < ESCALATION_CONFIDENCE_THRESHOLD (default 0.6)
+  4. repeated_unclear_exchanges — 3+ consecutive low-confidence turns in a row
+  5. resolution rejection ×2 — frontend-driven; NOT handled here.
+                               When the customer clicks "No, I need more help" twice on the
+                               resolution confirmation card, ChatWindow.tsx synthesises the
+                               message "I need to speak to a human agent" and calls send(),
+                               which routes through this function and fires trigger #1.
+                               See: frontend/widget/src/ChatWindow.tsx (resolutionRejections state)
 """
 import re
 from config.settings import ESCALATION_CONFIDENCE_THRESHOLD, ESCALATION_KEYWORDS, ESCALATION_HUMAN_PHRASES
@@ -13,10 +28,14 @@ def should_escalate(
     """
     Returns (escalate: bool, reason: str).
     Checks confidence score, keywords, and explicit human requests.
+
+    NOTE: A 5th trigger (resolution rejection ×2) exists in the widget frontend —
+    see module docstring above for details.
     """
     msg_lower = user_message.lower()
 
-    # Explicit human request
+    # Explicit human request (also fires when the widget sends a synthetic message
+    # after the customer rejects the resolution card twice)
     if any(phrase in msg_lower for phrase in ESCALATION_HUMAN_PHRASES):
         return True, "user_requested_human"
 

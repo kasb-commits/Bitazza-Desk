@@ -76,7 +76,7 @@ class WorkflowExecution:
 class ExecutionContext:
     variables: dict[str, Any]
     conversation_id: str
-    user_id: str
+    user_id: str | None   # None for guest (unauthenticated) sessions
     channel: str
     dry_run: bool = False
 

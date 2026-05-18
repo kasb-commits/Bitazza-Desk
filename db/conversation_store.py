@@ -251,19 +251,39 @@ def _priority_for_customer(cur, customer_id: str) -> int:
     return _TIER_PRIORITY.get(tier, 3)
 
 
-def create_conversation(user_id: str, platform: str, language: str = "en", issue_category: str | None = None) -> str:
+def create_conversation(
+    user_id: str | None,
+    platform: str,
+    language: str = "en",
+    issue_category: str | None = None,
+    is_guest: bool = False,
+    guest_name: str | None = None,
+    guest_email: str | None = None,
+) -> str:
     """
     Creates (or reuses) a customer row and opens a new ticket.
     Returns the ticket ID, which is used as the conversation_id throughout
     the Python layer so everything maps 1-to-1 with dashboard tickets.
+
+    Guest sessions (is_guest=True, user_id=None): bypass profile fetch and
+    create an anonymous customer row with optional name/email from the form.
     """
     with _conn() as conn:
         cur = conn.cursor()
-        customer_id = _ensure_customer(cur, user_id)
+
+        if is_guest:
+            customer_id = str(uuid.uuid4())
+            cur.execute(
+                "INSERT INTO customers (id, name, email, tier) VALUES (%s, %s, %s, 'regular')",
+                (customer_id, guest_name or "Guest", guest_email),
+            )
+            priority = 3
+        else:
+            customer_id = _ensure_customer(cur, user_id)
+            priority = _priority_for_customer(cur, customer_id)
 
         ticket_id = str(uuid.uuid4())
         team = _CATEGORY_TEAM.get(issue_category, "cs")
-        priority = _priority_for_customer(cur, customer_id)
         sla_mins = _SLA_MINUTES.get(priority, 10)
         cur.execute("""
             INSERT INTO tickets (id, customer_id, channel, status, category, priority, team, sla_deadline)
@@ -662,6 +682,15 @@ def create_ticket(conversation_id: str, escalation_reason: str) -> str:
 def get_ticket_id_by_conversation(conversation_id: str) -> str | None:
     """In the unified schema, conversation_id == ticket_id."""
     return conversation_id
+
+
+def get_ticket_meta(ticket_id: str) -> dict:
+    """Return {priority, customer_id} for a ticket — used by assignment_client."""
+    with _conn() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT priority, customer_id FROM tickets WHERE id = %s", (ticket_id,))
+        row = cur.fetchone()
+        return dict(row) if row else {"priority": 3, "customer_id": None}
 
 
 def is_human_handling(conversation_id: str) -> bool:

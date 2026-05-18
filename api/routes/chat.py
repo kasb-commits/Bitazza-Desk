@@ -1,7 +1,7 @@
 """Chat API routes — user-facing message endpoint."""
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
-from api.middleware.auth import get_user_id
+from api.middleware.auth import get_user_id, get_optional_user_id
 from api.ws_manager import manager
 from db.conversation_store import (
     init_db, create_conversation, add_message, get_history, get_paginated_history,
@@ -20,6 +20,8 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 class StartRequest(BaseModel):
     platform: str = "web"  # "freedom" | "bitazza" | "web"
     category: str | None = None  # issue category pre-selected in widget
+    guest_name: str | None = None   # optional name from pre-chat identity form
+    guest_email: str | None = None  # optional email from pre-chat identity form
 
 
 class StartResponse(BaseModel):
@@ -29,6 +31,7 @@ class StartResponse(BaseModel):
     agent_name: str
     agent_avatar: str
     agent_avatar_url: str
+    is_guest: bool = False
 
 
 class GreetRequest(BaseModel):
@@ -66,13 +69,22 @@ class MessageResponse(BaseModel):
 
 
 @router.post("/start", response_model=StartResponse)
-async def start_conversation(body: StartRequest, user_id: str = Depends(get_user_id)):
+async def start_conversation(body: StartRequest, user_id: str | None = Depends(get_optional_user_id)):
     import time as _time
     init_db()
-    cid = create_conversation(user_id=user_id, platform=body.platform, issue_category=body.category)
+    is_guest = user_id is None
+    cid = create_conversation(
+        user_id=user_id,
+        platform=body.platform,
+        issue_category=body.category,
+        is_guest=is_guest,
+        guest_name=body.guest_name,
+        guest_email=body.guest_email,
+    )
     agent = pick_agent(body.category)
     assign_ai_persona(cid, agent["name"], agent["avatar"], agent["avatar_url"])
     tid = cid  # ticket already created by create_conversation; no status change needed
+    customer_display_name = body.guest_name or "Guest" if is_guest else "—"
     await manager.broadcast_all({
         "type": "new_ticket",
         "ticket": {
@@ -88,10 +100,13 @@ async def start_conversation(body: StartRequest, user_id: str = Depends(get_user
             "last_message_at": None,
             "created_at": int(_time.time()),
             "updated_at": int(_time.time()),
-            "customer": {"id": user_id, "name": "—", "tier": "Standard"},
+            "customer": {"id": user_id or "guest", "name": customer_display_name, "tier": "Standard"},
         },
     })
-    customer_id = get_customer_id_for_user(user_id) or user_id
+    if is_guest:
+        customer_id = cid  # use ticket id as a stable reference for guest sessions
+    else:
+        customer_id = get_customer_id_for_user(user_id) or user_id
     return StartResponse(
         conversation_id=cid,
         ticket_id=tid,
@@ -99,6 +114,7 @@ async def start_conversation(body: StartRequest, user_id: str = Depends(get_user
         agent_name=agent["name"],
         agent_avatar=agent["avatar"],
         agent_avatar_url=agent["avatar_url"],
+        is_guest=is_guest,
     )
 
 
@@ -114,7 +130,7 @@ class SetCategoryResponse(BaseModel):
 
 
 @router.post("/set-category", response_model=SetCategoryResponse)
-def set_category(body: SetCategoryRequest, user_id: str = Depends(get_user_id)):
+def set_category(body: SetCategoryRequest, user_id: str | None = Depends(get_optional_user_id)):
     """
     Called when the user selects an issue category in the widget.
     Re-assigns the AI persona to the specialist agent for that category
@@ -131,7 +147,7 @@ def set_category(body: SetCategoryRequest, user_id: str = Depends(get_user_id)):
 
 
 @router.post("/greet", response_model=GreetResponse)
-def greet(body: GreetRequest, user_id: str = Depends(get_user_id)):
+def greet(body: GreetRequest, user_id: str | None = Depends(get_optional_user_id)):
     """
     Called immediately after language selection.
     Returns the AI bot's introduction message and persists it as the first assistant message.
@@ -150,7 +166,7 @@ def greet(body: GreetRequest, user_id: str = Depends(get_user_id)):
 
 
 @router.post("/message", response_model=MessageResponse)
-async def send_message(body: MessageRequest, user_id: str = Depends(get_user_id)):
+async def send_message(body: MessageRequest, user_id: str | None = Depends(get_optional_user_id)):
     if not body.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
@@ -292,7 +308,7 @@ class CSATRequest(BaseModel):
 
 
 @router.post("/csat")
-def submit_csat(body: CSATRequest, user_id: str = Depends(get_user_id)):
+def submit_csat(body: CSATRequest, user_id: str | None = Depends(get_optional_user_id)):
     if not 1 <= body.score <= 5:
         raise HTTPException(status_code=400, detail="Score must be between 1 and 5")
     from db.conversation_store import submit_csat_score
@@ -305,7 +321,7 @@ def get_conversation_history(
     conversation_id: str,
     page: int | None = None,
     limit: int | None = None,
-    user_id: str = Depends(get_user_id),
+    user_id: str | None = Depends(get_optional_user_id),
 ):
     if page is not None and limit is not None:
         history = get_paginated_history(conversation_id, page=page, limit=limit)
@@ -321,14 +337,16 @@ def get_conversation_history(
 def list_customer_tickets(
     page: int = 1,
     limit: int = 10,
-    user_id: str = Depends(get_user_id),
+    user_id: str = Depends(get_user_id),  # strict — guests get 401 automatically
 ):
     tickets = get_customer_tickets(user_id, page=page, limit=limit)
     return {"tickets": tickets}
 
 
 @router.get("/open-ticket")
-def get_open_ticket(user_id: str = Depends(get_user_id)):
+def get_open_ticket(user_id: str | None = Depends(get_optional_user_id)):
+    if user_id is None:
+        return {"ticket": None}
     ticket = get_open_ticket_for_customer(user_id)
     return {"ticket": ticket}
 

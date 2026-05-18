@@ -7,6 +7,7 @@ import MessageBubble from './MessageBubble';
 import TypingIndicator from './TypingIndicator';
 import CategoryPicker from './CategoryPicker';
 import PrevConversations from './PrevConversations';
+import GuestIdentityForm from './GuestIdentityForm';
 
 function playNotificationBeep() {
   try {
@@ -101,6 +102,8 @@ export default function ChatWindow({ cfg, onClose }: Props) {
   const [openTicket, setOpenTicket] = useState<PastTicket | null>(null);
   const [showOpenTicketBanner, setShowOpenTicketBanner] = useState(false);
   const [awaitingFirstReply, setAwaitingFirstReply] = useState(false);
+  const [isGuest, setIsGuest] = useState<boolean>(cfg.guestMode ?? false);
+  const [showGuestForm, setShowGuestForm] = useState<boolean>(false);
   const lastAgentMsgTime = useRef(0);
   const lastFailedText = useRef('');
   const sendRef = useRef<((text: string, category?: string, skipUserBubble?: boolean) => Promise<void>) | null>(null);
@@ -114,6 +117,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
     if (existing) {
       // Resume: load history from backend
       setConvId(existing.id);
+      if (existing.isGuest) setIsGuest(true);
       // Restore lang selection from session if available
       if (existing.lang) {
         setLang(existing.lang);
@@ -168,11 +172,57 @@ export default function ChatWindow({ cfg, onClose }: Props) {
       });
     } else {
       showGreeting();
-      startConversation(cfg)
-        .then((id) => setConvId(id))
-        .catch(() => setError('Could not connect. Please refresh.'));
+      // Guest mode: don't call startConversation yet — wait until after lang + identity form
+      if (!cfg.guestMode) {
+        startConversation(cfg)
+          .then((id) => setConvId(id))
+          .catch(() => setError('Could not connect. Please refresh.'));
+      }
     }
   }, []);
+
+  const handleGuestFormSubmit = (name: string, email: string) => {
+    setShowGuestForm(false);
+    setAwaitingFirstReply(true);
+    startConversation(cfg, name || undefined, email || undefined)
+      .then((id) => {
+        setConvId(id);
+        setCategoryAgent(cfg, id, 'other').then(({ agentName, agentAvatarUrl }) => {
+          const resolvedName = agentName ?? 'Ploy';
+          setBotName(resolvedName);
+          setBotAvatarUrl(agentAvatarUrl || null);
+          setTimeout(() => {
+            const greeting = lang === 'th'
+              ? `สวัสดีค่ะ ฉันชื่อ${resolvedName}! 😊 มีอะไรให้ช่วยได้บ้างคะ?`
+              : `Hi, I'm ${resolvedName}! 😊 How can I help you today?`;
+            setMessages((prev) => [...prev, {
+              id: 'ploy-intro',
+              role: 'assistant' as const,
+              content: greeting,
+              timestamp: Date.now(),
+              senderName: resolvedName,
+              agentAvatarUrl: agentAvatarUrl || undefined,
+            }]);
+            setAwaitingFirstReply(false);
+          }, 1200 + Math.random() * 600);
+        }).catch(() => {
+          // setCategoryAgent failed — still unlock input with a generic greeting
+          setTimeout(() => {
+            setMessages((prev) => [...prev, {
+              id: 'ploy-intro',
+              role: 'assistant' as const,
+              content: lang === 'th' ? 'สวัสดีค่ะ! มีอะไรให้ช่วยได้บ้างคะ? 😊' : 'Hi there! 😊 How can I help you today?',
+              timestamp: Date.now(),
+            }]);
+            setAwaitingFirstReply(false);
+          }, 1000);
+        });
+      })
+      .catch(() => {
+        setAwaitingFirstReply(false);
+        setError('Could not connect. Please refresh.');
+      });
+  };
 
   function showGreeting() {
     const now = Date.now();
@@ -195,8 +245,8 @@ export default function ChatWindow({ cfg, onClose }: Props) {
   const selectCategory = useCallback((category: IssueCategory) => {
     setSelectedCategory(category);
     storeSessionCategory(category);
-    // Load previous tickets for returning customers
-    if (getStoredCustomerId()) {
+    // Load previous tickets for returning customers (not guests)
+    if (!isGuest && getStoredCustomerId()) {
       fetchCustomerTickets(cfg, 1, 20).then((tickets) => {
         if (tickets.length > 0) {
           setPrevTickets(tickets);
@@ -245,7 +295,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
     } else {
       sendRef.current?.(openingMsg, category, true);
     }
-  }, [convId, cfg, lang]);
+  }, [convId, cfg, lang, isGuest]);
 
   const CATEGORY_PROMPT = {
     en: 'Please select the type of issue you need help with:',
@@ -256,6 +306,12 @@ export default function ChatWindow({ cfg, onClose }: Props) {
     setLang(selected);
     setLangSelected(true);
     storeSessionLang(selected);
+    // For guest mode: show the identity form instead of proceeding to category picker
+    if (cfg.guestMode) {
+      setShowGuestForm(true);
+      return;
+    }
+
     // Always show the category prompt immediately in the selected language
     setMessages((prev) => [...prev, {
       id: 'category-prompt',
@@ -264,8 +320,8 @@ export default function ChatWindow({ cfg, onClose }: Props) {
       timestamp: Date.now(),
       senderName: 'Bitazza Support',
     }]);
-    // Check for an open ticket from a *previous* session (only if customer_id is known)
-    if (getStoredCustomerId()) {
+    // Check for an open ticket from a *previous* session (only if authenticated customer_id is known)
+    if (!isGuest && getStoredCustomerId()) {
       fetchOpenTicket(cfg).then((ticket) => {
         if (!ticket) return;
         // Skip if this is the conversation we just started — nothing to "resume".
@@ -281,7 +337,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
         });
       });
     }
-  }, [cfg, convId]);
+  }, [cfg, convId, isGuest]);
 
   // Auto-scroll
   useEffect(() => {
@@ -613,7 +669,10 @@ export default function ChatWindow({ cfg, onClose }: Props) {
 
       {/* Messages */}
       <div className="csbot-messages flex-1 overflow-y-auto px-4 py-4 space-y-1">
-        {showPrevTickets && (
+        {showGuestForm && (
+          <GuestIdentityForm primaryColor={primaryColor} onSubmit={handleGuestFormSubmit} />
+        )}
+        {!showGuestForm && showPrevTickets && !isGuest && (
           <PrevConversations
             tickets={prevTickets}
             cfg={cfg}
@@ -621,7 +680,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
             primaryColor={primaryColor}
           />
         )}
-        {messages.map((m) => <MessageBubble key={m.id} message={m} primaryColor={primaryColor} botName={botName} botAvatarUrl={botAvatarUrl} escalatedAgent={escalatedAgent} />)}
+        {!showGuestForm && messages.map((m) => <MessageBubble key={m.id} message={m} primaryColor={primaryColor} botName={botName} botAvatarUrl={botAvatarUrl} escalatedAgent={escalatedAgent} />)}
         {(() => {
           const lastResMsg = [...messages].reverse().find((m) => m.offerResolution);
           if (!lastResMsg || csatPending || csatSubmitted) return null;
@@ -748,11 +807,11 @@ export default function ChatWindow({ cfg, onClose }: Props) {
             {lang === 'th' ? 'การสนทนานี้ปิดแล้ว' : 'This conversation is closed.'}
           </div>
         )}
-        {!langSelected && (
+        {!showGuestForm && !langSelected && (
           <div className="flex gap-2 justify-center pt-2 pb-1">
             <button
               onClick={() => selectLanguage('en')}
-              disabled={!convId}
+              disabled={!cfg.guestMode && !convId}
               className="csbot-lang-btn px-5 py-2 rounded-full text-xs font-semibold transition-all disabled:opacity-40"
               style={{ '--lang-color': primaryColor } as React.CSSProperties}
             >
@@ -760,7 +819,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
             </button>
             <button
               onClick={() => selectLanguage('th')}
-              disabled={!convId}
+              disabled={!cfg.guestMode && !convId}
               className="csbot-lang-btn px-5 py-2 rounded-full text-xs font-semibold transition-all disabled:opacity-40"
               style={{ '--lang-color': primaryColor } as React.CSSProperties}
             >
@@ -768,7 +827,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
             </button>
           </div>
         )}
-        {langSelected && !selectedCategory && !escalated && !showOpenTicketBanner && (
+        {!showGuestForm && !isGuest && langSelected && !selectedCategory && !escalated && !showOpenTicketBanner && (
           <CategoryPicker
             lang={lang}
             primaryColor={primaryColor}
@@ -776,8 +835,8 @@ export default function ChatWindow({ cfg, onClose }: Props) {
             disabled={loading || !convId}
           />
         )}
-        {loading && <TypingIndicator />}
-        {error && (
+        {!showGuestForm && loading && <TypingIndicator />}
+        {!showGuestForm && error && (
           <button
             className="w-full text-center text-xs text-red-400 py-2 hover:text-red-500 transition-colors"
             onClick={() => send(lastFailedText.current)}
@@ -796,13 +855,13 @@ export default function ChatWindow({ cfg, onClose }: Props) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={!langSelected ? 'Select a language / เลือกภาษา' : !selectedCategory ? (lang === 'th' ? 'เลือกประเภทปัญหาด้านบน' : 'Select an issue type above') : awaitingFirstReply ? t.placeholderConnecting : t.placeholder}
-          disabled={loading || !convId || !langSelected || !selectedCategory || awaitingFirstReply || csatPending || csatSubmitted || agentClosureRequest}
+          placeholder={!langSelected ? 'Select a language / เลือกภาษา' : (!isGuest && !selectedCategory) ? (lang === 'th' ? 'เลือกประเภทปัญหาด้านบน' : 'Select an issue type above') : awaitingFirstReply ? t.placeholderConnecting : t.placeholder}
+          disabled={showGuestForm || loading || !convId || !langSelected || (!isGuest && !selectedCategory) || awaitingFirstReply || csatPending || csatSubmitted || agentClosureRequest}
           className="csbot-input flex-1 text-sm px-4 py-2.5 outline-none disabled:opacity-40"
         />
         <button
           onClick={() => send(input)}
-          disabled={loading || !input.trim() || !convId || !langSelected || !selectedCategory || awaitingFirstReply || csatPending || csatSubmitted || agentClosureRequest}
+          disabled={showGuestForm || loading || !input.trim() || !convId || !langSelected || (!isGuest && !selectedCategory) || awaitingFirstReply || csatPending || csatSubmitted || agentClosureRequest}
           className="csbot-send-btn w-9 h-9 rounded-full flex items-center justify-center text-white transition-all disabled:opacity-30"
           style={{ background: `linear-gradient(135deg, ${primaryColor}, ${primaryColor}cc)` }}
           aria-label={t.send}

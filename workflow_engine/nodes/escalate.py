@@ -24,6 +24,16 @@ def update_ticket_status(ticket_id: str, status: str) -> None:
     _fn(ticket_id, status)
 
 
+def get_ticket_meta(ticket_id: str) -> dict:
+    from db.conversation_store import get_ticket_meta as _fn
+    return _fn(ticket_id)
+
+
+def trigger_auto_assign(ticket_id, category, priority, customer_id) -> None:
+    from engine.assignment_client import trigger_auto_assign as _fn
+    _fn(ticket_id, category, priority, customer_id)
+
+
 class EscalateNode:
 
     def run(self, node: WorkflowNode, ctx: ExecutionContext) -> NodeResult:
@@ -36,6 +46,9 @@ class EscalateNode:
             ticket_id = get_ticket_id_by_conversation(ctx.conversation_id)
             if ticket_id:
                 update_ticket_status(ticket_id, status)
+                _meta = get_ticket_meta(ticket_id)
+                if _meta.get("customer_id"):
+                    trigger_auto_assign(ticket_id, category, _meta["priority"], str(_meta["customer_id"]))
 
         # Build specialist handoff message.
         # If the ai_reply node already generated an explanation (e.g. "your account is
