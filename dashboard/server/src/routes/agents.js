@@ -81,7 +81,7 @@ router.post('/', requirePermission('admin.agents'), async (req, res) => {
   const { rows: roleCheck } = await pool.query('SELECT 1 FROM roles WHERE name=$1', [role]);
   if (!roleCheck.length) return res.status(400).json({ error: 'Role does not exist' });
 
-  const maxChatsVal = max_chats ? Math.min(Math.max(parseInt(max_chats), 1), 20) : 3;
+  const maxChatsVal = max_chats ? Math.min(Math.max(parseInt(max_chats), 1), 100) : 10;
 
   try {
     const hash = await bcrypt.hash(password, 10);
@@ -142,7 +142,7 @@ router.patch('/:id', requirePermission('admin.agents'), async (req, res) => {
   }
 
   const maxChatsVal = max_chats != null
-    ? Math.min(Math.max(parseInt(max_chats), 1), 20)
+    ? Math.min(Math.max(parseInt(max_chats), 1), 100)
     : null;
 
   try {
