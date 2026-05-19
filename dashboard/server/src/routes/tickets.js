@@ -192,6 +192,7 @@ router.get('/', async (req, res) => {
         c.phone       AS customer_phone,
         c.tier        AS customer_tier,
         c.kyc_status  AS customer_kyc_status,
+        c.kyc_tier    AS customer_kyc_tier,
         c.external_id AS customer_external_id,
         u.name AS assigned_to_name,
         (SELECT content FROM messages WHERE ticket_id = t.id ORDER BY created_at DESC LIMIT 1) AS last_message,
@@ -229,6 +230,7 @@ router.get('/', async (req, res) => {
         phone:      t.customer_phone ?? null,
         tier:       t.customer_tier  ?? 'Standard',
         kyc_status: t.customer_kyc_status ?? null,
+        kyc_tier:   t.customer_kyc_tier ?? 0,
       },
     })));
   } catch (err) {
@@ -243,7 +245,8 @@ router.get('/:id', async (req, res) => {
     const { rows: tRows } = await pool.query(`
       SELECT t.*, c.id AS customer_id, c.name AS customer_name, c.email AS customer_email,
              c.phone AS customer_phone, c.tier AS customer_tier,
-             c.kyc_status AS customer_kyc_status, c.external_id AS customer_external_id,
+             c.kyc_status AS customer_kyc_status, c.kyc_tier AS customer_kyc_tier,
+             c.external_id AS customer_external_id,
              c.bitazza_uid, c.line_uid, c.fb_psid,
              u.name AS assigned_to_name
       FROM tickets t
@@ -270,6 +273,7 @@ router.get('/:id', async (req, res) => {
         phone:      ticket.customer_phone ?? null,
         tier:       ticket.customer_tier  ?? 'Standard',
         kyc_status: ticket.customer_kyc_status ?? null,
+        kyc_tier:   ticket.customer_kyc_tier ?? 0,
         bitazza_uid: ticket.bitazza_uid,
         line_uid:   ticket.line_uid,
         fb_psid:    ticket.fb_psid,

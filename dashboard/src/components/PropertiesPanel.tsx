@@ -210,6 +210,7 @@ export default function PropertiesPanel({ ticket, onUpdate, partialDraft = '', o
               <div className="space-y-1.5">
                 <PropRow label="UID"         value={ticket.customer?.bitazza_uid ?? ticket.customer?.user_id ?? '—'} mono />
                 <PropRow label="KYC"         value={ticket.customer?.kyc_status ?? '—'} />
+                <PropRow label="KYC Tier"    value={ticket.customer?.kyc_tier != null ? `Tier ${ticket.customer.kyc_tier}` : '—'} />
                 <PropRow label="Past tickets" value={String(ticket.customer?.past_conversation_count ?? 0)} />
               </div>
             </Section>

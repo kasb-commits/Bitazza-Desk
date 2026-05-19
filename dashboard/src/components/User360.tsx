@@ -6,6 +6,7 @@ import { usePermissions } from '../PermissionContext';
 
 interface KYCInfo {
   status: string;
+  kyc_tier?: number;
   rejection_reason?: string;
   reviewed_at?: string;
 }
@@ -119,6 +120,7 @@ interface CustomerRow {
   phone?: string;
   tier?: string;
   kyc_status?: string;
+  kyc_tier?: number;
   created_at: string;
 }
 
@@ -164,6 +166,20 @@ const KYC_COLORS: Record<string, string> = {
   not_started:         'bg-surface-4 text-text-muted ring-surface-5',
   suspended:           'bg-red-100 text-red-800 ring-red-300 dark:bg-red-900/60 dark:text-red-300 dark:ring-red-700/60',
   expired:             'bg-orange-100 text-orange-700 ring-orange-300 dark:bg-orange-900/40 dark:text-orange-400 dark:ring-orange-700/40',
+};
+
+const KYC_TIER_LABELS: Record<number, string> = {
+  0: 'Unverified',
+  1: 'Basic',
+  2: 'Enhanced',
+  3: 'Full',
+};
+
+const KYC_TIER_COLORS: Record<number, string> = {
+  0: 'bg-surface-4 text-text-muted ring-surface-5',
+  1: 'bg-emerald-100 text-emerald-700 ring-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-400 dark:ring-emerald-700/40',
+  2: 'bg-sky-100 text-sky-700 ring-sky-300 dark:bg-sky-900/40 dark:text-sky-400 dark:ring-sky-700/40',
+  3: 'bg-violet-100 text-violet-700 ring-violet-300 dark:bg-violet-900/40 dark:text-violet-400 dark:ring-violet-700/40',
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -672,6 +688,7 @@ export default function User360() {
                         <th className="px-5 py-2.5 text-left font-medium">Email</th>
                         <th className="px-5 py-2.5 text-left font-medium">User ID</th>
                         <th className="px-5 py-2.5 text-left font-medium">KYC</th>
+                        <th className="px-5 py-2.5 text-left font-medium">KYC Tier</th>
                         <th className="px-5 py-2.5 text-left font-medium">Tier</th>
                         <th className="px-5 py-2.5 text-left font-medium">Joined</th>
                       </tr>
@@ -693,6 +710,11 @@ export default function User360() {
                             <td className="px-5 py-3">
                               {c.kyc_status
                                 ? <Badge label={c.kyc_status.replace(/_/g, ' ')} color={KYC_COLORS[c.kyc_status] ?? 'bg-surface-4 text-text-muted ring-surface-5'} />
+                                : <span className="text-text-muted">—</span>}
+                            </td>
+                            <td className="px-5 py-3">
+                              {c.kyc_tier != null
+                                ? <Badge label={`T${c.kyc_tier} · ${KYC_TIER_LABELS[c.kyc_tier] ?? c.kyc_tier}`} color={KYC_TIER_COLORS[c.kyc_tier] ?? KYC_TIER_COLORS[0]} />
                                 : <span className="text-text-muted">—</span>}
                             </td>
                             <td className="px-5 py-3">
@@ -746,6 +768,9 @@ export default function User360() {
                     <h2 className="text-lg font-bold text-text-primary">{user.first_name} {user.last_name}</h2>
                     <Badge label={user.tier} color={TIER_COLORS[user.tier] ?? TIER_COLORS.regular} />
                     <Badge label={user.kyc.status.replace(/_/g, ' ')} color={KYC_COLORS[user.kyc.status] ?? ''} />
+                    {user.kyc.kyc_tier != null && (
+                      <Badge label={`KYC T${user.kyc.kyc_tier} · ${KYC_TIER_LABELS[user.kyc.kyc_tier] ?? user.kyc.kyc_tier}`} color={KYC_TIER_COLORS[user.kyc.kyc_tier] ?? KYC_TIER_COLORS[0]} />
+                    )}
                   </div>
                   <div className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1 text-xs text-text-muted">
                     <span><span className="text-text-secondary font-medium">ID</span> {user.user_id}</span>
@@ -815,6 +840,12 @@ export default function User360() {
                           <span className="text-xs text-text-muted">Status</span>
                           <Badge label={user.kyc.status.replace(/_/g, ' ')} color={KYC_COLORS[user.kyc.status] ?? ''} />
                         </div>
+                        {user.kyc.kyc_tier != null && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-text-muted">KYC Tier</span>
+                            <Badge label={`Tier ${user.kyc.kyc_tier} · ${KYC_TIER_LABELS[user.kyc.kyc_tier] ?? user.kyc.kyc_tier}`} color={KYC_TIER_COLORS[user.kyc.kyc_tier] ?? KYC_TIER_COLORS[0]} />
+                          </div>
+                        )}
                         {hasPerm('user360.kyc') && user.kyc.rejection_reason && (
                           <div className="flex items-start justify-between gap-2">
                             <span className="text-xs text-text-muted shrink-0">Reason</span>

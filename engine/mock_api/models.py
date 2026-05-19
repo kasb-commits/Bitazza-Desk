@@ -31,6 +31,7 @@ class UserTier(str, Enum):
 
 class KYCInfo(BaseModel):
     status: KYCStatus
+    kyc_tier: int = 0                        # 0=unverified, 1=basic, 2=enhanced, 3=full/professional
     rejection_reason: Optional[str] = None   # only populated when status == rejected
     reviewed_at: Optional[str] = None        # ISO-8601 datetime string
 

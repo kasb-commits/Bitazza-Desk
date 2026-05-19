@@ -29,7 +29,7 @@ _SEED: list[dict] = [
         "email": "somchai.rakpong@example.com",
         "phone": "+66812345601",
         "tier": UserTier.regular,
-        "kyc": KYCInfo(status=KYCStatus.approved, reviewed_at="2025-11-01T09:00:00Z"),
+        "kyc": KYCInfo(status=KYCStatus.approved, kyc_tier=1, reviewed_at="2025-11-01T09:00:00Z"),
     },
     {
         "user_id": "USR-000002",
@@ -38,7 +38,7 @@ _SEED: list[dict] = [
         "email": "nattaya.suwan@example.com",
         "phone": "+66812345602",
         "tier": UserTier.vip,
-        "kyc": KYCInfo(status=KYCStatus.approved, reviewed_at="2025-10-15T14:30:00Z"),
+        "kyc": KYCInfo(status=KYCStatus.approved, kyc_tier=2, reviewed_at="2025-10-15T14:30:00Z"),
     },
     {
         "user_id": "USR-000003",
@@ -47,7 +47,7 @@ _SEED: list[dict] = [
         "email": "preecha.kongkiat@example.com",
         "phone": "+66812345603",
         "tier": UserTier.ea,
-        "kyc": KYCInfo(status=KYCStatus.approved, reviewed_at="2025-09-20T08:00:00Z"),
+        "kyc": KYCInfo(status=KYCStatus.approved, kyc_tier=2, reviewed_at="2025-09-20T08:00:00Z"),
     },
     {
         "user_id": "USR-000004",
@@ -56,7 +56,7 @@ _SEED: list[dict] = [
         "email": "wanida.phirom@example.com",
         "phone": "+66812345604",
         "tier": UserTier.high_net_worth,
-        "kyc": KYCInfo(status=KYCStatus.approved, reviewed_at="2025-08-05T11:15:00Z"),
+        "kyc": KYCInfo(status=KYCStatus.approved, kyc_tier=3, reviewed_at="2025-08-05T11:15:00Z"),
     },
     # rejected — multiple reasons
     {
@@ -238,7 +238,7 @@ _SEED: list[dict] = [
         "email": "chatri.pattana@example.com",
         "phone": "+66812345621",
         "tier": UserTier.regular,
-        "kyc": KYCInfo(status=KYCStatus.approved, reviewed_at="2025-12-10T09:00:00Z"),
+        "kyc": KYCInfo(status=KYCStatus.approved, kyc_tier=1, reviewed_at="2025-12-10T09:00:00Z"),
     },
     {
         "user_id": "USR-000022",
@@ -247,7 +247,7 @@ _SEED: list[dict] = [
         "email": "nuch.srisombat@example.com",
         "phone": "+66812345622",
         "tier": UserTier.regular,
-        "kyc": KYCInfo(status=KYCStatus.approved, reviewed_at="2025-11-20T14:00:00Z"),
+        "kyc": KYCInfo(status=KYCStatus.approved, kyc_tier=1, reviewed_at="2025-11-20T14:00:00Z"),
     },
     {
         "user_id": "USR-000023",
@@ -256,7 +256,7 @@ _SEED: list[dict] = [
         "email": "anucha.wongpan@example.com",
         "phone": "+66812345623",
         "tier": UserTier.vip,
-        "kyc": KYCInfo(status=KYCStatus.approved, reviewed_at="2025-10-05T10:30:00Z"),
+        "kyc": KYCInfo(status=KYCStatus.approved, kyc_tier=2, reviewed_at="2025-10-05T10:30:00Z"),
     },
     {
         "user_id": "USR-000024",
@@ -265,7 +265,7 @@ _SEED: list[dict] = [
         "email": "ploy.thammarat@example.com",
         "phone": "+66812345624",
         "tier": UserTier.ea,
-        "kyc": KYCInfo(status=KYCStatus.approved, reviewed_at="2025-09-15T08:00:00Z"),
+        "kyc": KYCInfo(status=KYCStatus.approved, kyc_tier=2, reviewed_at="2025-09-15T08:00:00Z"),
     },
     {
         "user_id": "USR-000025",
@@ -274,7 +274,7 @@ _SEED: list[dict] = [
         "email": "wanchai.sukhum@example.com",
         "phone": "+66812345625",
         "tier": UserTier.high_net_worth,
-        "kyc": KYCInfo(status=KYCStatus.approved, reviewed_at="2025-08-20T11:00:00Z"),
+        "kyc": KYCInfo(status=KYCStatus.approved, kyc_tier=3, reviewed_at="2025-08-20T11:00:00Z"),
     },
 
     # ── USR-000026–045: rejected (simulation pool — varied reasons) ───────────

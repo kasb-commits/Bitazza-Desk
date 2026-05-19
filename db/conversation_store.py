@@ -128,7 +128,9 @@ def _ensure_customer(cur, user_id: str) -> str:
             email      = profile.get("email") or None
             phone      = profile.get("phone") or None
             tier       = profile.get("tier") or None
-            kyc_status = (profile.get("kyc") or {}).get("status") or None
+            kyc_info   = profile.get("kyc") or {}
+            kyc_status = kyc_info.get("status") or None
+            kyc_tier   = kyc_info.get("kyc_tier")
             if display_name or kyc_status:
                 cur.execute("""
                     UPDATE customers
@@ -136,9 +138,10 @@ def _ensure_customer(cur, user_id: str) -> str:
                         email      = COALESCE(%s, email),
                         phone      = COALESCE(%s, phone),
                         tier       = COALESCE(%s, tier),
-                        kyc_status = COALESCE(%s, kyc_status)
+                        kyc_status = COALESCE(%s, kyc_status),
+                        kyc_tier   = COALESCE(%s, kyc_tier)
                     WHERE id = %s
-                """, (display_name, email, phone, tier, kyc_status, row["id"]))
+                """, (display_name, email, phone, tier, kyc_status, kyc_tier, row["id"]))
         except Exception:
             logger.exception("Failed to refresh profile for user_id=%s — continuing with cached data", user_id)
         return row["id"]
@@ -157,7 +160,9 @@ def _ensure_customer(cur, user_id: str) -> str:
             email      = profile.get("email") or None
             phone      = profile.get("phone") or None
             tier       = profile.get("tier") or None
-            kyc_status = (profile.get("kyc") or {}).get("status") or None
+            kyc_info   = profile.get("kyc") or {}
+            kyc_status = kyc_info.get("status") or None
+            kyc_tier   = kyc_info.get("kyc_tier")
             cur.execute("""
                 UPDATE customers
                 SET external_id = %s,
@@ -165,9 +170,10 @@ def _ensure_customer(cur, user_id: str) -> str:
                     email       = COALESCE(%s, email),
                     phone       = COALESCE(%s, phone),
                     tier        = COALESCE(%s, tier),
-                    kyc_status  = COALESCE(%s, kyc_status)
+                    kyc_status  = COALESCE(%s, kyc_status),
+                    kyc_tier    = COALESCE(%s, kyc_tier)
                 WHERE id = %s
-            """, (user_id, display_name, email, phone, tier, kyc_status, row["id"]))
+            """, (user_id, display_name, email, phone, tier, kyc_status, kyc_tier, row["id"]))
         except Exception:
             logger.exception("Failed to backfill profile for legacy customer user_id=%s — skipping enrichment", user_id)
         return row["id"]
@@ -182,12 +188,14 @@ def _ensure_customer(cur, user_id: str) -> str:
     email        = profile.get("email") or None
     phone        = profile.get("phone") or None
     tier         = profile.get("tier") or "regular"
-    kyc_status   = (profile.get("kyc") or {}).get("status") or None
+    kyc_info     = profile.get("kyc") or {}
+    kyc_status   = kyc_info.get("status") or None
+    kyc_tier     = kyc_info.get("kyc_tier")
 
     cur.execute("""
-        INSERT INTO customers (id, name, email, phone, tier, kyc_status, external_id)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-    """, (customer_id, display_name, email, phone, tier, kyc_status, user_id))
+        INSERT INTO customers (id, name, email, phone, tier, kyc_status, kyc_tier, external_id)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+    """, (customer_id, display_name, email, phone, tier, kyc_status, kyc_tier, user_id))
     return customer_id
 
 
@@ -211,7 +219,9 @@ def update_customer_from_profile(user_id: str, profile: dict) -> None:
     email      = profile.get("email") or None
     phone      = profile.get("phone") or None
     tier       = profile.get("tier") or None
-    kyc_status = (profile.get("kyc") or {}).get("status") or None
+    kyc_info   = profile.get("kyc") or {}
+    kyc_status = kyc_info.get("status") or None
+    kyc_tier   = kyc_info.get("kyc_tier")
 
     if not display_name:
         return
@@ -225,9 +235,10 @@ def update_customer_from_profile(user_id: str, profile: dict) -> None:
                     email      = COALESCE(%s, email),
                     phone      = COALESCE(%s, phone),
                     tier       = COALESCE(%s, tier),
-                    kyc_status = COALESCE(%s, kyc_status)
+                    kyc_status = COALESCE(%s, kyc_status),
+                    kyc_tier   = COALESCE(%s, kyc_tier)
                 WHERE external_id = %s
-            """, (display_name, email, phone, tier, kyc_status, user_id))
+            """, (display_name, email, phone, tier, kyc_status, kyc_tier, user_id))
     except Exception:
         logger.exception("update_customer_from_profile failed for user_id=%s — non-fatal", user_id)
 
@@ -904,6 +915,7 @@ def get_open_tickets(search: str = "", status_filter: str = "open") -> list[dict
                 c.phone     AS cust_phone,
                 c.tier      AS cust_tier,
                 c.kyc_status AS cust_kyc_status,
+                c.kyc_tier   AS cust_kyc_tier,
                 c.external_id AS cust_external_id
             FROM tickets t
             JOIN customers c ON t.customer_id = c.id
@@ -955,6 +967,7 @@ def get_open_tickets(search: str = "", status_filter: str = "open") -> list[dict
                 "phone":       ticket["cust_phone"],
                 "tier":        ticket["cust_tier"] or "regular",
                 "kyc_status":  ticket["cust_kyc_status"],
+                "kyc_tier":    ticket["cust_kyc_tier"] if ticket.get("cust_kyc_tier") is not None else 0,
             },
         })
     return result

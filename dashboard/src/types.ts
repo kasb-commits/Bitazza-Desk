@@ -64,6 +64,7 @@ export interface CustomerProfile {
   email?: string;
   tier: CustomerTier;
   kyc_status?: string;
+  kyc_tier?: number;
   bitazza_uid?: string;
   line_uid?: string;
   fb_psid?: string;

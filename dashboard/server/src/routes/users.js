@@ -50,7 +50,7 @@ router.get('/', async (req, res) => {
     const [countRes, rowsRes] = await Promise.all([
       pool.query('SELECT COUNT(*)::int AS total FROM customers'),
       pool.query(
-        `SELECT id, bitazza_uid, external_id, name, email, phone, tier, kyc_status, created_at
+        `SELECT id, bitazza_uid, external_id, name, email, phone, tier, kyc_status, kyc_tier, created_at
          FROM customers
          ORDER BY name ASC NULLS LAST
          LIMIT $1 OFFSET $2`,
