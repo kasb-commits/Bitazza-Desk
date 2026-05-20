@@ -100,11 +100,24 @@ export const api = {
   escalate: (id: string, reason?: string) =>
     req(`/api/tickets/${id}/escalate`, { method: 'POST', body: JSON.stringify({ reason }) }),
 
-  reply: (id: string, content: string, is_note = false, channel?: string) =>
+  reply: (id: string, content: string, is_note = false, channel?: string, attachmentIds?: string[]) =>
     req(`/api/tickets/${id}/messages`, {
       method: 'POST',
-      body: JSON.stringify({ content, is_note, channel }),
+      body: JSON.stringify({ content, is_note, channel, ...(attachmentIds?.length ? { attachment_ids: attachmentIds } : {}) }),
     }),
+
+  uploadAttachment: async (file: File): Promise<{ id: string; url: string; name: string; mime_type: string; size: number }> => {
+    const token = getToken();
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`${API}/api/uploads/attachment`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    if (!res.ok) throw new Error(`upload failed: ${res.status}`);
+    return res.json();
+  },
 
   claimTicket: (id: string) =>
     req(`/api/tickets/${id}/claim`, { method: 'POST' }),
@@ -312,6 +325,41 @@ export const api = {
 
   bulkMarkNotifications: (ids: string[], read: boolean) =>
     req('/api/notifications/bulk', { method: 'PATCH', body: JSON.stringify({ ids, read }) }),
+
+  // Ticket Properties
+  getPropertyDefinitions: (includeInactive = false) =>
+    req<import('./types').PropertyDefinition[]>(
+      `/api/ticket-properties/definitions${includeInactive ? '?include_inactive=true' : ''}`
+    ),
+
+  createPropertyDefinition: (body: Omit<import('./types').PropertyDefinition, 'id' | 'created_at' | 'updated_at'>) =>
+    req<import('./types').PropertyDefinition>(
+      '/api/ticket-properties/definitions',
+      { method: 'POST', body: JSON.stringify(body) }
+    ),
+
+  updatePropertyDefinition: (id: string, body: Partial<import('./types').PropertyDefinition>) =>
+    req<import('./types').PropertyDefinition>(
+      `/api/ticket-properties/definitions/${id}`,
+      { method: 'PATCH', body: JSON.stringify(body) }
+    ),
+
+  deletePropertyDefinition: (id: string) =>
+    req<{ deleted: boolean; deactivated: boolean; message?: string }>(
+      `/api/ticket-properties/definitions/${id}`,
+      { method: 'DELETE' }
+    ),
+
+  getTicketPropertyValues: (ticketId: string) =>
+    req<import('./types').PropertyValuesMap>(
+      `/api/ticket-properties/tickets/${ticketId}/values`
+    ),
+
+  setTicketPropertyValue: (ticketId: string, propertyId: string, value: string | string[] | number | boolean | null) =>
+    req<import('./types').PropertyValue>(
+      `/api/ticket-properties/tickets/${ticketId}/values`,
+      { method: 'PATCH', body: JSON.stringify({ property_id: propertyId, value }) }
+    ),
 
   // FR-09: Core API — live customer profile from Bitazza backend (5s timeout)
   getCoreProfile: async (bitazzaUid: string) => {

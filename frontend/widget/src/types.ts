@@ -55,6 +55,14 @@ export const ISSUE_CATEGORIES: IssueCategoryDef[] = [
   },
 ];
 
+export interface MessageAttachment {
+  id: string;
+  url: string;
+  name: string;
+  mimeType: string;
+  size: number;
+}
+
 export interface Message {
   id: string;
   role: MessageRole;
@@ -67,6 +75,7 @@ export interface Message {
   offerResolution?: boolean;
   /** Explicit sender name to display — overrides the dynamic botName. Used to pin static messages to "Bitazza Support". */
   senderName?: string;
+  attachments?: MessageAttachment[];
 }
 
 export interface CSBotConfig {

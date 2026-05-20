@@ -11,10 +11,10 @@ interface Props {
   onSelectTicket?: (ticketId: string) => void;
 }
 
-const SENTIMENT_CONFIG: Record<string, { label: string; cls: string }> = {
-  positive: { label: 'Positive', cls: 'bg-accent-green/10 text-accent-green ring-1 ring-accent-green/20' },
-  negative: { label: 'Negative', cls: 'bg-brand/10 text-brand ring-1 ring-brand/20' },
-  neutral:  { label: 'Neutral',  cls: 'bg-surface-4 text-text-secondary ring-1 ring-surface-5' },
+const SENTIMENT_CONFIG: Record<string, { label: string; bg: string; color: string; ring: string }> = {
+  positive: { label: 'Positive', bg: '#f0fdf4', color: '#15803d', ring: '1px solid #bbf7d0' },
+  negative: { label: 'Negative', bg: '#fef2f2', color: '#b91c1c', ring: '1px solid #fecaca' },
+  neutral:  { label: 'Neutral',  bg: '#f3f4f6', color: '#6b7280', ring: '1px solid #e5e7eb' },
 };
 
 export default function CopilotPanel({ ticketId, partialDraft = '', onAcceptDraft, onSelectTicket }: Props) {
@@ -84,7 +84,7 @@ export default function CopilotPanel({ ticketId, partialDraft = '', onAcceptDraf
     setTimeout(() => setCopied(false), 1500);
   };
 
-  const sentimentInfo = SENTIMENT_CONFIG[sentiment] ?? SENTIMENT_CONFIG.neutral;
+  const sentimentInfo = SENTIMENT_CONFIG[sentiment as keyof typeof SENTIMENT_CONFIG] ?? SENTIMENT_CONFIG.neutral;
 
   return (
     <div className="p-4 space-y-5">
@@ -176,13 +176,15 @@ export default function CopilotPanel({ ticketId, partialDraft = '', onAcceptDraf
               )}
               <button
                 onClick={copySuggestion}
-                className="text-xs px-3 py-1.5 bg-surface-3 ring-1 ring-surface-5 hover:bg-surface-4 text-text-secondary rounded transition-colors"
+                className="text-xs px-3 py-1.5 rounded transition-colors font-medium"
+              style={{ background: '#f3f4f6', color: '#374151', border: '1px solid #e5e7eb' }}
               >
                 {copied ? '✓ Copied' : 'Copy'}
               </button>
               <button
                 onClick={() => setSuggestion('')}
-                className="text-xs px-3 py-1.5 bg-surface-3 ring-1 ring-surface-5 hover:ring-brand/30 hover:text-brand text-text-muted rounded transition-colors"
+                className="text-xs px-3 py-1.5 rounded transition-colors"
+              style={{ background: '#f3f4f6', color: '#9ca3af', border: '1px solid #e5e7eb' }}
               >
                 Reject
               </button>
@@ -212,7 +214,10 @@ export default function CopilotPanel({ ticketId, partialDraft = '', onAcceptDraf
         {sentimentLoading
           ? <Skeleton className="h-5 w-20 rounded-full" />
           : sentiment
-            ? <span className={`text-xs px-2.5 py-1 rounded-full font-medium capitalize ${sentimentInfo.cls}`}>
+            ? <span
+                className="text-xs px-2.5 py-1 rounded-full font-medium capitalize"
+                style={{ background: sentimentInfo.bg, color: sentimentInfo.color, boxShadow: `0 0 0 ${sentimentInfo.ring}` }}
+              >
                 {sentimentInfo.label}
               </span>
             : <span className="text-xs text-text-muted italic">Analyzing…</span>
@@ -234,17 +239,20 @@ export default function CopilotPanel({ ticketId, partialDraft = '', onAcceptDraf
           <div
             key={t.id}
             onClick={() => onSelectTicket?.(t.id)}
-            className={`bg-surface-3 ring-1 ring-surface-5 rounded-lg px-3 py-2.5 space-y-0.5 ${onSelectTicket ? 'cursor-pointer hover:bg-surface-4 hover:ring-brand/30 transition-colors' : ''}`}
+            className={`rounded-lg px-3 py-2.5 space-y-0.5 transition-colors ${onSelectTicket ? 'cursor-pointer' : ''}`}
+            style={{ background: '#f0f4ff', border: '1px solid #c7d2fe' }}
+            onMouseEnter={e => { if (onSelectTicket) (e.currentTarget as HTMLDivElement).style.background = '#e0e7ff'; }}
+            onMouseLeave={e => { if (onSelectTicket) (e.currentTarget as HTMLDivElement).style.background = '#f0f4ff'; }}
           >
             <div className="flex items-center justify-between">
-              <span className="font-mono text-[10px] text-text-muted">{t.id.slice(0, 8)}…</span>
-              <span className="text-[10px] text-text-muted">{t.status?.replace(/_/g, ' ')}</span>
+              <span className="font-mono text-[10px]" style={{ color: '#6366f1' }}>{t.id.slice(0, 8)}…</span>
+              <span className="text-[10px]" style={{ color: '#6b7280' }}>{t.status?.replace(/_/g, ' ')}</span>
             </div>
             {t.customer_name && (
-              <p className="text-xs font-medium text-text-primary truncate">{t.customer_name}</p>
+              <p className="text-xs font-medium truncate" style={{ color: '#1e1b4b' }}>{t.customer_name}</p>
             )}
             {t.last_message && (
-              <p className="text-[10px] text-text-muted truncate">{t.last_message}</p>
+              <p className="text-[10px] truncate" style={{ color: '#4b5563' }}>{t.last_message}</p>
             )}
           </div>
         ))}
@@ -296,7 +304,10 @@ function AssistedDraftSection({
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generate(); } }}
           placeholder={'Tell AI what to write…\ne.g. "Explain how to reset 2FA" or "Apologise and ask for their transaction ID"'}
           rows={3}
-          className="w-full text-xs bg-surface-3 ring-1 ring-surface-5 focus:ring-brand rounded-md px-2.5 py-2 outline-none text-text-primary placeholder:text-text-muted transition-colors resize-none leading-relaxed"
+          className="w-full text-xs rounded-md px-2.5 py-2 outline-none transition-colors resize-none leading-relaxed"
+          style={{ background: '#f9fafb', border: '1px solid #e5e7eb', color: '#111827' }}
+          onFocus={e => { e.currentTarget.style.borderColor = '#6366f1'; e.currentTarget.style.boxShadow = '0 0 0 2px rgba(99,102,241,0.15)'; }}
+          onBlur={e => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.boxShadow = 'none'; }}
         />
         <button
           onClick={generate}
@@ -308,11 +319,11 @@ function AssistedDraftSection({
       </div>
 
       {partialDraft.trim() && (
-        <div className="flex items-center gap-1.5 text-[10px] text-text-muted bg-surface-3 ring-1 ring-surface-5 rounded px-2 py-1">
-          <svg className="w-3 h-3 shrink-0 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="flex items-center gap-1.5 text-[10px] rounded px-2 py-1" style={{ background: '#f0f4ff', border: '1px solid #c7d2fe', color: '#6b7280' }}>
+          <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#6366f1' }}>
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
           </svg>
-          <span className="truncate">Using your draft: <span className="text-text-secondary">{partialDraft.slice(0, 40)}{partialDraft.length > 40 ? '…' : ''}</span></span>
+          <span className="truncate">Using your draft: <span style={{ color: '#374151' }}>{partialDraft.slice(0, 40)}{partialDraft.length > 40 ? '…' : ''}</span></span>
         </div>
       )}
 
@@ -341,13 +352,15 @@ function AssistedDraftSection({
             )}
             <button
               onClick={copy}
-              className="text-xs px-3 py-1.5 bg-surface-3 ring-1 ring-surface-5 hover:bg-surface-4 text-text-secondary rounded transition-colors"
+              className="text-xs px-3 py-1.5 rounded transition-colors font-medium"
+              style={{ background: '#f3f4f6', color: '#374151', border: '1px solid #e5e7eb' }}
             >
               {copied ? '✓ Copied' : 'Copy'}
             </button>
             <button
               onClick={() => setDraft('')}
-              className="text-xs px-3 py-1.5 bg-surface-3 ring-1 ring-surface-5 hover:ring-brand/30 hover:text-brand text-text-muted rounded transition-colors"
+              className="text-xs px-3 py-1.5 rounded transition-colors"
+              style={{ background: '#f3f4f6', color: '#9ca3af', border: '1px solid #e5e7eb' }}
             >
               Reject
             </button>

@@ -724,3 +724,137 @@ UNABLE_TO_HELP_MESSAGES = {
     "en": "I want to make sure you get the best help possible — let me get a colleague to take a look at this with you. Is that okay?",
     "th": "หนูอยากให้คุณได้รับความช่วยเหลือที่ดีที่สุด ขอให้เพื่อนร่วมทีมมาช่วยดูเรื่องนี้ด้วยกันได้ไหมคะ?",
 }
+
+
+# ── Information collection prompts ────────────────────────────────────────────
+# Used when the AI cannot resolve an account-specific issue and needs to gather
+# more context before handing off to a human agent.
+# The screenshot ask is always optional — user can just describe in text.
+
+_COLLECTION_SCREENSHOT_ASK = {
+    "en": "If you're able to, a screenshot of what you're seeing would help our team investigate faster — but feel free to just describe it if that's easier.",
+    "th": "ถ้าสะดวก รูปภาพหน้าจอที่แสดงปัญหาจะช่วยให้ทีมเราตรวจสอบได้รวดเร็วขึ้น — แต่จะอธิบายเป็นข้อความก็ได้เช่นกันนะคะ",
+}
+
+_COLLECTION_QUESTIONS: dict[str, dict[str, str]] = {
+    "kyc_verification": {
+        "en": (
+            "To help our team look into this properly, could you share a few more details?\n"
+            "- What exact message or status are you seeing in the app?\n"
+            "- Which document type did you submit (national ID, passport, or other)?\n"
+            "- Roughly when did you submit it?"
+        ),
+        "th": (
+            "เพื่อให้ทีมเราตรวจสอบได้อย่างถูกต้อง ช่วยบอกรายละเอียดเพิ่มเติมได้ไหมคะ?\n"
+            "- ข้อความหรือสถานะที่คุณเห็นในแอปคืออะไร?\n"
+            "- คุณส่งเอกสารประเภทใด (บัตรประชาชน, หนังสือเดินทาง หรืออื่นๆ)?\n"
+            "- ส่งเอกสารไปเมื่อประมาณวันไหน?"
+        ),
+    },
+    "account_restriction": {
+        "en": (
+            "I'd like to pass along as much detail as possible to the team. Could you tell me:\n"
+            "- Which specific action is blocked — trading, deposits, or withdrawals?\n"
+            "- What message does the app show when you try?\n"
+            "- When did you first notice this restriction?"
+        ),
+        "th": (
+            "หนูอยากส่งรายละเอียดให้ทีมได้มากที่สุดเท่าที่จะทำได้ค่ะ ช่วยบอกหนูได้ไหมคะว่า:\n"
+            "- การดำเนินการใดที่ถูกบล็อก — การเทรด, การฝาก หรือการถอน?\n"
+            "- แอปแสดงข้อความอะไรเมื่อคุณพยายามทำ?\n"
+            "- คุณสังเกตเห็นข้อจำกัดนี้ครั้งแรกเมื่อไร?"
+        ),
+    },
+    "withdrawal_issue": {
+        "en": (
+            "Before I pass this to the team, a few quick details will help them investigate faster:\n"
+            "- Which currency and approximate amount?\n"
+            "- Which network did you use (e.g. TRC20, ERC20, BEP20)?\n"
+            "- What date did you initiate it, and what status does it show now?\n"
+            "- Any error message?"
+        ),
+        "th": (
+            "ก่อนที่หนูจะส่งต่อให้ทีม รายละเอียดสั้นๆ เหล่านี้จะช่วยให้เขาตรวจสอบได้เร็วขึ้นนะคะ:\n"
+            "- สกุลเงินและจำนวนเงินโดยประมาณ?\n"
+            "- ใช้เครือข่ายใด (เช่น TRC20, ERC20, BEP20)?\n"
+            "- ทำรายการวันไหน และสถานะตอนนี้แสดงว่าอะไร?\n"
+            "- มีข้อความแสดงข้อผิดพลาดไหม?"
+        ),
+    },
+    "deposit_issue": {
+        "en": (
+            "To help the team trace this quickly, could you share:\n"
+            "- Which currency and approximate amount?\n"
+            "- Did you deposit via bank transfer or crypto? If crypto, which network?\n"
+            "- What date did you send it?\n"
+            "- Do you have a transaction reference, hash, or bank receipt?"
+        ),
+        "th": (
+            "เพื่อให้ทีมติดตามรายการได้รวดเร็ว ช่วยบอกข้อมูลเหล่านี้ได้ไหมคะ:\n"
+            "- สกุลเงินและจำนวนเงินโดยประมาณ?\n"
+            "- ฝากผ่านการโอนเงินธนาคารหรือคริปโต? ถ้าคริปโต ใช้เครือข่ายใด?\n"
+            "- โอนเงินไปวันไหน?\n"
+            "- มีเลขอ้างอิงธุรกรรม, transaction hash หรือสลิปธนาคารไหม?"
+        ),
+    },
+    "fraud_security": {
+        "en": (
+            "I'm sorry to hear this is happening. To make sure our security team has everything they need:\n"
+            "- What exactly happened, and when?\n"
+            "- Are there any specific transaction IDs or amounts involved?\n"
+            "- Is this still ongoing, or has it already occurred?"
+        ),
+        "th": (
+            "หนูเสียใจที่ได้ยินเรื่องนี้ค่ะ เพื่อให้ทีมความปลอดภัยมีข้อมูลครบถ้วน:\n"
+            "- เกิดอะไรขึ้น และเกิดขึ้นเมื่อไร?\n"
+            "- มีรหัสธุรกรรมหรือจำนวนเงินที่เกี่ยวข้องไหม?\n"
+            "- เหตุการณ์ยังเกิดขึ้นอยู่ หรือเกิดขึ้นแล้ว?"
+        ),
+    },
+    "trade_issue": {
+        "en": (
+            "Before I hand this over, a few details will help the trading team investigate:\n"
+            "- Which trading pair was involved?\n"
+            "- What type of order (market, limit, stop)?\n"
+            "- What did you expect to happen vs what actually happened?\n"
+            "- Approximately when did this occur?"
+        ),
+        "th": (
+            "ก่อนส่งต่อ รายละเอียดเหล่านี้จะช่วยให้ทีมเทรดตรวจสอบได้ค่ะ:\n"
+            "- คู่เทรดที่เกี่ยวข้องคืออะไร?\n"
+            "- ประเภทออเดอร์อะไร (market, limit, stop)?\n"
+            "- คุณคาดหวังว่าจะเกิดอะไรขึ้น และเกิดอะไรขึ้นจริงๆ?\n"
+            "- เกิดขึ้นประมาณเมื่อไร?"
+        ),
+    },
+}
+
+_COLLECTION_FALLBACK = {
+    "en": (
+        "To help our team investigate, could you describe in a bit more detail what you're experiencing — "
+        "what you see in the app, when it started, and any error messages?"
+    ),
+    "th": (
+        "เพื่อให้ทีมเราตรวจสอบได้ ช่วยอธิบายรายละเอียดเพิ่มเติมเกี่ยวกับสิ่งที่เกิดขึ้นได้ไหมคะ — "
+        "คุณเห็นอะไรในแอป เริ่มเกิดขึ้นเมื่อไร และมีข้อความแสดงข้อผิดพลาดอะไรบ้าง?"
+    ),
+}
+
+
+def build_collection_prompt(category: str | None, language: str) -> str:
+    """
+    Build the information-collection message shown to the user when the AI cannot
+    resolve an account-specific issue on its own. Asks targeted questions and
+    optionally invites a screenshot.
+
+    Called from engine/agent.py when the collection phase is first entered.
+    Both questions and screenshot ask are language-aware (EN/TH).
+    """
+    lang = language if language in ("en", "th") else "en"
+    cat = category or ""
+    questions = (
+        _COLLECTION_QUESTIONS.get(cat, {}).get(lang)
+        or _COLLECTION_FALLBACK[lang]
+    )
+    screenshot_ask = _COLLECTION_SCREENSHOT_ASK[lang]
+    return f"{questions}\n\n{screenshot_ask}"

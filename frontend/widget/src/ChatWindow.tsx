@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { Message, CSBotConfig, IssueCategory } from './types';
+import type { Message, MessageAttachment, CSBotConfig, IssueCategory } from './types';
 import { ISSUE_CATEGORIES } from './types';
-import { startConversation, sendMessage, fetchHistory, setCategoryAgent, getStoredSession, storeSessionLang, storeSessionCategory, storeSessionAgent, clearStoredSession, fetchCustomerTickets, fetchOpenTicket, getStoredCustomerId } from './api';
+import { startConversation, sendMessage, uploadAttachment, fetchHistory, setCategoryAgent, getStoredSession, storeSessionLang, storeSessionCategory, storeSessionAgent, clearStoredSession, fetchCustomerTickets, fetchOpenTicket, getStoredCustomerId } from './api';
 import type { PastTicket } from './api';
 import MessageBubble from './MessageBubble';
 import TypingIndicator from './TypingIndicator';
@@ -104,6 +104,10 @@ export default function ChatWindow({ cfg, onClose }: Props) {
   const [awaitingFirstReply, setAwaitingFirstReply] = useState(false);
   const [isGuest, setIsGuest] = useState<boolean>(cfg.guestMode ?? false);
   const [showGuestForm, setShowGuestForm] = useState<boolean>(false);
+  const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const lastAgentMsgTime = useRef(0);
   const lastFailedText = useRef('');
   const sendRef = useRef<((text: string, category?: string, skipUserBubble?: boolean) => Promise<void>) | null>(null);
@@ -413,17 +417,45 @@ export default function ChatWindow({ cfg, onClose }: Props) {
     return () => clearInterval(interval);
   }, [convId, cfg]);
 
+  const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
+  const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+  const handleFiles = useCallback(async (files: FileList | File[]) => {
+    if (!convId) return;
+    const arr = Array.from(files).slice(0, 5);
+    const valid = arr.filter(f => ALLOWED_MIME.includes(f.type) && f.size <= MAX_FILE_SIZE);
+    if (!valid.length) return;
+    setUploadingFiles(true);
+    try {
+      const uploaded = await Promise.all(valid.map(f => uploadAttachment(cfg, f)));
+      const attachments: MessageAttachment[] = uploaded.map(u => ({
+        id: u.id, url: u.url, name: u.name, mimeType: u.mimeType, size: u.size,
+      }));
+      setPendingAttachments(prev => [...prev, ...attachments].slice(0, 5));
+    } catch {
+      // fail silently — user can retry
+    } finally {
+      setUploadingFiles(false);
+    }
+  }, [convId, cfg]);
+
   const send = useCallback(async (text: string, category?: string, skipUserBubble = false) => {
-    if (!text.trim() || !convId || loading) return;
+    const hasAttachments = pendingAttachments.length > 0;
+    if (!text.trim() && !hasAttachments) return;
+    if (!convId || loading) return;
     setError(null);
 
     const trimmed = text.trim();
+    const attachmentsSnapshot = [...pendingAttachments];
+    setPendingAttachments([]);
+
     if (!skipUserBubble) {
       const userMsg: Message = {
         id: crypto.randomUUID(),
         role: 'user',
         content: trimmed,
         timestamp: Date.now(),
+        attachments: attachmentsSnapshot.length ? attachmentsSnapshot : undefined,
       };
       setMessages((prev) => [...prev, userMsg]);
     }
@@ -433,7 +465,8 @@ export default function ChatWindow({ cfg, onClose }: Props) {
     try {
       lastFailedText.current = '';
       const activeCategory = category ?? selectedCategory ?? undefined;
-      const result = await sendMessage(cfg, convId, trimmed, consecutiveLow, activeCategory);
+      const attachmentIds = attachmentsSnapshot.map(a => a.id);
+      const result = await sendMessage(cfg, convId, trimmed, consecutiveLow, activeCategory, attachmentIds.length ? attachmentIds : undefined);
       setLang(result.language as 'en' | 'th');
 
       // reply is null when a human is already handling — suppress the bot bubble entirely
@@ -848,28 +881,76 @@ export default function ChatWindow({ cfg, onClose }: Props) {
       </div>
 
       {/* Input */}
-      <div className="csbot-input-area px-3 py-3 flex gap-2 items-center">
-        <input
-          ref={inputRef}
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={!langSelected ? 'Select a language / เลือกภาษา' : (!isGuest && !selectedCategory) ? (lang === 'th' ? 'เลือกประเภทปัญหาด้านบน' : 'Select an issue type above') : awaitingFirstReply ? t.placeholderConnecting : t.placeholder}
-          disabled={showGuestForm || loading || !convId || !langSelected || (!isGuest && !selectedCategory) || awaitingFirstReply || csatPending || csatSubmitted || agentClosureRequest}
-          className="csbot-input flex-1 text-sm px-4 py-2.5 outline-none disabled:opacity-40"
-        />
-        <button
-          onClick={() => send(input)}
-          disabled={showGuestForm || loading || !input.trim() || !convId || !langSelected || (!isGuest && !selectedCategory) || awaitingFirstReply || csatPending || csatSubmitted || agentClosureRequest}
-          className="csbot-send-btn w-9 h-9 rounded-full flex items-center justify-center text-white transition-all disabled:opacity-30"
-          style={{ background: `linear-gradient(135deg, ${primaryColor}, ${primaryColor}cc)` }}
-          aria-label={t.send}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-          </svg>
-        </button>
+      <div
+        className={`csbot-input-area px-3 py-3 flex flex-col gap-2${isDragOver ? ' ring-2 ring-inset ring-blue-400' : ''}`}
+        onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+        onDragLeave={() => setIsDragOver(false)}
+        onDrop={(e) => { e.preventDefault(); setIsDragOver(false); if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files); }}
+        onPaste={(e) => { if (e.clipboardData.files.length) { e.preventDefault(); handleFiles(e.clipboardData.files); } }}
+      >
+        {/* Pending attachment previews */}
+        {pendingAttachments.length > 0 && (
+          <div className="flex flex-wrap gap-2 px-1">
+            {pendingAttachments.map((a) => (
+              <div key={a.id} className="relative group">
+                {a.mimeType.startsWith('image/') ? (
+                  <img src={a.url} alt={a.name} className="w-14 h-14 object-cover rounded-lg border border-gray-200" />
+                ) : (
+                  <div className="w-14 h-14 flex items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-[10px] text-gray-500 text-center px-1 break-all">{a.name}</div>
+                )}
+                <button
+                  className="absolute -top-1 -right-1 w-4 h-4 bg-gray-700 text-white rounded-full text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={() => setPendingAttachments(prev => prev.filter(x => x.id !== a.id))}
+                  aria-label="Remove attachment"
+                >×</button>
+              </div>
+            ))}
+            {uploadingFiles && <div className="w-14 h-14 flex items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-[10px] text-gray-400">...</div>}
+          </div>
+        )}
+        <div className="flex gap-2 items-center">
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+            multiple
+            className="hidden"
+            onChange={(e) => { if (e.target.files) { handleFiles(e.target.files); e.target.value = ''; } }}
+          />
+          {/* Paperclip button */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={showGuestForm || !convId || !langSelected || (!isGuest && !selectedCategory) || awaitingFirstReply || csatPending || csatSubmitted || agentClosureRequest}
+            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-30 flex-shrink-0"
+            aria-label="Attach file"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66L9.41 17.41a2 2 0 01-2.83-2.83l8.49-8.48" />
+            </svg>
+          </button>
+          <input
+            ref={inputRef}
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={!langSelected ? 'Select a language / เลือกภาษา' : (!isGuest && !selectedCategory) ? (lang === 'th' ? 'เลือกประเภทปัญหาด้านบน' : 'Select an issue type above') : awaitingFirstReply ? t.placeholderConnecting : t.placeholder}
+            disabled={showGuestForm || loading || !convId || !langSelected || (!isGuest && !selectedCategory) || awaitingFirstReply || csatPending || csatSubmitted || agentClosureRequest}
+            className="csbot-input flex-1 text-sm px-4 py-2.5 outline-none disabled:opacity-40"
+          />
+          <button
+            onClick={() => send(input)}
+            disabled={showGuestForm || loading || (!input.trim() && !pendingAttachments.length) || !convId || !langSelected || (!isGuest && !selectedCategory) || awaitingFirstReply || csatPending || csatSubmitted || agentClosureRequest}
+            className="csbot-send-btn w-9 h-9 rounded-full flex items-center justify-center text-white transition-all disabled:opacity-30"
+            style={{ background: `linear-gradient(135deg, ${primaryColor}, ${primaryColor}cc)` }}
+            aria-label={t.send}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Footer branding */}

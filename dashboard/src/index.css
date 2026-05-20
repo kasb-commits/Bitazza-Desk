@@ -112,3 +112,275 @@ a:focus:not(:focus-visible) {
 html {
   scrollbar-gutter: stable;
 }
+
+/* ── Glass Context: CSS var overrides for light frosted-glass pages ─────── */
+/*    Apply .glass-context to a wrapper to make all surface/text vars light   */
+.glass-context {
+  --surface-0: #eef2f7;
+  --surface-1: rgba(255, 255, 255, 0.82);
+  --surface-2: rgba(255, 255, 255, 0.75);
+  --surface-3: rgba(255, 255, 255, 0.60);
+  --surface-4: rgba(255, 255, 255, 0.48);
+  --surface-5: rgba(180, 195, 220, 0.45);
+  --text-primary:   #1a1d2e;
+  --text-secondary: #6b7280;
+  --text-muted:     #9ca3af;
+}
+
+/* Applied to each panel to add backdrop-filter blur */
+.panel-glass {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* ── Frosted Glass Design System (Home Dashboard) ────────────────────────── */
+.glass-page {
+  background: #eef2f7;
+  color: #1a1d2e;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 16px;
+  padding: 20px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 2px 16px rgba(80, 100, 160, 0.10);
+}
+
+.glass-card-sm {
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 10px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 2px 16px rgba(80, 100, 160, 0.10);
+}
+
+.glass-card-interactive {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  cursor: pointer;
+}
+
+.glass-card-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(80, 100, 160, 0.15);
+  background: rgba(255, 255, 255, 0.90);
+}
+
+.glass-row:hover {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.glass-table {
+  background: rgba(255, 255, 255, 0.80);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 16px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 2px 16px rgba(80, 100, 160, 0.10);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   DESIGN SYSTEM — Reusable tokens + component primitives
+   Use these across ALL pages for visual consistency.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── DS Tokens ───────────────────────────────────────────────────────────── */
+:root {
+  /* Border-radius scale */
+  --ds-radius-xs:   4px;
+  --ds-radius-sm:   6px;
+  --ds-radius-md:   10px;
+  --ds-radius-lg:   14px;
+  --ds-radius-xl:   20px;
+  --ds-radius-full: 9999px;
+
+  /* Shadow scale — blue-shifted so they feel at home on light surfaces */
+  --ds-shadow-xs: 0 1px 3px  rgba(80, 100, 160, 0.06);
+  --ds-shadow-sm: 0 2px 8px  rgba(80, 100, 160, 0.09);
+  --ds-shadow-md: 0 4px 16px rgba(80, 100, 160, 0.12);
+  --ds-shadow-lg: 0 8px 32px rgba(80, 100, 160, 0.15);
+  --ds-shadow-xl: 0 16px 48px rgba(80, 100, 160, 0.20);
+
+  /* Transition scale */
+  --ds-ease-fast:   100ms cubic-bezier(0.4, 0, 0.2, 1);
+  --ds-ease-base:   150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --ds-ease-slow:   200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --ds-ease-spring: 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Brand accent (indigo — used in glass/light surfaces) */
+  --ds-accent:       #6366f1;
+  --ds-accent-hover: #4f46e5;
+  --ds-accent-subtle:#eef2ff;
+  --ds-accent-text:  #4338ca;
+}
+
+/* ── DS: Dropdown panel ──────────────────────────────────────────────────── */
+/*  Always fully opaque, regardless of surrounding glass context.             */
+/*  Use on every floating menu, select, context menu across the app.          */
+.ds-dropdown {
+  background: #ffffff;
+  border: 1px solid rgba(180, 195, 220, 0.55);
+  border-radius: var(--ds-radius-lg);
+  box-shadow: var(--ds-shadow-lg);
+  overflow: hidden;
+}
+
+/* ── DS: Dropdown item ───────────────────────────────────────────────────── */
+.ds-dropdown-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 9px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  transition: background var(--ds-ease-fast);
+  text-align: left;
+  border: none;
+  background: transparent;
+  gap: 8px;
+}
+.ds-dropdown-item:hover                  { background: #f9fafb; }
+.ds-dropdown-item.ds-item-active         { background: var(--ds-accent-subtle); color: var(--ds-accent-text); font-weight: 600; }
+.ds-dropdown-item.ds-item-active:hover   { background: #e0e7ff; }
+.ds-dropdown-item.ds-item-danger         { color: #dc2626; }
+.ds-dropdown-item.ds-item-danger:hover   { background: #fef2f2; }
+.ds-dropdown-divider                     { height: 1px; background: #f1f5f9; margin: 4px 0; }
+
+/* ── DS: Toggle (mode switcher — e.g. Reply / Note) ─────────────────────── */
+/*  A pill-shaped container with two or more labeled items.                   */
+.ds-toggle {
+  display: inline-flex;
+  border-radius: var(--ds-radius-md);
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px;
+  gap: 1px;
+}
+.ds-toggle-item {
+  padding: 4px 14px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 8px;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all var(--ds-ease-base);
+  border: none;
+  background: transparent;
+  white-space: nowrap;
+}
+.ds-toggle-item:hover                    { color: #374151; background: rgba(255,255,255,0.5); }
+/* Reply active — green */
+.ds-toggle-item.ds-toggle-reply-active  {
+  background: #ffffff;
+  color: #15803d;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.10);
+}
+/* Note active — amber/yellow */
+.ds-toggle-item.ds-toggle-note-active   {
+  background: #fef9c3;
+  color: #854d0e;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.10);
+}
+
+/* ── DS: Input ───────────────────────────────────────────────────────────── */
+.ds-input {
+  background: #ffffff;
+  border: 1px solid rgba(180, 195, 220, 0.55);
+  border-radius: var(--ds-radius-md);
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #1a1d2e;
+  outline: none;
+  transition: border-color var(--ds-ease-base), box-shadow var(--ds-ease-base);
+  width: 100%;
+  font-family: inherit;
+}
+.ds-input:focus         { border-color: #818cf8; box-shadow: 0 0 0 3px rgba(129,140,248,0.15); }
+.ds-input::placeholder  { color: #9ca3af; }
+
+/* ── DS: Buttons ─────────────────────────────────────────────────────────── */
+.ds-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  border: none;
+  white-space: nowrap;
+  font-family: inherit;
+  transition: all var(--ds-ease-base);
+}
+.ds-btn:active:not(:disabled) { transform: scale(0.97); }
+.ds-btn:disabled               { opacity: 0.4; cursor: not-allowed; }
+
+/* Size modifiers */
+.ds-btn-xs { padding: 3px  10px; border-radius: var(--ds-radius-sm); font-size: 11px; }
+.ds-btn-sm { padding: 5px  12px; border-radius: var(--ds-radius-md); }
+.ds-btn-md { padding: 7px  16px; border-radius: var(--ds-radius-md); font-size: 13px; }
+.ds-btn-lg { padding: 10px 20px; border-radius: var(--ds-radius-lg); font-size: 14px; }
+
+/* Variant: primary (indigo) */
+.ds-btn-primary            { background: var(--ds-accent); color: #fff; box-shadow: 0 1px 4px rgba(99,102,241,0.25); }
+.ds-btn-primary:hover      { background: var(--ds-accent-hover); }
+
+/* Variant: success (green) */
+.ds-btn-success            { background: #dcfce7; color: #15803d; }
+.ds-btn-success:hover      { background: #bbf7d0; }
+
+/* Variant: ghost (neutral) */
+.ds-btn-ghost              { background: transparent; color: #6b7280; }
+.ds-btn-ghost:hover        { background: #f3f4f6; color: #374151; }
+
+/* Variant: danger */
+.ds-btn-danger             { background: #fef2f2; color: #dc2626; }
+.ds-btn-danger:hover       { background: #fee2e2; }
+
+/* Variant: outline */
+.ds-btn-outline            { background: #fff; color: #374151; border: 1px solid rgba(180,195,220,0.55); }
+.ds-btn-outline:hover      { background: #f9fafb; }
+
+/* ── DS: Badge / pill ────────────────────────────────────────────────────── */
+.ds-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--ds-radius-full);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ds-badge-neutral  { background: #f3f4f6; color: #6b7280; }
+.ds-badge-indigo   { background: var(--ds-accent-subtle); color: var(--ds-accent-text); }
+.ds-badge-green    { background: #dcfce7; color: #15803d; }
+.ds-badge-amber    { background: #fef3c7; color: #92400e; }
+.ds-badge-red      { background: #fef2f2; color: #b91c1c; }
+.ds-badge-blue     { background: #dbeafe; color: #1d4ed8; }
+
+/* ── DS: Section heading ─────────────────────────────────────────────────── */
+.ds-section-heading {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9ca3af;
+}
+
+/* ── DS: Subtle divider ──────────────────────────────────────────────────── */
+.ds-divider { height: 1px; background: rgba(180,195,220,0.35); }
+
+/* ── DS: Message bubble backgrounds ─────────────────────────────────────── */
+/*  Semantic colors that stay legible on any chat background.                 */
+.ds-bubble-customer { background: #ffffff;  color: #111827; border: 1px solid rgba(180,195,220,0.35); }
+.ds-bubble-bot      { background: #dbeafe;  color: #1e3a8a; }
+.ds-bubble-agent    { background: #d1fae5;  color: #064e3b; }

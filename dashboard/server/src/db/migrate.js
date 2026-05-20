@@ -269,6 +269,73 @@ INSERT INTO role_permissions (role_name, permission) VALUES
   ('super_admin',   'user360.tickets')
 ON CONFLICT DO NOTHING;
 
+-- Backfill missing inbox action permissions (inbox.assign, inbox.set_priority, inbox.set_tags,
+-- supervisor.reassign, studio.*, admin.tags, admin.canned_responses, etc.)
+INSERT INTO role_permissions (role_name, permission) VALUES
+  -- inbox.assign — agents can claim/assign conversations
+  ('agent',         'inbox.assign'),
+  ('kyc_agent',     'inbox.assign'),
+  ('finance_agent', 'inbox.assign'),
+  -- inbox.set_priority — all front-line staff can set ticket priority
+  ('agent',         'inbox.set_priority'),
+  ('kyc_agent',     'inbox.set_priority'),
+  ('finance_agent', 'inbox.set_priority'),
+  ('supervisor',    'inbox.set_priority'),
+  ('admin',         'inbox.set_priority'),
+  ('super_admin',   'inbox.set_priority'),
+  -- inbox.set_tags — all front-line staff can add/remove tags on tickets
+  ('agent',         'inbox.set_tags'),
+  ('kyc_agent',     'inbox.set_tags'),
+  ('finance_agent', 'inbox.set_tags'),
+  ('supervisor',    'inbox.set_tags'),
+  ('admin',         'inbox.set_tags'),
+  ('super_admin',   'inbox.set_tags'),
+  -- supervisor.reassign — supervisors and admins can reassign tickets
+  ('supervisor',    'supervisor.reassign'),
+  ('admin',         'supervisor.reassign'),
+  ('super_admin',   'supervisor.reassign'),
+  -- studio permissions — supervisors/admins manage AI Studio flows
+  ('supervisor',    'studio.create'),
+  ('supervisor',    'studio.edit'),
+  ('supervisor',    'studio.delete'),
+  ('supervisor',    'studio.test'),
+  ('admin',         'studio.create'),
+  ('admin',         'studio.edit'),
+  ('admin',         'studio.delete'),
+  ('admin',         'studio.test'),
+  ('super_admin',   'studio.create'),
+  ('super_admin',   'studio.edit'),
+  ('super_admin',   'studio.delete'),
+  ('super_admin',   'studio.test'),
+  -- admin.* — full admin panel permissions
+  ('admin',         'admin.tags'),
+  ('admin',         'admin.canned_responses'),
+  ('admin',         'admin.assignment_rules'),
+  ('admin',         'admin.sla_targets'),
+  ('admin',         'admin.bot_config'),
+  ('admin',         'admin.report_settings'),
+  ('super_admin',   'admin.tags'),
+  ('super_admin',   'admin.canned_responses'),
+  ('super_admin',   'admin.assignment_rules'),
+  ('super_admin',   'admin.sla_targets'),
+  ('super_admin',   'admin.bot_config'),
+  ('super_admin',   'admin.report_settings'),
+  -- knowledge.read/write — agents can read, admins can write
+  ('agent',         'knowledge.read'),
+  ('kyc_agent',     'knowledge.read'),
+  ('finance_agent', 'knowledge.read'),
+  ('supervisor',    'knowledge.read'),
+  ('admin',         'knowledge.read'),
+  ('admin',         'knowledge.write'),
+  ('super_admin',   'knowledge.read'),
+  ('super_admin',   'knowledge.write'),
+  -- section.metrics
+  ('admin',         'section.metrics'),
+  ('super_admin',   'section.metrics'),
+  -- section.studio for admin
+  ('admin',         'section.studio')
+ON CONFLICT DO NOTHING;
+
 -- roles.display_name — optional human-readable label for custom roles
 DO $$ BEGIN
   ALTER TABLE roles ADD COLUMN IF NOT EXISTS display_name VARCHAR;
@@ -352,6 +419,12 @@ END $$;
 -- customers.tier: expand CHECK constraint to include new tiers from mock API
 DO $$ BEGIN
   ALTER TABLE customers DROP CONSTRAINT IF EXISTS customers_tier_check;
+EXCEPTION WHEN others THEN NULL;
+END $$;
+
+-- customers.kyc_tier: 0=unverified, 1=basic, 2=enhanced, 3=full/professional
+DO $$ BEGIN
+  ALTER TABLE customers ADD COLUMN IF NOT EXISTS kyc_tier INT DEFAULT 0;
 EXCEPTION WHEN others THEN NULL;
 END $$;
 

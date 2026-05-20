@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import type { TicketDetail, TicketStatus, Message } from '../types';
+import { createPortal } from 'react-dom';
+import type { TicketDetail, TicketStatus, Message, MessageAttachment } from '../types';
 import { api } from '../api';
 import { usePerm } from '../PermissionContext';
 import { StatusBadge } from './ui/Badge';
@@ -7,7 +8,7 @@ import { Avatar } from './ui/Avatar';
 import { SLATimer } from './ui/SLATimer';
 import { Spinner } from './ui/Spinner';
 
-// ─── Constants ──────────────────────────────────────────────────────────────
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const STATUS_OPTIONS: TicketStatus[] = [
   'Open_Live', 'In_Progress', 'Pending_Customer',
@@ -49,17 +50,122 @@ function useVirtualRange(total: number, containerRef: React.RefObject<HTMLDivEle
   return range;
 }
 
-// ─── Timestamp grouping ───────────────────────────────────────────────────────
+// ─── Timestamp grouping ──────────────────────────────────────────────────────
 
 function shouldShowTimestamp(msgs: Message[], index: number): boolean {
   if (index === 0) return true;
   const prev = msgs[index - 1];
   const curr = msgs[index];
-  return curr.created_at - prev.created_at > 5 * 60; // 5 min gap
+  return curr.created_at - prev.created_at > 5 * 60;
 }
 
 function formatTime(epochSec: number): string {
   return new Date(epochSec * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+// ─── Status Dropdown ─────────────────────────────────────────────────────────
+
+const STATUS_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
+  Open_Live:           { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+  In_Progress:         { bg: 'bg-blue-50',    text: 'text-blue-700',    dot: 'bg-blue-500'    },
+  Pending_Customer:    { bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-500'   },
+  Escalated:           { bg: 'bg-red-50',     text: 'text-red-700',     dot: 'bg-red-500'     },
+  Closed_Resolved:     { bg: 'bg-gray-100',   text: 'text-gray-600',    dot: 'bg-gray-400'    },
+  Closed_Unresponsive: { bg: 'bg-gray-100',   text: 'text-gray-500',    dot: 'bg-gray-300'    },
+};
+
+function StatusDropdown({
+  status, onChange, canClose, canEscalate,
+}: {
+  status: TicketStatus;
+  onChange: (s: TicketStatus) => void;
+  canClose: boolean;
+  canEscalate: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (
+        dropRef.current && !dropRef.current.contains(e.target as Node) &&
+        btnRef.current  && !btnRef.current.contains(e.target as Node)
+      ) setOpen(false);
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
+
+  const handleToggle = () => {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      // align dropdown right-edge to button right-edge
+      setPos({ top: r.bottom + 6, left: r.right - 208 });
+    }
+    setOpen(o => !o);
+  };
+
+  // Status color map — explicit styles (never Tailwind vars that may not compile)
+  const STATUS_STYLE: Record<string, { bg: string; color: string; dot: string }> = {
+    Open_Live:           { bg: '#f0fdf4', color: '#15803d', dot: '#22c55e' },
+    In_Progress:         { bg: '#eff6ff', color: '#1d4ed8', dot: '#3b82f6' },
+    Pending_Customer:    { bg: '#fffbeb', color: '#92400e', dot: '#f59e0b' },
+    Escalated:           { bg: '#fef2f2', color: '#b91c1c', dot: '#ef4444' },
+    Closed_Resolved:     { bg: '#f9fafb', color: '#6b7280', dot: '#9ca3af' },
+    Closed_Unresponsive: { bg: '#f9fafb', color: '#9ca3af', dot: '#d1d5db' },
+  };
+  const sty = STATUS_STYLE[status] ?? { bg: '#f3f4f6', color: '#6b7280', dot: '#9ca3af' };
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        onClick={handleToggle}
+        className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-all"
+        style={{ background: sty.bg, color: sty.color }}
+      >
+        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: sty.dot }} />
+        {status.replace(/_/g, ' ')}
+        <svg className={`w-3 h-3 opacity-60 transition-transform duration-150 ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7"/>
+        </svg>
+      </button>
+
+      {open && createPortal(
+        <div
+          ref={dropRef}
+          className="ds-dropdown w-52 animate-slide-in-up"
+          style={{ position: 'fixed', top: pos.top, left: Math.max(4, pos.left), zIndex: 9999 }}
+        >
+          {STATUS_OPTIONS.map(s => {
+            const st = STATUS_STYLE[s] ?? { bg: '#f3f4f6', color: '#6b7280', dot: '#9ca3af' };
+            const isActive = s === status;
+            const isAllowed = s === 'Escalated' ? canEscalate : canClose;
+            return (
+              <button
+                key={s}
+                onClick={() => { if (isAllowed) { onChange(s); setOpen(false); } }}
+                disabled={!isAllowed}
+                className="ds-dropdown-item"
+                style={isActive ? { background: st.bg, color: st.color } : isAllowed ? {} : { opacity: 0.35, cursor: 'not-allowed' }}
+              >
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: st.dot }} />
+                <span className="flex-1">{s.replace(/_/g, ' ')}</span>
+                {isActive && (
+                  <svg className="w-3 h-3 shrink-0" style={{ color: st.color }} fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+                  </svg>
+                )}
+              </button>
+            );
+          })}
+        </div>,
+        document.body
+      )}
+    </>
+  );
 }
 
 // ─── Message bubble ──────────────────────────────────────────────────────────
@@ -102,9 +208,9 @@ function MessageBubble({ msg, showTs }: BubbleProps) {
         .filter(Boolean) as { label: string; text: string }[];
       return (
         <div className="w-full my-1 px-1">
-          <div className="bg-accent-blue/8 ring-1 ring-accent-blue/25 rounded-lg overflow-hidden">
+          <div className="bg-accent-blue/8 ring-1 ring-accent-blue/25 rounded-xl overflow-hidden">
             <div className="flex items-center gap-2 px-3 pt-2.5 pb-2 border-b border-accent-blue/20">
-              <svg className="w-3.5 h-3.5 text-accent-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5 text-accent-blue shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
               </svg>
               <span className="text-[10px] font-semibold text-accent-blue uppercase tracking-wide">
@@ -126,9 +232,9 @@ function MessageBubble({ msg, showTs }: BubbleProps) {
 
     return (
       <div className="w-full my-1 px-1">
-        <div className="bg-accent-amber/10 ring-1 ring-accent-amber/30 rounded-lg px-3 py-2.5">
+        <div className="bg-accent-amber/10 ring-1 ring-accent-amber/30 rounded-xl px-3 py-2.5">
           <div className="flex items-center gap-1.5 mb-1.5">
-            <svg className="w-3 h-3 text-accent-amber" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3 h-3 text-accent-amber shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/>
             </svg>
             <span className="text-[10px] font-semibold text-accent-amber uppercase tracking-wide">
@@ -146,7 +252,7 @@ function MessageBubble({ msg, showTs }: BubbleProps) {
     const supervisorName = (msg as Message & { supervisor_name?: string }).supervisor_name ?? 'Supervisor';
     return (
       <div className="w-full my-1 px-1">
-        <div className="bg-surface-3 ring-1 ring-accent-amber/20 rounded-lg px-3 py-2.5 border-l-2 border-accent-amber">
+        <div className="bg-surface-3 ring-1 ring-accent-amber/20 rounded-xl px-3 py-2.5 border-l-2 border-accent-amber">
           <div className="flex items-center gap-1.5 mb-1.5">
             <span className="text-[10px] font-semibold text-accent-amber uppercase tracking-wide">
               Whisper from {supervisorName} · {ts}
@@ -160,8 +266,14 @@ function MessageBubble({ msg, showTs }: BubbleProps) {
 
   const isCustomer = (type as string) === 'customer' || (type as string) === 'user';
   const isBot      = type === 'bot' || type === 'ai' || type === 'assistant';
-  const isRight    = !isCustomer; // agents and bots on the right
+  const isRight    = !isCustomer;
   const label      = isCustomer ? (msg.agent_name || 'Customer') : isBot ? 'Bot' : (msg.agent_name || 'Agent');
+
+  // Attachments stored in metadata by the Python backend
+  const attachments: MessageAttachment[] = (
+    msg.attachments ??
+    ((msg.metadata?.attachments as MessageAttachment[] | undefined) ?? [])
+  );
 
   return (
     <div className={`flex flex-col max-w-[72%] ${isRight ? 'self-end items-end' : 'self-start items-start'}`}>
@@ -171,14 +283,38 @@ function MessageBubble({ msg, showTs }: BubbleProps) {
       <div className={`
         px-3.5 py-2.5 text-sm whitespace-pre-wrap break-words leading-relaxed
         ${isCustomer
-          ? 'bg-surface-3 text-text-primary rounded-xl rounded-tl-sm ring-1 ring-surface-5'
+          /* Customer: pure white with border — distinct against the tinted chat bg */
+          ? 'ds-bubble-customer rounded-xl rounded-tl-sm'
           : isBot
-          ? 'bg-surface-2 text-text-secondary italic ring-1 ring-surface-5 rounded-xl rounded-tr-sm'
-          : 'bg-brand/8 text-text-primary ring-1 ring-brand/15 rounded-xl rounded-tr-sm'
+          /* AI Bot: blue */
+          ? 'ds-bubble-bot rounded-xl rounded-tr-sm'
+          /* Human agent: green */
+          : 'ds-bubble-agent rounded-xl rounded-tr-sm'
         }
       `}>
-        {isBot && <span className="font-semibold not-italic text-text-muted text-xs mr-1.5">Bot</span>}
+        {isBot && <span className="font-semibold text-blue-500 text-xs mr-1.5">Bot</span>}
         {msg.content}
+
+        {/* Attachment thumbnails */}
+        {attachments.length > 0 && (
+          <div className={`flex flex-wrap gap-2 ${msg.content ? 'mt-2' : ''}`}>
+            {attachments.map((a) => (
+              a.mime_type.startsWith('image/') ? (
+                <a key={a.id} href={a.url} target="_blank" rel="noopener noreferrer">
+                  <img src={a.url} alt={a.name} className="w-20 h-20 object-cover rounded-lg border border-white/20 hover:opacity-90 transition-opacity cursor-pointer" />
+                </a>
+              ) : (
+                <a key={a.id} href={a.url} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-xs">
+                  <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                  </svg>
+                  <span className="max-w-[100px] truncate">{a.name}</span>
+                </a>
+              )
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -225,6 +361,15 @@ export default function MessageThread({ ticketId, ws, onStatusChange, pendingDra
   const [typingAgents, setTypingAgents] = useState<string[]>([]);
   const [cannedMatches, setCannedMatches] = useState<{ id: string; shortcut: string; body: string }[]>([]);
   const [allCanned, setAllCanned] = useState<{ id: string; shortcut: string; body: string; title: string }[]>([]);
+
+  // AI quick actions
+  const [aiLoading, setAiLoading] = useState<'suggest' | 'summarize' | null>(null);
+  const [inlineSummary, setInlineSummary] = useState('');
+
+  const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -232,7 +377,6 @@ export default function MessageThread({ ticketId, ws, onStatusChange, pendingDra
   const messages: Message[] = useMemo(() => ticket?.history ?? [], [ticket]);
   const virtualRange = useVirtualRange(messages.length, scrollRef);
 
-  // Reset per-ticket state when the selected ticket changes
   useEffect(() => {
     setTicket(null);
     setReply('');
@@ -241,6 +385,7 @@ export default function MessageThread({ ticketId, ws, onStatusChange, pendingDra
     setLoading(true);
     setTypingAgents([]);
     setCannedMatches([]);
+    setInlineSummary('');
   }, [ticketId]);
 
   const load = useCallback(async () => {
@@ -281,7 +426,6 @@ export default function MessageThread({ ticketId, ws, onStatusChange, pendingDra
       try {
         const event = JSON.parse(e.data) as Record<string, unknown>;
         const evId = (event.conversation_id ?? event.ticketId) as string | undefined;
-        // Use the stable ticketId prop — ticket state may still be null on first mount
         if (evId && evId !== ticketId) return;
 
         if (event.type === 'new_message') {
@@ -333,11 +477,31 @@ export default function MessageThread({ ticketId, ws, onStatusChange, pendingDra
     setCannedMatches([]);
   };
 
-  const send = async () => {
-    if (!reply.trim() || sending || !ticket) return;
-    setSending(true);
+  const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
+  const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+  const handleFiles = async (files: FileList | File[]) => {
+    const arr = Array.from(files).slice(0, 5);
+    const valid = arr.filter(f => ALLOWED_MIME.includes(f.type) && f.size <= MAX_FILE_SIZE);
+    if (!valid.length) return;
+    setUploadingFiles(true);
     try {
-      await api.reply(ticket.id, reply.trim(), isNote, replyChannel);
+      const uploaded = await Promise.all(valid.map(f => api.uploadAttachment(f)));
+      const attachments: MessageAttachment[] = uploaded.map(u => ({
+        id: u.id, url: u.url, name: u.name, mime_type: u.mime_type, size: u.size,
+      }));
+      setPendingAttachments(prev => [...prev, ...attachments].slice(0, 5));
+    } catch { /* silent */ } finally { setUploadingFiles(false); }
+  };
+
+  const send = async () => {
+    if (!reply.trim() && !pendingAttachments.length) return;
+    if (sending || !ticket) return;
+    setSending(true);
+    const attachmentIds = pendingAttachments.map(a => a.id);
+    setPendingAttachments([]);
+    try {
+      await api.reply(ticket.id, reply.trim(), isNote, replyChannel, attachmentIds.length ? attachmentIds : undefined);
       setReply('');
       setIsAiDraft(false);
       await load();
@@ -358,10 +522,31 @@ export default function MessageThread({ ticketId, ws, onStatusChange, pendingDra
     onStatusChange();
   };
 
+  // ── AI quick actions ──
+  const handleSuggestReply = async () => {
+    if (!ticket || aiLoading) return;
+    setAiLoading('suggest');
+    try {
+      const r = await api.suggestReply(ticket.id);
+      setReply(r.suggestion);
+      setIsAiDraft(true);
+      textareaRef.current?.focus();
+    } catch { /* silent */ } finally { setAiLoading(null); }
+  };
+
+  const handleSummarize = async () => {
+    if (!ticket || aiLoading) return;
+    setAiLoading('summarize');
+    try {
+      const r = await api.summarize(ticket.id);
+      setInlineSummary(r.summary);
+    } catch { /* silent */ } finally { setAiLoading(null); }
+  };
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full bg-surface-0">
-        <Spinner size="md" className="text-text-muted" />
+      <div className="flex items-center justify-center h-full bg-white">
+        <Spinner size="md" className="text-gray-300" />
       </div>
     );
   }
@@ -374,65 +559,68 @@ export default function MessageThread({ ticketId, ws, onStatusChange, pendingDra
   const slaBreachAt = (ticket as TicketDetail & { sla_breach_at?: string }).sla_breach_at;
 
   return (
-    <div className="flex flex-col h-full bg-surface-0">
+    <div className="flex flex-col h-full bg-white" style={{ position: 'relative', zIndex: 1 }}>
 
       {/* ── Thread Header ── */}
-      <div className="px-4 py-2.5 bg-surface-2 border-b border-surface-5 flex items-center justify-between gap-3 shrink-0">
-        <div className="flex items-center gap-2.5 min-w-0">
+      <div
+        className="px-5 py-3.5 flex items-center justify-between gap-4 shrink-0 bg-white"
+        style={{ borderBottom: '1px solid rgba(180,195,220,0.35)' }}
+      >
+        {/* Left: avatar + name + meta */}
+        <div className="flex items-center gap-3 min-w-0">
           <Avatar name={ticket.customer?.name ?? '?'} size="sm" />
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-text-primary truncate">
+              <span className="text-[14px] font-semibold text-gray-900 truncate">
                 {ticket.customer?.name || ticket.customer?.user_id || ticket.id.slice(0, 8)}
               </span>
-              <StatusBadge status={ticket.status} dot size="xs" />
+              {ticket.customer?.tier === 'VIP' && (
+                <span className="ds-badge ds-badge-red text-[9px] shrink-0">VIP</span>
+              )}
             </div>
             <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-[10px] font-mono text-text-muted"># {ticket.id.slice(0, 10)}</span>
+              <span className="text-[11px] font-mono text-gray-400"># {ticket.id.slice(0, 10)}</span>
               {ticket.category && (
-                <span className="text-[10px] text-text-muted">{ticket.category.replace(/_/g, ' ')}</span>
+                <span className="text-[11px] text-gray-400 capitalize">{ticket.category.replace(/_/g, ' ')}</span>
               )}
               {slaBreachAt && <SLATimer deadline={slaBreachAt} showLabel />}
               {isVirtual && (
-                <span className="text-[10px] text-text-muted bg-surface-3 px-1.5 py-0.5 rounded">
-                  {messages.length} msgs
-                </span>
+                <span className="text-[11px] text-gray-400">{messages.length} msgs</span>
               )}
             </div>
           </div>
         </div>
 
-        {/* Status buttons */}
-        <div className="flex items-center gap-1 flex-wrap justify-end shrink-0">
-{STATUS_OPTIONS
-            .filter(s => s === 'Escalated' ? canEscalate : canClose)
-            .map(s => (
-              <button key={s} onClick={() => changeStatus(s)} disabled={ticket.status === s}
-                className={`text-xs px-2.5 py-1 rounded ring-1 whitespace-nowrap transition-colors active:scale-[0.98] ${
-                  ticket.status === s
-                    ? 'bg-surface-4 ring-surface-5 text-text-primary font-medium cursor-default'
-                    : 'ring-surface-5 text-text-secondary hover:text-text-primary hover:bg-surface-3'
-                } disabled:cursor-default`}>
-                {s.replace(/_/g, ' ')}
-              </button>
-            ))}
+        {/* Right: resolve + status */}
+        <div className="flex items-center gap-2 shrink-0">
+          {canReply && !['Closed_Resolved', 'Closed_Unresponsive'].includes(ticket.status) && (
+            <button
+              onClick={requestResolution}
+              className="ds-btn ds-btn-sm ds-btn-success"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4.5 12.75l6 6 9-13.5"/>
+              </svg>
+              Resolve
+            </button>
+          )}
+          <StatusDropdown
+            status={ticket.status}
+            onChange={changeStatus}
+            canClose={canClose}
+            canEscalate={canEscalate}
+          />
         </div>
       </div>
 
       {/* ── Message list ── */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-2">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-2" style={{ background: 'linear-gradient(160deg, #f0f4ff 0%, #e8f2f8 100%)' }}>
         {isVirtual && <div style={{ height: topPad }} />}
 
         {visibleMessages.map((msg, i) => {
           const globalIdx = isVirtual ? virtualRange.start + i : i;
           const showTs = shouldShowTimestamp(messages, globalIdx);
-          return (
-            <MessageBubble
-              key={globalIdx}
-              msg={msg}
-              showTs={showTs}
-            />
-          );
+          return <MessageBubble key={globalIdx} msg={msg} showTs={showTs} />;
         })}
 
         {isVirtual && <div style={{ height: botPad }} />}
@@ -452,102 +640,147 @@ export default function MessageThread({ ticketId, ws, onStatusChange, pendingDra
 
       {/* ── Canned response dropdown ── */}
       {cannedMatches.length > 0 && (
-        <div className="mx-4 mb-1 bg-surface-3 ring-1 ring-surface-5 rounded-lg overflow-hidden shadow-panel animate-slide-in-up">
+        <div className="mx-3 mb-1 rounded-xl overflow-hidden animate-slide-in-up"
+          style={{ background: '#fff', boxShadow: '0 4px 20px rgba(80,100,160,0.12)', border: '1px solid rgba(180,195,220,0.4)' }}>
           {cannedMatches.map(c => (
             <button key={c.id} onClick={() => applyCanned(c.body)}
-              className="w-full text-left px-3 py-2.5 text-sm hover:bg-surface-4 border-b border-surface-5 last:border-0 transition-colors">
-              <span className="font-medium text-brand">/{c.shortcut}</span>
+              className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 border-b border-gray-100 last:border-0 transition-colors">
+              <span className="font-semibold text-indigo-600">/{c.shortcut}</span>
               <span className="text-text-muted ml-2 text-xs">{c.body.slice(0, 60)}…</span>
             </button>
           ))}
         </div>
       )}
 
-      {/* ── Reply composer ── */}
+      {/* ── Composer ── */}
       {(canReply || canInternalNote) && (
-        <div className={`px-4 py-3 border-t border-surface-5 shrink-0 ${isNote ? 'bg-accent-amber/8' : 'bg-surface-2'}`}>
+        <div className="px-4 pb-4 pt-3 shrink-0 bg-white" style={{ borderTop: '1px solid rgba(180,195,220,0.35)' }}>
 
-          {/* Mode + channel row */}
-          <div className="flex items-center gap-2 mb-2.5 flex-wrap">
-            {/* Mode toggle */}
-            <div className="flex bg-surface-3 ring-1 ring-surface-5 rounded-md overflow-hidden">
-              {canReply && (
-                <button onClick={() => setIsNote(false)}
-                  className={`text-xs px-3 py-1.5 transition-colors ${!isNote ? 'bg-surface-2 text-text-primary font-medium shadow-sm' : 'text-text-secondary hover:text-text-primary'}`}>
-                  Reply
-                </button>
-              )}
-              {canInternalNote && (
-                <button onClick={() => setIsNote(true)}
-                  className={`text-xs px-3 py-1.5 transition-colors ${isNote ? 'bg-accent-amber/20 text-accent-amber font-medium' : 'text-text-secondary hover:text-text-primary'}`}>
-                  Internal Note
-                </button>
-              )}
-            </div>
-
-            {/* Request Closure chip */}
-            {canReply && !['Closed_Resolved', 'Closed_Unresponsive'].includes(ticket.status) && (
-              <>
-                <div className="w-px h-4 bg-surface-5" />
-                <button
-                  onClick={requestResolution}
-                  className="text-xs px-2.5 py-1.5 rounded-md ring-1 ring-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10 whitespace-nowrap transition-colors active:scale-[0.98]"
-                >
-                  ✓ Request Closure
-                </button>
-              </>
-            )}
-
-            {/* Channel pills — only in Reply mode */}
-            {!isNote && (
-              <div className="flex items-center gap-1 ml-auto">
-                {REPLY_CHANNELS.map(ch => {
-                  const fbLocked = ch === 'facebook' && isFbWindowClosed(messages);
-                  return (
-                    <button key={ch}
-                      onClick={() => !fbLocked && setReplyChannel(ch)}
-                      disabled={fbLocked}
-                      title={fbLocked ? 'Facebook 24h window closed' : ch}
-                      className={`text-[10px] px-2 py-1 rounded capitalize transition-colors ${
-                        replyChannel === ch && !isNote
-                          ? 'bg-brand text-white'
-                          : fbLocked
-                          ? 'text-text-muted cursor-not-allowed opacity-40'
-                          : 'text-text-secondary hover:text-text-primary hover:bg-surface-4'
-                      }`}>
-                      {ch}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Facebook 24h warning */}
-          {!isNote && replyChannel === 'facebook' && isFbWindowClosed(messages) && (
-            <div className="mb-2 flex items-center gap-2 text-xs text-brand bg-brand/10 ring-1 ring-brand/20 px-3 py-2 rounded-md">
-              <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
-              </svg>
-              Facebook 24h messaging window has closed.
-            </div>
-          )}
-
-          {/* AI Draft label */}
-          {isAiDraft && !isNote && (
-            <div className="mb-2 flex items-center gap-1.5">
-              <svg className="w-3 h-3 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          {/* Inline AI summary result */}
+          {inlineSummary && (
+            <div className="mb-2 rounded-xl p-3 flex gap-2 items-start" style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)' }}>
+              <svg className="w-3.5 h-3.5 text-indigo-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
               </svg>
-              <span className="text-[10px] font-semibold text-indigo-400">AI Draft</span>
-              <span className="text-[10px] text-text-muted">Review before sending</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] font-semibold text-indigo-600 uppercase tracking-wide mb-1">AI Summary</div>
+                <p className="text-xs text-gray-700 leading-relaxed">{inlineSummary}</p>
+              </div>
+              <button onClick={() => setInlineSummary('')} className="text-gray-400 hover:text-gray-600 shrink-0">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
             </div>
           )}
 
-          {/* Compose area */}
-          <div className={`ring-1 rounded-lg overflow-hidden transition-colors ${
-            isNote ? 'ring-accent-amber/30' : 'ring-surface-5 focus-within:ring-brand'
-          }`}>
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+            multiple
+            className="hidden"
+            onChange={(e) => { if (e.target.files) { handleFiles(e.target.files); e.target.value = ''; } }}
+          />
+
+          {/* Glass card composer */}
+          <div
+            className={`rounded-xl overflow-hidden transition-all ${isDragOver ? 'ring-2 ring-indigo-400' : isNote ? 'ring-2 ring-amber-300' : 'ring-1 ring-gray-200 focus-within:ring-2 focus-within:ring-indigo-300'}`}
+            style={{ background: '#ffffff', boxShadow: '0 1px 8px rgba(80,100,160,0.08)' }}
+            onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+            onDragLeave={() => setIsDragOver(false)}
+            onDrop={(e) => { e.preventDefault(); setIsDragOver(false); if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files); }}
+            onPaste={(e) => { if (e.clipboardData.files.length) { e.preventDefault(); handleFiles(e.clipboardData.files); } }}
+          >
+            {/* Mode + channel row */}
+            <div className="flex items-center gap-2 px-3 pt-2.5 pb-1 flex-wrap">
+              {/* Mode toggle */}
+              <div className="ds-toggle">
+                {canReply && (
+                  <button
+                    onClick={() => setIsNote(false)}
+                    className={`ds-toggle-item ${!isNote ? 'ds-toggle-reply-active' : ''}`}
+                  >
+                    Reply
+                  </button>
+                )}
+                {canInternalNote && (
+                  <button
+                    onClick={() => setIsNote(true)}
+                    className={`ds-toggle-item ${isNote ? 'ds-toggle-note-active' : ''}`}
+                  >
+                    Note
+                  </button>
+                )}
+              </div>
+
+              {/* Channel pills — Reply mode only */}
+              {!isNote && (
+                <div className="flex items-center gap-1">
+                  {REPLY_CHANNELS.map(ch => {
+                    const fbLocked = ch === 'facebook' && isFbWindowClosed(messages);
+                    return (
+                      <button key={ch}
+                        onClick={() => !fbLocked && setReplyChannel(ch)}
+                        disabled={fbLocked}
+                        title={fbLocked ? 'Facebook 24h window closed' : ch}
+                        className={`text-[10px] px-2 py-0.5 rounded-full capitalize transition-colors font-medium ${
+                          replyChannel === ch && !isNote
+                            ? 'bg-indigo-600 text-white'
+                            : fbLocked
+                            ? 'text-gray-300 cursor-not-allowed'
+                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                        }`}>
+                        {ch}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* AI Draft label */}
+              {isAiDraft && !isNote && (
+                <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-indigo-500">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
+                  </svg>
+                  AI Draft
+                </span>
+              )}
+            </div>
+
+            {/* Facebook 24h warning */}
+            {!isNote && replyChannel === 'facebook' && isFbWindowClosed(messages) && (
+              <div className="mx-3 mb-1 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 ring-1 ring-amber-200 px-3 py-2 rounded-lg">
+                <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
+                </svg>
+                Facebook 24h messaging window has closed.
+              </div>
+            )}
+
+            {/* Attachment previews */}
+            {pendingAttachments.length > 0 && (
+              <div className="flex flex-wrap gap-2 px-3 pt-2">
+                {pendingAttachments.map((a) => (
+                  <div key={a.id} className="relative group">
+                    {a.mime_type.startsWith('image/') ? (
+                      <img src={a.url} alt={a.name} className="w-14 h-14 object-cover rounded-lg border border-gray-200" />
+                    ) : (
+                      <div className="w-14 h-14 flex items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-[10px] text-gray-500 text-center px-1 break-all">{a.name}</div>
+                    )}
+                    <button
+                      className="absolute -top-1 -right-1 w-4 h-4 bg-gray-700 text-white rounded-full text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => setPendingAttachments(prev => prev.filter(x => x.id !== a.id))}
+                    >×</button>
+                  </div>
+                ))}
+                {uploadingFiles && <div className="w-14 h-14 flex items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-[10px] text-gray-400">…</div>}
+              </div>
+            )}
+
+            {/* Textarea */}
             <textarea
               ref={textareaRef}
               value={reply}
@@ -555,18 +788,69 @@ export default function MessageThread({ ticketId, ws, onStatusChange, pendingDra
               onKeyDown={e => {
                 if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
               }}
-              placeholder={isNote ? 'Internal note… (↵ to send, ⇧↵ for newline)' : `Reply via ${replyChannel}… (/ for canned responses, ↵ to send, ⇧↵ for newline)`}
-              className={`w-full text-sm px-3.5 py-3 resize-none outline-none leading-relaxed min-h-[80px] ${
-                isNote ? 'bg-accent-amber/8 text-text-primary placeholder:text-text-muted' : 'bg-surface-2 text-text-primary placeholder:text-text-muted'
+              placeholder={isNote ? 'Internal note… (↵ to send)' : `Reply via ${replyChannel}… (/ for canned, ↵ to send)`}
+              className={`w-full text-sm px-3.5 py-2.5 resize-none outline-none leading-relaxed min-h-[72px] bg-transparent placeholder:text-gray-400 ${
+                isNote ? 'text-amber-900 placeholder:text-amber-400' : 'text-gray-900'
               }`}
               rows={3}
             />
-            <div className={`flex items-center justify-end gap-2 px-3 py-2 border-t ${isNote ? 'border-accent-amber/20 bg-accent-amber/5' : 'border-surface-5 bg-surface-3'}`}>
-              <span className="text-[10px] text-text-muted">{reply.length > 0 ? `${reply.length} chars` : '⌘↵ to send'}</span>
+
+            {/* Bottom bar: AI actions + char count + send */}
+            <div className="flex items-center gap-1.5 px-2.5 py-2" style={{ borderTop: '1px solid rgba(180,195,220,0.3)' }}>
+              {/* AI Copilot quick actions */}
+              <button
+                onClick={handleSuggestReply}
+                disabled={!!aiLoading}
+                title="AI Suggest Reply"
+                className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-full font-medium text-indigo-600 hover:bg-indigo-50 transition-colors disabled:opacity-40"
+              >
+                {aiLoading === 'suggest' ? (
+                  <Spinner size="xs" className="text-indigo-500" />
+                ) : (
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
+                  </svg>
+                )}
+                Suggest
+              </button>
+
+              <button
+                onClick={handleSummarize}
+                disabled={!!aiLoading}
+                title="Summarize conversation"
+                className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-full font-medium text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-40"
+              >
+                {aiLoading === 'summarize' ? (
+                  <Spinner size="xs" className="text-blue-500" />
+                ) : (
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12"/>
+                  </svg>
+                )}
+                Summarize
+              </button>
+
+              {/* Paperclip — reply mode only, not internal notes */}
+              {!isNote && (
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Attach file"
+                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66L9.41 17.41a2 2 0 01-2.83-2.83l8.49-8.48"/>
+                  </svg>
+                </button>
+              )}
+
+              <div className="flex-1" />
+
+              <span className="text-[10px] text-gray-400">{reply.length > 0 ? `${reply.length} chars` : '⌘↵'}</span>
+
               <button
                 onClick={send}
-                disabled={!reply.trim() || sending}
-                className="flex items-center gap-1.5 bg-brand hover:bg-brand-dim text-white text-xs px-3 py-1.5 rounded font-medium disabled:opacity-30 transition-colors active:scale-[0.98]"
+                disabled={(!reply.trim() && !pendingAttachments.length) || sending}
+                className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1.5 rounded-xl font-semibold disabled:opacity-30 transition-colors active:scale-[0.98] shadow-sm"
               >
                 {sending ? <Spinner size="xs" className="text-white" /> : (
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

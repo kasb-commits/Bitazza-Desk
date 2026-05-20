@@ -5,8 +5,8 @@ import type { Ticket, Priority, Agent, InboxView, StatusFilter } from '../types'
 import { api } from '../api';
 import { KpiCard } from './ui/KpiCard';
 import { Avatar } from './ui/Avatar';
-import { StatusBadge, ChannelBadge, PriorityBadge } from './ui/Badge';
-import { KpiCardSkeleton, TableRowSkeleton } from './ui/Skeleton';
+import { ChannelBadge, PriorityBadge } from './ui/Badge';
+import { KpiCardSkeleton } from './ui/Skeleton';
 import { EmptyState } from './ui/EmptyState';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -60,37 +60,82 @@ const CHANNEL_PIE_COLORS: Record<string, string> = {
 };
 const CHANNEL_PIE_FALLBACK = '#6b7280';
 
-// ── Ticket Row ────────────────────────────────────────────────────────────────
+// ── Background Blobs ──────────────────────────────────────────────────────────
 
-const URGENCY_ROW: Record<string, string> = {
-  critical: 'border-l-2 border-l-red-500',
-  warning:  'border-l-2 border-l-amber-400',
-  normal:   '',
-};
-const URGENCY_TIME: Record<string, string> = {
-  critical: 'text-red-500 font-semibold',
-  warning:  'text-amber-500 font-semibold',
-  normal:   'text-text-muted',
-};
+function BgBlobs() {
+  return (
+    <div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: 0 }}>
+      <div style={{
+        position: 'absolute', width: 600, height: 600, top: -200, right: -100,
+        borderRadius: '50%', filter: 'blur(80px)', opacity: 0.35,
+        background: 'radial-gradient(circle, #a5b4fc, #818cf8)',
+      }} />
+      <div style={{
+        position: 'absolute', width: 400, height: 400, bottom: -100, left: 200,
+        borderRadius: '50%', filter: 'blur(80px)', opacity: 0.2,
+        background: 'radial-gradient(circle, #c7d2fe, #6366f1)',
+      }} />
+      <div style={{
+        position: 'absolute', width: 300, height: 300, top: '40%', right: '30%',
+        borderRadius: '50%', filter: 'blur(80px)', opacity: 0.18,
+        background: 'radial-gradient(circle, #bfdbfe, #93c5fd)',
+      }} />
+    </div>
+  );
+}
+
+// ── KPI Icons ─────────────────────────────────────────────────────────────────
+
+const IconTicket = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
+    <rect x="9" y="3" width="6" height="4" rx="1"/>
+  </svg>
+);
+const IconChat = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+  </svg>
+);
+const IconBolt = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+  </svg>
+);
+const IconStar = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+  </svg>
+);
+const IconClock = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <polyline points="12 6 12 12 16 14"/>
+  </svg>
+);
+
+// ── Ticket Row ────────────────────────────────────────────────────────────────
 
 function TicketRow({ ticket, onClick }: { ticket: Ticket; onClick: () => void }) {
   const name = ticket.customer?.name ?? 'Unknown';
   const urgency = getUrgencyLevel(ticket);
+  const urgencyBorder = urgency === 'critical' ? 'border-l-2 border-l-red-400' : urgency === 'warning' ? 'border-l-2 border-l-amber-400' : '';
+  const urgencyTime = urgency === 'critical' ? 'text-red-500 font-semibold' : urgency === 'warning' ? 'text-amber-500 font-semibold' : 'text-gray-400';
+
   return (
     <div
       onClick={onClick}
-      className={`group flex items-center gap-3 px-4 py-3 border-b border-surface-5 hover:bg-surface-3 cursor-pointer transition-colors duration-100 ${URGENCY_ROW[urgency]}`}
+      className={`group flex items-center gap-3 px-4 py-3 border-b border-gray-100 glass-row cursor-pointer transition-colors duration-100 ${urgencyBorder}`}
     >
       <Avatar name={name} size="sm" className="shrink-0" />
       <div className="min-w-0 flex-1">
-        <div className="text-xs font-semibold text-text-primary truncate">{name}</div>
-        <div className="text-xs text-text-secondary truncate mt-0.5">{ticket.last_message ?? '—'}</div>
+        <div className="text-xs font-semibold text-gray-900 truncate">{name}</div>
+        <div className="text-xs text-gray-500 truncate mt-0.5">{ticket.last_message ?? '—'}</div>
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <ChannelBadge channel={ticket.channel as any} size="xs" />
         {ticket.priority !== 3 && <PriorityBadge priority={ticket.priority as Priority} size="xs" />}
-        <StatusBadge status={ticket.status} size="xs" />
-        <span className={`text-[10px] w-8 text-right tabular-nums ${URGENCY_TIME[urgency]}`}>
+        <span className={`text-[10px] w-8 text-right tabular-nums ${urgencyTime}`}>
           {relativeTime(ticket.last_message_at ?? ticket.created_at)}
         </span>
       </div>
@@ -107,17 +152,25 @@ function TicketTable({
   loading: boolean; onTicketClick: (id: string) => void;
 }) {
   return (
-    <div className="bg-surface-2 ring-1 ring-surface-5 rounded-lg flex flex-col overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3.5 border-b border-surface-5 shrink-0">
+    <div className="glass-table">
+      <div className="flex items-center justify-between px-4 py-3.5 border-b border-gray-100 shrink-0">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-text-primary">{title}</span>
+          <span className="text-sm font-semibold text-gray-900">{title}</span>
           {badge}
         </div>
-        <span className="text-xs text-text-muted">{tickets.length} tickets</span>
+        <span className="text-xs text-gray-400">{tickets.length} tickets</span>
       </div>
       <div className="overflow-y-auto flex-1">
         {loading
-          ? Array.from({ length: 5 }).map((_, i) => <TableRowSkeleton key={i} cols={4} />)
+          ? Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
+                <div className="w-7 h-7 rounded-full bg-gray-200 animate-pulse shrink-0" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-2.5 bg-gray-200 rounded animate-pulse w-2/3" />
+                  <div className="h-2 bg-gray-100 rounded animate-pulse w-1/2" />
+                </div>
+              </div>
+            ))
           : tickets.length === 0
             ? <EmptyState title="No tickets" className="h-32" />
             : tickets.map(t => <TicketRow key={t.id} ticket={t} onClick={() => onTicketClick(t.id)} />)
@@ -133,7 +186,7 @@ function EscalatedStrip({ tickets, onTicketClick }: { tickets: Ticket[]; onTicke
   if (tickets.length === 0) return null;
   const shown = tickets.slice(0, 3);
   return (
-    <div className="rounded-lg bg-red-500/8 border border-red-500/25 px-4 py-3 flex flex-col gap-2">
+    <div className="rounded-xl border border-red-200 px-4 py-3 flex flex-col gap-2" style={{ background: 'rgba(239,68,68,0.06)' }}>
       <div className="flex items-center gap-2 mb-0.5">
         <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse" />
         <span className="text-xs font-semibold text-red-500 uppercase tracking-wide">
@@ -144,7 +197,7 @@ function EscalatedStrip({ tickets, onTicketClick }: { tickets: Ticket[]; onTicke
         <div key={t.id} onClick={() => onTicketClick(t.id)}
           className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity">
           <Avatar name={t.customer?.name ?? 'Unknown'} size="xs" className="shrink-0" />
-          <span className="text-xs font-medium text-text-primary truncate flex-1">
+          <span className="text-xs font-medium text-gray-800 truncate flex-1">
             {t.customer?.name ?? 'Unknown'}
           </span>
           <ChannelBadge channel={t.channel as any} size="xs" />
@@ -154,7 +207,7 @@ function EscalatedStrip({ tickets, onTicketClick }: { tickets: Ticket[]; onTicke
         </div>
       ))}
       {tickets.length > 3 && (
-        <span className="text-[10px] text-text-muted mt-0.5">+{tickets.length - 3} more — go to Inbox</span>
+        <span className="text-[10px] text-gray-400 mt-0.5">+{tickets.length - 3} more — go to Inbox</span>
       )}
     </div>
   );
@@ -164,22 +217,20 @@ function EscalatedStrip({ tickets, onTicketClick }: { tickets: Ticket[]; onTicke
 
 function ResolutionCard({ total, resolved }: { total: number; resolved: number }) {
   const rate = total > 0 ? Math.round((resolved / total) * 100) : null;
-  const color = rate == null ? 'text-text-muted' : rate >= 70 ? 'text-green-500' : rate >= 40 ? 'text-amber-500' : 'text-red-500';
+  const color = rate == null ? 'text-gray-400' : rate >= 70 ? 'text-emerald-600' : rate >= 40 ? 'text-amber-600' : 'text-red-500';
+  const barColor = rate == null ? '' : rate >= 70 ? 'bg-emerald-500' : rate >= 40 ? 'bg-amber-500' : 'bg-red-500';
   return (
-    <div className="bg-surface-2 ring-1 ring-surface-5 rounded-lg p-4 flex flex-col gap-1">
-      <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Resolution Today</span>
+    <div className="glass-card flex flex-col gap-2">
+      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Resolution Today</span>
       <div className={`text-3xl font-bold tabular-nums ${color}`}>
         {rate != null ? `${rate}%` : '—'}
       </div>
-      <span className="text-xs text-text-secondary">
+      <span className="text-xs text-gray-500">
         {resolved} resolved / {total} opened
       </span>
       {rate != null && (
-        <div className="mt-2 h-1.5 rounded-full bg-surface-5 overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all duration-500 ${rate >= 70 ? 'bg-green-500' : rate >= 40 ? 'bg-amber-500' : 'bg-red-500'}`}
-            style={{ width: `${rate}%` }}
-          />
+        <div className="mt-1 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+          <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${rate}%` }} />
         </div>
       )}
     </div>
@@ -194,9 +245,9 @@ function ChannelPie({ data }: { data: { channel: string; count: number }[] }) {
 
   if (sorted.length === 0) {
     return (
-      <div className="bg-surface-2 ring-1 ring-surface-5 rounded-lg p-4 flex flex-col gap-3">
-        <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Channels Today</span>
-        <span className="text-xs text-text-muted">No data yet</span>
+      <div className="glass-card flex flex-col gap-3">
+        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Channels Today</span>
+        <span className="text-xs text-gray-400">No data yet</span>
       </div>
     );
   }
@@ -208,8 +259,8 @@ function ChannelPie({ data }: { data: { channel: string; count: number }[] }) {
   }));
 
   return (
-    <div className="bg-surface-2 ring-1 ring-surface-5 rounded-lg p-4 flex flex-col gap-3">
-      <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Channels Today</span>
+    <div className="glass-card flex flex-col gap-3">
+      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Channels Today</span>
       <div className="flex items-center gap-4">
         <div className="w-24 h-24 shrink-0">
           <ResponsiveContainer width="100%" height="100%">
@@ -218,7 +269,7 @@ function ChannelPie({ data }: { data: { channel: string; count: number }[] }) {
                 {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
               </Pie>
               <Tooltip
-                contentStyle={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-5)', borderRadius: 6, fontSize: 10 }}
+                contentStyle={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
                 formatter={(v: number, name: string) => [`${v} (${Math.round(v / total * 100)}%)`, name]}
               />
             </PieChart>
@@ -228,8 +279,8 @@ function ChannelPie({ data }: { data: { channel: string; count: number }[] }) {
           {pieData.map(d => (
             <div key={d.name} className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full shrink-0" style={{ background: d.color }} />
-              <span className="text-xs text-text-secondary truncate flex-1">{d.name}</span>
-              <span className="text-xs tabular-nums text-text-primary font-medium shrink-0">{d.value}</span>
+              <span className="text-xs text-gray-600 truncate flex-1">{d.name}</span>
+              <span className="text-xs tabular-nums text-gray-900 font-medium shrink-0">{d.value}</span>
             </div>
           ))}
         </div>
@@ -244,18 +295,18 @@ function TodaySummary({ opened, resolved, pending, escalated }: {
   opened: number; resolved: number; pending: number; escalated: number;
 }) {
   const rows = [
-    { label: 'Opened today',   value: opened,   color: 'text-accent-blue'  },
-    { label: 'Resolved today', value: resolved,  color: 'text-green-500'    },
-    { label: 'Pending reply',  value: pending,   color: 'text-purple-400'   },
-    { label: 'Escalated',      value: escalated, color: 'text-brand'        },
+    { label: 'Opened today',   value: opened,   color: 'text-blue-600'   },
+    { label: 'Resolved today', value: resolved,  color: 'text-emerald-600'},
+    { label: 'Pending reply',  value: pending,   color: 'text-purple-600' },
+    { label: 'Escalated',      value: escalated, color: 'text-red-500'    },
   ];
   return (
-    <div className="bg-surface-2 ring-1 ring-surface-5 rounded-lg p-4 flex flex-col gap-3">
-      <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Today's Summary</span>
-      <div className="flex flex-col gap-2">
+    <div className="glass-card flex flex-col gap-3">
+      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Today's Summary</span>
+      <div className="flex flex-col gap-2.5">
         {rows.map(r => (
           <div key={r.label} className="flex items-center justify-between">
-            <span className="text-xs text-text-secondary">{r.label}</span>
+            <span className="text-xs text-gray-600">{r.label}</span>
             <span className={`text-sm font-bold tabular-nums ${r.color}`}>{r.value}</span>
           </div>
         ))}
@@ -267,34 +318,34 @@ function TodaySummary({ opened, resolved, pending, escalated }: {
 // ── Agent Activity ────────────────────────────────────────────────────────────
 
 const AGENT_DOT: Record<string, string> = {
-  Available:      'bg-green-500',
-  Busy:           'bg-amber-500',
-  Break:          'bg-text-muted',
-  after_call_work:'bg-text-muted',
-  Offline:        'bg-surface-5',
-  away:           'bg-surface-5',
+  Available:       'bg-emerald-500',
+  Busy:            'bg-amber-500',
+  Break:           'bg-gray-400',
+  after_call_work: 'bg-gray-400',
+  Offline:         'bg-gray-300',
+  away:            'bg-gray-300',
 };
 
 function AgentActivity({ agents }: { agents: Agent[] }) {
   const active = agents.filter(a => a.active !== false && (a.state ?? a.status) !== 'Offline' && (a.state ?? a.status) !== 'away');
   if (active.length === 0) return null;
   return (
-    <div className="bg-surface-2 ring-1 ring-surface-5 rounded-lg px-4 py-3">
+    <div className="glass-card-sm" style={{ padding: '14px 16px' }}>
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-xs font-semibold text-text-primary">Agent Activity</span>
-        <span className="text-[10px] text-text-muted">{active.length} online</span>
+        <span className="text-xs font-semibold text-gray-900">Agent Activity</span>
+        <span className="text-[10px] text-gray-400">{active.length} online</span>
       </div>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {active.map(a => {
           const state = a.state ?? a.status ?? 'Offline';
           const tickets = Number(a.active_chats ?? a.active_conversation_count ?? 0);
           const max = a.max_chats ?? a.max_capacity ?? 0;
-          const dotClass = AGENT_DOT[state] ?? 'bg-surface-5';
+          const dotClass = AGENT_DOT[state] ?? 'bg-gray-300';
           return (
-            <div key={a.id} className="flex items-center gap-2 bg-surface-3 rounded-md px-3 py-1.5 flex-1 min-w-0">
+            <div key={a.id} className="flex items-center gap-2 rounded-xl px-3 py-1.5 flex-1 min-w-0" style={{ background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.7)' }}>
               <span className={`w-2 h-2 rounded-full shrink-0 ${dotClass}`} />
-              <span className="text-xs font-medium text-text-primary truncate flex-1">{a.name}</span>
-              <span className="text-[10px] tabular-nums text-text-muted shrink-0">
+              <span className="text-xs font-medium text-gray-800 truncate flex-1">{a.name}</span>
+              <span className="text-[10px] tabular-nums text-gray-400 shrink-0">
                 {tickets}{max > 0 ? `/${max}` : ''} tickets
               </span>
             </div>
@@ -378,10 +429,8 @@ export default function HomeDashboard({ onSelectTicket, onNavigateInbox }: HomeD
 
   const vipTickets = useMemo(() =>
     [...allTickets].filter(t => t.priority === 1).sort(sortByCreated).slice(0, 15), [allTickets]);
-
   const latestTickets = useMemo(() =>
     [...allTickets].filter(t => t.priority !== 1).sort(sortByCreated).slice(0, 15), [allTickets]);
-
   const escalatedTickets = useMemo(() =>
     allTickets.filter(t => t.status === 'escalated').sort(sortByCreated), [allTickets]);
 
@@ -398,16 +447,18 @@ export default function HomeDashboard({ onSelectTicket, onNavigateInbox }: HomeD
   const firstLoad = loading && allTickets.length === 0;
 
   return (
-    <div className="flex-1 overflow-y-auto bg-surface-0">
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
+    <div className="glass-page flex-1 overflow-y-auto relative">
+      <BgBlobs />
+
+      <div className="relative max-w-7xl mx-auto p-6 space-y-5" style={{ zIndex: 1 }}>
 
         {/* Error banner */}
         {error && (
-          <div className="flex items-center justify-between gap-4 rounded-lg bg-red-500/10 border border-red-500/30 px-4 py-3">
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-red-200 px-4 py-3" style={{ background: 'rgba(239,68,68,0.06)' }}>
             <span className="text-sm text-red-500">{error}</span>
             <div className="flex items-center gap-3 shrink-0">
               <button onClick={() => loadRef.current()} className="text-xs font-semibold text-red-500 hover:text-red-400 transition-colors">Retry</button>
-              <button onClick={() => setError(null)} className="text-xs text-text-muted hover:text-text-secondary transition-colors">Dismiss</button>
+              <button onClick={() => setError(null)} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">Dismiss</button>
             </div>
           </div>
         )}
@@ -415,18 +466,21 @@ export default function HomeDashboard({ onSelectTicket, onNavigateInbox }: HomeD
         {/* Greeting header */}
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-lg font-bold text-text-primary">
+            <h2 className="text-xl font-bold text-gray-900" style={{ letterSpacing: '-0.3px' }}>
               {getGreeting()}{userName ? `, ${userName.split(' ')[0]}` : ''}.
             </h2>
             {escalatedCount === 0 && (
-              <p className="text-sm text-text-secondary mt-0.5">Here's what's happening today.</p>
+              <p className="text-sm text-gray-500 mt-0.5">Here's what's happening today.</p>
             )}
           </div>
           <div className="flex items-center gap-3 shrink-0 pt-0.5">
-            {updatedLabel && <span className="text-[10px] text-text-muted tabular-nums">{updatedLabel}</span>}
+            {updatedLabel && <span className="text-[10px] text-gray-400 tabular-nums">{updatedLabel}</span>}
             <button
               onClick={() => loadRef.current()} disabled={loading} title="Refresh"
-              className="p-1.5 rounded-md hover:bg-surface-3 text-text-muted hover:text-text-secondary transition-colors disabled:opacity-40"
+              className="w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-150 disabled:opacity-40"
+              style={{ background: 'rgba(255,255,255,0.75)', border: '1px solid rgba(255,255,255,0.6)', backdropFilter: 'blur(12px)', color: '#6b7280' }}
+              onMouseEnter={e => (e.currentTarget.style.color = '#6366f1')}
+              onMouseLeave={e => (e.currentTarget.style.color = '#6b7280')}
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
                 fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
@@ -450,15 +504,15 @@ export default function HomeDashboard({ onSelectTicket, onNavigateInbox }: HomeD
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-            <KpiCard label="Open Tickets" value={openCount} sub="currently open" accent="blue"
+            <KpiCard glass icon={<IconTicket />} label="Open Tickets" value={openCount} sub="currently open" accent="blue"
               onClick={() => onNavigateInbox('all_open', 'Open_Live')} />
-            <KpiCard label="Active Chats" value={activeCount} sub="in progress" accent="green"
+            <KpiCard glass icon={<IconChat />} label="Active Chats" value={activeCount} sub="in progress" accent="green"
               onClick={() => onNavigateInbox('all_open', 'In_Progress')} />
-            <KpiCard label="Escalated" value={escalatedCount} sub="need attention" accent="brand"
+            <KpiCard glass icon={<IconBolt />} label="Escalated" value={escalatedCount} sub="need attention" accent="red"
               pulse={escalatedCount > 0} onClick={() => onNavigateInbox('all_open', 'Escalated')} />
-            <KpiCard label="VIP Tickets" value={vipCount} sub="priority 1" accent="amber"
+            <KpiCard glass icon={<IconStar />} label="VIP Tickets" value={vipCount} sub="priority 1" accent="amber"
               onClick={() => onNavigateInbox('by_priority', 'all')} />
-            <KpiCard label="Pending" value={pendingCount} sub="awaiting customer" accent="purple"
+            <KpiCard glass icon={<IconClock />} label="Pending" value={pendingCount} sub="awaiting customer" accent="purple"
               onClick={() => onNavigateInbox('all_open', 'Pending_Customer')} />
           </div>
         )}
@@ -486,7 +540,11 @@ export default function HomeDashboard({ onSelectTicket, onNavigateInbox }: HomeD
           style={{ height: 'calc(100vh - 320px)', minHeight: 300 }}>
           <TicketTable
             title="VIP Tickets"
-            badge={<span className="text-[10px] font-bold bg-brand/10 text-brand px-2 py-0.5 rounded-full">VIP</span>}
+            badge={
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.1)', color: '#6366f1' }}>
+                VIP
+              </span>
+            }
             tickets={vipTickets} loading={firstLoad} onTicketClick={handleTicketClick}
           />
           <TicketTable title="Latest Tickets" tickets={latestTickets} loading={firstLoad} onTicketClick={handleTicketClick} />

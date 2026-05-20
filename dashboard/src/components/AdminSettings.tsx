@@ -1,38 +1,40 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import type { Agent, AgentRole, NotificationChannelConfig } from '../types';
+import type { Agent, AgentRole, NotificationChannelConfig, PropertyDefinition, PropertyOption, PropertyFieldType } from '../types';
 import type { AuthUser } from '../App';
 import { api } from '../api';
 import { Avatar } from './ui/Avatar';
 import { Spinner } from './ui/Spinner';
 import { useToast } from './ui/Toast';
 
-const TABS = ['Agents', 'Roles', 'Tags', 'Canned Responses', 'Assignment Rules', 'SLA Targets', 'Bot Config', 'Report Settings'] as const;
+const TABS = ['Agents', 'Roles', 'Tags', 'Ticket Properties', 'Canned Responses', 'Assignment Rules', 'SLA Targets', 'Bot Config', 'Report Settings'] as const;
 type Tab = typeof TABS[number];
 
 const TAB_SLUG: Record<Tab, string> = {
-  'Agents':           'agents',
-  'Roles':            'roles',
-  'Tags':             'tags',
-  'Canned Responses': 'canned-responses',
-  'Assignment Rules': 'assignment-rules',
-  'SLA Targets':      'sla-targets',
-  'Bot Config':       'bot-config',
-  'Report Settings':  'report-settings',
+  'Agents':            'agents',
+  'Roles':             'roles',
+  'Tags':              'tags',
+  'Ticket Properties': 'ticket-properties',
+  'Canned Responses':  'canned-responses',
+  'Assignment Rules':  'assignment-rules',
+  'SLA Targets':       'sla-targets',
+  'Bot Config':        'bot-config',
+  'Report Settings':   'report-settings',
 };
 const SLUG_TAB: Record<string, Tab> = Object.fromEntries(
   Object.entries(TAB_SLUG).map(([tab, slug]) => [slug, tab as Tab])
 );
 
 const TAB_ICONS: Record<Tab, string> = {
-  'Agents':           'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z',
-  'Roles':            'M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z',
-  'Tags':             'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z',
-  'Canned Responses': 'M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z',
-  'Assignment Rules': 'M4 6h16M4 10h16M4 14h16M4 18h16',
-  'SLA Targets':      'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
-  'Bot Config':       'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H4a2 2 0 01-2-2V5a2 2 0 012-2h16a2 2 0 012 2v10a2 2 0 01-2 2h-1',
-  'Report Settings':  'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9',
+  'Agents':            'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z',
+  'Roles':             'M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z',
+  'Tags':              'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z',
+  'Ticket Properties': 'M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75',
+  'Canned Responses':  'M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z',
+  'Assignment Rules':  'M4 6h16M4 10h16M4 14h16M4 18h16',
+  'SLA Targets':       'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+  'Bot Config':        'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H4a2 2 0 01-2-2V5a2 2 0 012-2h16a2 2 0 012 2v10a2 2 0 01-2 2h-1',
+  'Report Settings':   'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9',
 };
 
 interface Props { currentUser: AuthUser; }
@@ -78,6 +80,7 @@ export default function AdminSettings({ currentUser }: Props) {
               {tab === 'Agents'           ? 'Manage agent accounts, roles, and capacity.' :
                tab === 'Roles'            ? 'Configure role permissions for dashboard access.' :
                tab === 'Tags'             ? 'Manage global ticket tags available to all agents.' :
+               tab === 'Ticket Properties' ? 'Define dynamic properties for ticket classification, sub-categories, and group routing.' :
                tab === 'Canned Responses' ? 'Pre-written replies for common customer scenarios.' :
                tab === 'Assignment Rules' ? 'Configure routing logic per channel and category.' :
                tab === 'SLA Targets'      ? 'Set SLA response and resolution time targets per tier.' :
@@ -89,6 +92,7 @@ export default function AdminSettings({ currentUser }: Props) {
           {tab === 'Agents'           && <AgentsTab currentUser={currentUser} />}
           {tab === 'Roles'            && <RolesTab currentUser={currentUser} />}
           {tab === 'Tags'             && <TagsTab />}
+          {tab === 'Ticket Properties' && <TicketPropertiesTab />}
           {tab === 'Canned Responses' && <CannedResponsesTab />}
           {tab === 'Assignment Rules' && <AssignmentRulesTab />}
           {tab === 'SLA Targets'      && <StubTab label="SLA Targets" description="Set SLA response and resolution time targets per tier: VIP 1 min · EA 3 min · Standard 10 min." />}
@@ -1646,6 +1650,434 @@ function NotificationsTab() {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// ── Ticket Properties tab ─────────────────────────────────────────────────────
+
+const CATEGORY_OPTIONS = [
+  { value: 'kyc_verification',    label: 'KYC Verification' },
+  { value: 'account_restriction', label: 'Account Restriction' },
+  { value: 'password_2fa_reset',  label: 'Password / 2FA Reset' },
+  { value: 'fraud_security',      label: 'Fraud / Security' },
+  { value: 'withdrawal_issue',    label: 'Transactions' },
+  { value: 'unclassified',        label: 'Unclassified' },
+];
+
+const FIELD_TYPE_LABELS: Record<PropertyFieldType, string> = {
+  single_select: 'Single Select',
+  multi_select:  'Multi Select',
+  text:          'Text',
+  number:        'Number',
+  boolean:       'Toggle',
+};
+
+function slugify(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+}
+
+const EMPTY_FORM = {
+  name:        '',
+  field_key:   '',
+  field_type:  'single_select' as PropertyFieldType,
+  applies_to:  [] as string[],
+  is_required: false,
+  options:     [{ value: '', label: '' }] as PropertyOption[],
+};
+
+function TicketPropertiesTab() {
+  const { addToast } = useToast();
+  const [defs, setDefs]             = useState<PropertyDefinition[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [showForm, setShowForm]     = useState(false);
+  const [editId, setEditId]         = useState<string | null>(null);
+  const [form, setForm]             = useState({ ...EMPTY_FORM });
+  const [keyTouched, setKeyTouched] = useState(false);
+  const [saving, setSaving]         = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<PropertyDefinition | null>(null);
+
+  const load = () => {
+    setLoading(true);
+    api.getPropertyDefinitions(true)
+      .then(setDefs)
+      .catch(() => addToast('Failed to load property definitions', 'error'))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(load, []);
+
+  const openCreate = () => {
+    setEditId(null);
+    setForm({ ...EMPTY_FORM });
+    setKeyTouched(false);
+    setShowForm(true);
+  };
+
+  const openEdit = (def: PropertyDefinition) => {
+    setEditId(def.id);
+    setForm({
+      name:        def.name,
+      field_key:   def.field_key,
+      field_type:  def.field_type,
+      applies_to:  def.applies_to ?? [],
+      is_required: def.is_required,
+      options:     def.options?.length ? def.options.map(o => ({ ...o })) : [{ value: '', label: '' }],
+    });
+    setKeyTouched(true);
+    setShowForm(true);
+  };
+
+  const handleNameChange = (name: string) => {
+    setForm(f => ({ ...f, name, field_key: keyTouched ? f.field_key : slugify(name) }));
+  };
+
+  const handleSave = async () => {
+    if (!form.name.trim() || !form.field_key.trim()) {
+      addToast('Name and field key are required', 'error'); return;
+    }
+    const needsOptions = form.field_type === 'single_select' || form.field_type === 'multi_select';
+    const cleanOptions = needsOptions
+      ? form.options.filter(o => o.label.trim()).map(o => ({
+          value: o.value || slugify(o.label),
+          label: o.label.trim(),
+        }))
+      : undefined;
+    if (needsOptions && (!cleanOptions || cleanOptions.length === 0)) {
+      addToast('Add at least one option for select types', 'error'); return;
+    }
+    setSaving(true);
+    try {
+      const payload = {
+        name:          form.name.trim(),
+        field_key:     form.field_key.trim(),
+        field_type:    form.field_type,
+        options:       cleanOptions ?? null,
+        applies_to:    form.applies_to.length ? form.applies_to : null,
+        is_required:   form.is_required,
+        display_order: 0,
+        is_active:     true,
+      };
+      if (editId) {
+        await api.updatePropertyDefinition(editId, payload);
+        addToast('Property updated', 'success');
+      } else {
+        await api.createPropertyDefinition(payload);
+        addToast('Property created', 'success');
+      }
+      setShowForm(false);
+      load();
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Save failed', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggleActive = async (def: PropertyDefinition) => {
+    try {
+      await api.updatePropertyDefinition(def.id, { is_active: !def.is_active });
+      setDefs(prev => prev.map(d => d.id === def.id ? { ...d, is_active: !d.is_active } : d));
+    } catch {
+      addToast('Failed to update property', 'error');
+    }
+  };
+
+  const handleOrder = async (def: PropertyDefinition, dir: -1 | 1) => {
+    const sorted = [...defs].sort((a, b) => a.display_order - b.display_order);
+    const idx = sorted.findIndex(d => d.id === def.id);
+    const swapIdx = idx + dir;
+    if (swapIdx < 0 || swapIdx >= sorted.length) return;
+    const newOrder = sorted[swapIdx].display_order;
+    const swapOrder = def.display_order;
+    try {
+      await Promise.all([
+        api.updatePropertyDefinition(def.id, { display_order: newOrder }),
+        api.updatePropertyDefinition(sorted[swapIdx].id, { display_order: swapOrder }),
+      ]);
+      setDefs(prev => prev.map(d => {
+        if (d.id === def.id) return { ...d, display_order: newOrder };
+        if (d.id === sorted[swapIdx].id) return { ...d, display_order: swapOrder };
+        return d;
+      }));
+    } catch { addToast('Failed to reorder', 'error'); }
+  };
+
+  const handleDelete = async (def: PropertyDefinition) => {
+    try {
+      const result = await api.deletePropertyDefinition(def.id);
+      if (result.deactivated) {
+        addToast('Property has existing values — deactivated instead of deleted', 'warning');
+      } else {
+        addToast('Property deleted', 'success');
+      }
+      setDeleteTarget(null);
+      load();
+    } catch {
+      addToast('Failed to delete property', 'error');
+    }
+  };
+
+  const sortedDefs = [...defs].sort((a, b) => a.display_order - b.display_order);
+
+  return (
+    <div className="space-y-5">
+
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-text-muted">
+          {defs.filter(d => d.is_active).length} active · {defs.filter(d => !d.is_active).length} inactive
+        </p>
+        <button
+          onClick={openCreate}
+          className="flex items-center gap-2 text-xs bg-brand hover:bg-brand-dim text-white px-3 py-2 rounded-lg transition-colors"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          New Property
+        </button>
+      </div>
+
+      {/* Create / Edit form */}
+      {showForm && (
+        <div className="rounded-xl border border-surface-5 bg-surface-1 p-5 space-y-4">
+          <h3 className="text-sm font-semibold text-text-primary">{editId ? 'Edit Property' : 'New Property'}</h3>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs text-text-muted">Display Name *</label>
+              <input
+                value={form.name}
+                onChange={e => handleNameChange(e.target.value)}
+                placeholder="e.g. KYC Sub-category"
+                className="w-full text-sm bg-surface-2 ring-1 ring-surface-5 px-3 py-2 rounded-lg outline-none focus:ring-brand text-text-primary placeholder:text-text-muted"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-text-muted">Field Key * <span className="font-normal text-text-muted">(auto-generated)</span></label>
+              <input
+                value={form.field_key}
+                onChange={e => { setKeyTouched(true); setForm(f => ({ ...f, field_key: e.target.value })); }}
+                placeholder="kyc_sub_category"
+                className="w-full text-sm font-mono bg-surface-2 ring-1 ring-surface-5 px-3 py-2 rounded-lg outline-none focus:ring-brand text-text-primary placeholder:text-text-muted"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs text-text-muted">Field Type *</label>
+              <select
+                value={form.field_type}
+                onChange={e => setForm(f => ({ ...f, field_type: e.target.value as PropertyFieldType }))}
+                className="w-full text-sm bg-surface-2 ring-1 ring-surface-5 px-3 py-2 rounded-lg outline-none focus:ring-brand text-text-primary"
+                disabled={!!editId}
+              >
+                {(Object.keys(FIELD_TYPE_LABELS) as PropertyFieldType[]).map(t => (
+                  <option key={t} value={t}>{FIELD_TYPE_LABELS[t]}</option>
+                ))}
+              </select>
+              {editId && <p className="text-[10px] text-text-muted">Field type cannot be changed after creation.</p>}
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-text-muted">Required</label>
+              <div className="flex items-center gap-2 mt-2">
+                <button
+                  onClick={() => setForm(f => ({ ...f, is_required: !f.is_required }))}
+                  className={`w-9 h-5 rounded-full transition-colors relative ${form.is_required ? 'bg-brand' : 'bg-surface-5'}`}
+                >
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${form.is_required ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                </button>
+                <span className="text-xs text-text-muted">{form.is_required ? 'Yes — amber warning if empty' : 'No'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Applies To */}
+          <div className="space-y-2">
+            <label className="text-xs text-text-muted">Applies To <span className="font-normal">(leave empty = all categories)</span></label>
+            <div className="flex flex-wrap gap-2">
+              {CATEGORY_OPTIONS.map(cat => {
+                const sel = form.applies_to.includes(cat.value);
+                return (
+                  <button
+                    key={cat.value}
+                    onClick={() => setForm(f => ({
+                      ...f,
+                      applies_to: sel
+                        ? f.applies_to.filter(v => v !== cat.value)
+                        : [...f.applies_to, cat.value],
+                    }))}
+                    className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                      sel ? 'bg-brand text-white border-brand' : 'bg-surface-2 text-text-secondary border-surface-5 hover:border-brand/40'
+                    }`}
+                  >{cat.label}</button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Options editor */}
+          {(form.field_type === 'single_select' || form.field_type === 'multi_select') && (
+            <div className="space-y-2">
+              <label className="text-xs text-text-muted">Options</label>
+              <div className="space-y-1.5">
+                {form.options.map((opt, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input
+                      value={opt.label}
+                      onChange={e => {
+                        const next = [...form.options];
+                        next[i] = { value: slugify(e.target.value), label: e.target.value };
+                        setForm(f => ({ ...f, options: next }));
+                      }}
+                      placeholder={`Option ${i + 1} label`}
+                      className="flex-1 text-xs bg-surface-2 ring-1 ring-surface-5 px-2.5 py-1.5 rounded outline-none focus:ring-brand text-text-primary placeholder:text-text-muted"
+                    />
+                    <button
+                      onClick={() => setForm(f => ({ ...f, options: f.options.filter((_, j) => j !== i) }))}
+                      className="text-text-muted hover:text-brand transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+                <button
+                  onClick={() => setForm(f => ({ ...f, options: [...f.options, { value: '', label: '' }] }))}
+                  className="text-xs text-brand hover:text-brand-dim flex items-center gap-1 transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add option
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="text-xs bg-brand hover:bg-brand-dim text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5"
+            >
+              {saving ? <><Spinner size="xs" /> Saving…</> : (editId ? 'Save Changes' : 'Create Property')}
+            </button>
+            <button
+              onClick={() => setShowForm(false)}
+              className="text-xs px-4 py-2 rounded-lg border border-surface-5 text-text-secondary hover:text-text-primary hover:bg-surface-3 transition-colors"
+            >Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Table */}
+      {loading ? (
+        <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-10 bg-surface-2 rounded animate-pulse" />)}</div>
+      ) : sortedDefs.length === 0 ? (
+        <div className="text-center py-12 text-text-muted text-sm">No properties defined yet.</div>
+      ) : (
+        <div className="rounded-xl border border-surface-5 overflow-hidden">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-surface-2 border-b border-surface-5">
+                <th className="text-left px-4 py-2.5 text-text-muted font-medium">Name</th>
+                <th className="text-left px-4 py-2.5 text-text-muted font-medium">Key</th>
+                <th className="text-left px-4 py-2.5 text-text-muted font-medium">Type</th>
+                <th className="text-left px-4 py-2.5 text-text-muted font-medium">Applies To</th>
+                <th className="text-center px-4 py-2.5 text-text-muted font-medium">Req.</th>
+                <th className="text-center px-4 py-2.5 text-text-muted font-medium">Active</th>
+                <th className="text-center px-4 py-2.5 text-text-muted font-medium">Order</th>
+                <th className="px-4 py-2.5" />
+              </tr>
+            </thead>
+            <tbody>
+              {sortedDefs.map((def, idx) => (
+                <tr key={def.id} className={`border-b border-surface-5 last:border-0 ${!def.is_active ? 'opacity-50' : ''}`}>
+                  <td className="px-4 py-3 font-medium text-text-primary">{def.name}</td>
+                  <td className="px-4 py-3 font-mono text-text-muted">{def.field_key}</td>
+                  <td className="px-4 py-3 text-text-secondary">{FIELD_TYPE_LABELS[def.field_type]}</td>
+                  <td className="px-4 py-3 text-text-secondary">
+                    {def.applies_to?.length
+                      ? def.applies_to.map(c => CATEGORY_OPTIONS.find(o => o.value === c)?.label ?? c).join(', ')
+                      : <span className="italic text-text-muted">All</span>
+                    }
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {def.is_required
+                      ? <span className="inline-block w-2 h-2 rounded-full bg-accent-amber" />
+                      : <span className="text-text-muted">—</span>
+                    }
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <button
+                      onClick={() => handleToggleActive(def)}
+                      className={`w-9 h-5 rounded-full transition-colors relative ${def.is_active ? 'bg-brand' : 'bg-surface-5'}`}
+                    >
+                      <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${def.is_active ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                    </button>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <button onClick={() => handleOrder(def, -1)} disabled={idx === 0}
+                        className="p-0.5 text-text-muted hover:text-text-primary disabled:opacity-30 transition-colors">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                        </svg>
+                      </button>
+                      <button onClick={() => handleOrder(def, 1)} disabled={idx === sortedDefs.length - 1}
+                        className="p-0.5 text-text-muted hover:text-text-primary disabled:opacity-30 transition-colors">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2 justify-end">
+                      <button onClick={() => openEdit(def)} className="text-text-muted hover:text-brand transition-colors" title="Edit">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                      </button>
+                      <button onClick={() => setDeleteTarget(def)} className="text-text-muted hover:text-brand transition-colors" title="Delete">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-surface-0 rounded-xl border border-surface-5 shadow-xl p-6 w-96 space-y-4">
+            <h3 className="text-sm font-semibold text-text-primary">Delete "{deleteTarget.name}"?</h3>
+            <p className="text-xs text-text-muted">
+              If this property has existing values on tickets it will be deactivated instead of permanently deleted. You can reactivate it any time.
+            </p>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => handleDelete(deleteTarget)}
+                className="text-xs bg-brand hover:bg-brand-dim text-white px-4 py-2 rounded-lg transition-colors"
+              >Delete / Deactivate</button>
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="text-xs px-4 py-2 rounded-lg border border-surface-5 text-text-secondary hover:text-text-primary hover:bg-surface-3 transition-colors"
+              >Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

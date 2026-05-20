@@ -481,9 +481,23 @@ function Sidebar({ user, collapsed, onToggle, onLogout, theme, onThemeToggle }: 
 
   return (
     <aside
-      className="flex flex-col bg-surface-1 shrink-0 border-r border-surface-5 transition-all duration-200 ease-out-expo"
+      className="flex flex-col bg-surface-1 shrink-0 border-r border-surface-5 transition-all duration-200 relative"
       style={{ width: collapsed ? 56 : 220 }}
     >
+      {/* Edge collapse toggle — always visible on the right border */}
+      <button
+        onClick={onToggle}
+        title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        className="absolute -right-3 top-1/2 -translate-y-1/2 z-20 w-6 h-10 flex items-center justify-center rounded-full bg-surface-2 border border-surface-5 text-text-muted hover:text-text-primary hover:bg-surface-3 transition-all shadow-sm"
+        style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+      >
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          {collapsed
+            ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
+            : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.75 19.5L8.25 12l7.5-7.5"/>
+          }
+        </svg>
+      </button>
       {/* Logo */}
       <div className={`flex items-center gap-3 px-3.5 h-12 border-b border-surface-5 shrink-0 ${collapsed ? 'justify-center' : ''}`}>
         <div className="w-7 h-7 rounded-md bg-brand flex items-center justify-center shrink-0">
@@ -765,14 +779,15 @@ function Workspace({ ws, tickets, ticketStats, selectedId, view, search, statusF
   useEffect(() => { setComposeReply(''); }, [selectedId]);
 
   return (
-    <div className="flex flex-1 overflow-hidden">
+    <div className="flex flex-1 overflow-hidden bg-white">
+
       <ConversationList
         tickets={tickets} ticketStats={ticketStats} selectedId={selectedId} view={view} search={search}
         statusFilter={statusFilter}
         onSelect={onSelect} onViewChange={onViewChange}
         onSearchChange={onSearchChange} onStatusFilterChange={onStatusFilterChange} onRefresh={onRefresh}
       />
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden" style={{ position: 'relative', zIndex: 1 }}>
         {selectedId
           ? <MessageThread
               ticketId={selectedId}
@@ -783,13 +798,13 @@ function Workspace({ ws, tickets, ticketStats, selectedId, view, search, statusF
               onReplyChange={setComposeReply}
             />
           : (
-            <div className="flex flex-col items-center justify-center h-full bg-surface-0 gap-4">
-              <div className="w-12 h-12 rounded-full bg-surface-3 ring-1 ring-surface-5 flex items-center justify-center">
+            <div className="flex flex-col items-center justify-center h-full gap-4" style={{ background: 'rgba(238,242,247,0.5)' }}>
+              <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.75)', border: '1px solid rgba(255,255,255,0.6)', backdropFilter: 'blur(12px)', color: '#6b7280' }}>
                 {Icons.inbox}
               </div>
               <div className="text-center">
-                <p className="text-text-primary text-sm font-medium">Select a conversation</p>
-                <p className="text-text-muted text-xs mt-1">Choose a ticket from the list to start</p>
+                <p className="text-sm font-medium" style={{ color: '#1a1d2e' }}>Select a conversation</p>
+                <p className="text-xs mt-1" style={{ color: '#9ca3af' }}>Choose a ticket from the list to start</p>
               </div>
             </div>
           )
@@ -802,6 +817,7 @@ function Workspace({ ws, tickets, ticketStats, selectedId, view, search, statusF
           partialDraft={composeReply}
           onAcceptDraft={(text) => setPendingDraft(text)}
           onSelectTicket={onSelect}
+          knownTags={[...new Set(tickets.flatMap(t => t.tags ?? []))]}
         />
       )}
     </div>

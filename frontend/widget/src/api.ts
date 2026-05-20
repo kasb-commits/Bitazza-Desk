@@ -241,12 +241,37 @@ export async function fetchPaginatedHistory(
   }
 }
 
+export async function uploadAttachment(
+  cfg: CSBotConfig,
+  file: File,
+): Promise<{ id: string; url: string; name: string; mimeType: string; size: number }> {
+  const form = new FormData();
+  form.append('file', file);
+  const headers: Record<string, string> = {};
+  if (cfg.token) headers['Authorization'] = `Bearer ${cfg.token}`;
+  const res = await fetch(`${cfg.apiUrl}/uploads/attachment`, {
+    method: 'POST',
+    headers,
+    body: form,
+  });
+  if (!res.ok) throw new Error(`upload failed: ${res.status}`);
+  const data = await res.json();
+  return {
+    id: data.id,
+    url: data.url,
+    name: data.name,
+    mimeType: data.mime_type,
+    size: data.size,
+  };
+}
+
 export async function sendMessage(
   cfg: CSBotConfig,
   conversationId: string,
   message: string,
   consecutiveLowConfidence = 0,
   category?: string,
+  attachmentIds?: string[],
 ): Promise<SendResult> {
   const res = await fetch(`${cfg.apiUrl}/chat/message`, {
     method: 'POST',
@@ -256,6 +281,7 @@ export async function sendMessage(
       message,
       consecutive_low_confidence: consecutiveLowConfidence,
       ...(category ? { category } : {}),
+      ...(attachmentIds?.length ? { attachment_ids: attachmentIds } : {}),
     }),
   });
   if (!res.ok) throw new Error(`message failed: ${res.status}`);

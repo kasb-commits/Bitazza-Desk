@@ -75,6 +75,36 @@ export default function MessageBubble({ message, primaryColor = '#6366f1', botNa
         ) : (
           <span className="whitespace-pre-wrap">{message.content}</span>
         )}
+
+        {/* Attachment thumbnails */}
+        {message.attachments && message.attachments.length > 0 && (
+          <div className={`flex flex-wrap gap-2 ${message.content ? 'mt-2' : ''}`}>
+            {message.attachments.map((a) => (
+              a.mimeType.startsWith('image/') ? (
+                <a key={a.id} href={a.url} target="_blank" rel="noopener noreferrer">
+                  <img
+                    src={a.url}
+                    alt={a.name}
+                    className="w-20 h-20 object-cover rounded-lg border border-white/20 hover:opacity-90 transition-opacity cursor-pointer"
+                  />
+                </a>
+              ) : (
+                <a
+                  key={a.id}
+                  href={a.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-xs"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                  <span className="max-w-[100px] truncate">{a.name}</span>
+                </a>
+              )
+            ))}
+          </div>
+        )}
       </div>
 
       <span className="text-[10px] text-gray-400/60 mt-1 mx-1">{time}</span>

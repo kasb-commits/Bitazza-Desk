@@ -94,6 +94,14 @@ export interface Agent {
   team?: string;
 }
 
+export interface MessageAttachment {
+  id: string;
+  url: string;
+  name: string;
+  mime_type: string;
+  size: number;
+}
+
 export interface Message {
   id?: string;
   role: SenderType;
@@ -105,6 +113,7 @@ export interface Message {
   agent_name?: string;
   supervisor_name?: string;
   metadata?: Record<string, unknown>;
+  attachments?: MessageAttachment[];
 }
 
 export interface Ticket {
@@ -134,6 +143,7 @@ export interface Ticket {
   collision_agent_ids?: string[];
   csat_score?: number | null;
   customer_name?: string | null;   // flat field returned by some queries
+  source?: string | null;          // originating app: "Bitazza GL" / "Bitazza TH" — from auth api (future)
 }
 
 export interface TicketDetail extends Ticket {
@@ -314,6 +324,40 @@ export interface NotificationChannelConfig {
   reports: { daily: boolean; weekly: boolean };
   updated_at?: string | null;
 }
+
+// ── Ticket Properties ─────────────────────────────────────────────────────────
+
+export type PropertyFieldType = 'single_select' | 'multi_select' | 'text' | 'number' | 'boolean';
+
+export interface PropertyOption {
+  value: string;
+  label: string;
+}
+
+export interface PropertyDefinition {
+  id: string;
+  name: string;
+  field_key: string;
+  field_type: PropertyFieldType;
+  options: PropertyOption[] | null;
+  applies_to: string[] | null;
+  is_required: boolean;
+  is_active: boolean;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PropertyValue {
+  property_id: string;
+  value_text: string | null;
+  value_array: string[] | null;
+  value_number: number | null;
+  updated_at: string;
+  updated_by_name: string | null;
+}
+
+export type PropertyValuesMap = Record<string, PropertyValue>;
 
 // Legacy — kept so old components referencing Conversation don't break
 export interface Conversation {

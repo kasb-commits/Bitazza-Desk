@@ -1,9 +1,12 @@
-import { useState } from 'react';
-import type { Ticket, InboxView, StatusFilter, Priority, TicketStatus } from '../types';
-import { ChannelBadge, PriorityBadge, CategoryBadge } from './ui/Badge';
+import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import type { Ticket, InboxView, StatusFilter, TicketStatus, TicketCategory } from '../types';
+import { api } from '../api';
 import { Avatar } from './ui/Avatar';
 import { ConversationRowSkeleton } from './ui/Skeleton';
 import { EmptyState } from './ui/EmptyState';
+
+// ── View options ───────────────────────────────────────────────────────────────
 
 const VIEWS: { id: InboxView; label: string }[] = [
   { id: 'all_open',    label: 'All Open'    },
@@ -14,35 +17,65 @@ const VIEWS: { id: InboxView; label: string }[] = [
   { id: 'by_priority', label: 'Priority'    },
 ];
 
-const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
-  { id: 'all',                  label: 'All'        },
-  { id: 'Open_Live',            label: 'Open'       },
-  { id: 'In_Progress',          label: 'Active'     },
-  { id: 'Pending_Customer',     label: 'Pending'    },
-  { id: 'Escalated',            label: 'Escalated'  },
-  { id: 'Closed_Resolved',      label: 'Resolved'   },
-  { id: 'Closed_Unresponsive',  label: 'Closed'     },
+// Status filter options
+const STATUS_FILTERS: { id: StatusFilter; label: string; dot: string }[] = [
+  { id: 'all',                  label: 'Any Status',  dot: '' },
+  { id: 'Open_Live',            label: 'Open',        dot: '#22c55e' },
+  { id: 'In_Progress',          label: 'Active',      dot: '#3b82f6' },
+  { id: 'Pending_Customer',     label: 'Pending',     dot: '#f59e0b' },
+  { id: 'Escalated',            label: 'Escalated',   dot: '#ef4444' },
+  { id: 'Closed_Resolved',      label: 'Resolved',    dot: '#9ca3af' },
+  { id: 'Closed_Unresponsive',  label: 'Closed',      dot: '#d1d5db' },
 ];
 
-// Status → left-accent color
-const STATUS_ACCENT: Partial<Record<TicketStatus, string>> = {
-  Open_Live:           'bg-accent-green',
-  In_Progress:         'bg-accent-blue',
-  Pending_Customer:    'bg-accent-amber',
-  Escalated:           'bg-brand',
-  Closed_Resolved:     'bg-surface-5',
-  Closed_Unresponsive: 'bg-surface-5',
+type SortOption = 'newest' | 'oldest' | 'priority' | 'sla';
+const SORT_OPTIONS: { id: SortOption; label: string }[] = [
+  { id: 'newest',   label: 'Newest first'   },
+  { id: 'oldest',   label: 'Oldest first'   },
+  { id: 'priority', label: 'Priority'        },
+  { id: 'sla',      label: 'SLA deadline'   },
+];
+
+// Left accent bar color per status
+const STATUS_BAR: Partial<Record<TicketStatus, string>> = {
+  Open_Live:           '#22c55e',
+  In_Progress:         '#3b82f6',
+  Pending_Customer:    '#f59e0b',
+  Escalated:           '#ef4444',
+  Closed_Resolved:     '#d1d5db',
+  Closed_Unresponsive: '#e5e7eb',
 };
+
+// Category display config (explicit light-mode colors)
+const CATEGORY_LABEL: Partial<Record<TicketCategory, { label: string; bg: string; color: string }>> = {
+  kyc_verification:    { label: 'KYC',          bg: '#fce7f3', color: '#9d174d' },
+  account_restriction: { label: 'Account',      bg: '#fef3c7', color: '#92400e' },
+  password_2fa_reset:  { label: 'Password/2FA', bg: '#dbeafe', color: '#1e40af' },
+  fraud_security:      { label: 'Fraud',        bg: '#fee2e2', color: '#991b1b' },
+  withdrawal_issue:    { label: 'Withdrawal',   bg: '#ecfdf5', color: '#065f46' },
+  unclassified:        { label: 'Unclassified', bg: '#f3f4f6', color: '#6b7280' },
+};
+
+// Channel display config
+const CHANNEL_LABEL: Record<string, { label: string; bg: string; color: string }> = {
+  web:      { label: 'Web',      bg: '#ede9fe', color: '#5b21b6' },
+  line:     { label: 'LINE',     bg: '#dcfce7', color: '#166534' },
+  facebook: { label: 'Facebook', bg: '#dbeafe', color: '#1e40af' },
+  email:    { label: 'Email',    bg: '#f3f4f6', color: '#374151' },
+};
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
 function timeAgo(ts: string | number | null | undefined): string {
   if (!ts) return '';
   const numeric = typeof ts === 'number' ? ts : (typeof ts === 'string' && /^\d+$/.test(ts) ? Number(ts) : NaN);
   const epoch = Number.isFinite(numeric) ? numeric : Math.floor(new Date(ts).getTime() / 1000);
   const s = Math.floor(Date.now() / 1000) - epoch;
-  if (s < 60) return `${s}s`;
+  if (s < 60) return 'now';
   if (s < 3600) return `${Math.floor(s / 60)}m`;
   if (s < 86400) return `${Math.floor(s / 3600)}h`;
-  return `${Math.floor(s / 86400)}d`;
+  if (s < 86400 * 7) return `${Math.floor(s / 86400)}d`;
+  return new Date(epoch * 1000).toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
 function isSlaRisk(ticket: Ticket): boolean {
@@ -51,6 +84,96 @@ function isSlaRisk(ticket: Ticket): boolean {
   const diff = new Date(dl).getTime() - Date.now();
   return diff > 0 && diff < 30 * 60 * 1000;
 }
+
+// ── Generic portal dropdown ───────────────────────────────────────────────────
+
+function PortalDropdown<T extends string>({
+  trigger,
+  options,
+  value,
+  onChange,
+}: {
+  trigger: (open: boolean, ref: React.RefObject<HTMLButtonElement | null>) => React.ReactNode;
+  options: { id: T; label: string; dot?: string }[];
+  value: T;
+  onChange: (v: T) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 176 });
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (
+        dropRef.current && !dropRef.current.contains(e.target as Node) &&
+        btnRef.current  && !btnRef.current.contains(e.target as Node)
+      ) setOpen(false);
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
+
+  const handleToggle = () => {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      const dropW = Math.max(176, r.width);
+      const left  = Math.min(r.left, window.innerWidth - dropW - 8);
+      setPos({ top: r.bottom + 4, left: Math.max(8, left), width: dropW });
+    }
+    setOpen(o => !o);
+  };
+
+  // Intercept clicks on the trigger element
+  return (
+    <>
+      <div onClick={handleToggle} style={{ display: 'contents' }}>
+        {trigger(open, btnRef)}
+      </div>
+
+      {open && createPortal(
+        <div
+          ref={dropRef}
+          className="ds-dropdown animate-slide-in-up"
+          style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 9999 }}
+        >
+          {options.map(opt => (
+            <button
+              key={opt.id}
+              onClick={() => { onChange(opt.id); setOpen(false); }}
+              className="ds-dropdown-item"
+              style={opt.id === value ? { background: '#eef2ff', color: '#4338ca', fontWeight: 600 } : {}}
+            >
+              {opt.dot && (
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: opt.dot }} />
+              )}
+              <span className="flex-1">{opt.label}</span>
+              {opt.id === value && (
+                <svg className="w-3.5 h-3.5 shrink-0 text-indigo-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+                </svg>
+              )}
+            </button>
+          ))}
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
+// ── Stat pill ──────────────────────────────────────────────────────────────────
+
+function StatPill({ label, value, color }: { label: string; value: number; color?: string }) {
+  return (
+    <div className="text-center">
+      <div className="text-sm font-bold tabular-nums" style={{ color: color ?? '#1f2937' }}>{value}</div>
+      <div className="text-[9px] text-gray-400 uppercase tracking-wide leading-tight">{label}</div>
+    </div>
+  );
+}
+
+// ── Props ──────────────────────────────────────────────────────────────────────
 
 interface Props {
   tickets: Ticket[];
@@ -66,13 +189,35 @@ interface Props {
   onRefresh: () => void;
 }
 
+// ── Main Component ─────────────────────────────────────────────────────────────
+
 export default function ConversationList({
   tickets, ticketStats, selectedId, view, search, statusFilter,
   onSelect, onViewChange, onSearchChange, onStatusFilterChange, onRefresh,
 }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
-  const [loading] = useState(false); // would be true while initial fetch
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
+  const [statusMenuPos, setStatusMenuPos] = useState({ top: 0, left: 0 });
+  const statusBtnRef = useRef<HTMLButtonElement>(null);
+  const statusDropRef = useRef<HTMLDivElement>(null);
+  const [loading] = useState(false);
+  const [sort, setSort] = useState<SortOption>('newest');
+
+  const sortedTickets = [...tickets].sort((a, b) => {
+    if (sort === 'priority') return (a.priority ?? 3) - (b.priority ?? 3);
+    if (sort === 'sla') {
+      const da = a.sla_deadline ?? a.sla_breach_at;
+      const db = b.sla_deadline ?? b.sla_breach_at;
+      if (!da && !db) return 0;
+      if (!da) return 1;
+      if (!db) return -1;
+      return new Date(da).getTime() - new Date(db).getTime();
+    }
+    const ta = Number(a.last_message_at ?? a.updated_at ?? a.created_at) || 0;
+    const tb = Number(b.last_message_at ?? b.updated_at ?? b.created_at) || 0;
+    return sort === 'newest' ? tb - ta : ta - tb;
+  });
 
   const toggleSelect = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -83,81 +228,185 @@ export default function ConversationList({
     });
   };
 
-  const handleBulkClose = async () => {
-    if (selected.size > 10 && !confirm(`Close ${selected.size} conversations?`)) return;
+  const handleBulkStatus = async (status: TicketStatus) => {
+    setStatusMenuOpen(false);
     setBulkLoading(true);
     try {
-      await Promise.all(
-        [...selected].map(id =>
-          fetch(`${import.meta.env.VITE_API_URL ?? ''}/api/tickets/${id}/status`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${JSON.parse(localStorage.getItem('auth_user') ?? '{}').token ?? ''}`,
-            },
-            body: JSON.stringify({ status: 'Closed_Resolved' }),
-          })
-        )
-      );
+      await Promise.all([...selected].map(id => api.setStatus(id, status)));
       setSelected(new Set());
       onRefresh();
-    } finally { setBulkLoading(false); }
+    } catch { /* silent — individual failures don't block the refresh */ } finally {
+      setBulkLoading(false);
+    }
   };
 
-  const openCount      = ticketStats.open;
-  const activeCount    = ticketStats.active;
-  const escalatedCount = ticketStats.escalated;
+  const openStatusMenu = () => {
+    if (statusBtnRef.current) {
+      const r = statusBtnRef.current.getBoundingClientRect();
+      setStatusMenuPos({ top: r.bottom + 4, left: r.left });
+    }
+    setStatusMenuOpen(o => !o);
+  };
+
+  // Close status menu on outside click — must exclude both the trigger button AND the dropdown div
+  useEffect(() => {
+    if (!statusMenuOpen) return;
+    const h = (e: MouseEvent) => {
+      const target = e.target as Node;
+      const insideBtn  = statusBtnRef.current?.contains(target) ?? false;
+      const insideDrop = statusDropRef.current?.contains(target) ?? false;
+      if (!insideBtn && !insideDrop) setStatusMenuOpen(false);
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [statusMenuOpen]);
+
+  const isAllSelected = sortedTickets.length > 0 && sortedTickets.every(t => selected.has(t.id));
+  const isPartialSelected = !isAllSelected && sortedTickets.some(t => selected.has(t.id));
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(sortedTickets.map(t => t.id)));
+    }
+  };
+
+  const BULK_STATUS_OPTIONS: { status: TicketStatus; label: string; dot: string }[] = [
+    { status: 'Open_Live',           label: 'Open',            dot: '#22c55e' },
+    { status: 'In_Progress',         label: 'In Progress',     dot: '#3b82f6' },
+    { status: 'Pending_Customer',    label: 'Pending Customer', dot: '#f59e0b' },
+    { status: 'Escalated',           label: 'Escalated',       dot: '#ef4444' },
+    { status: 'Closed_Resolved',     label: 'Resolved',        dot: '#9ca3af' },
+    { status: 'Closed_Unresponsive', label: 'Closed',          dot: '#d1d5db' },
+  ];
+
+  const currentFilter = STATUS_FILTERS.find(f => f.id === statusFilter) ?? STATUS_FILTERS[0];
 
   return (
-    <aside className="w-[300px] shrink-0 bg-surface-1 border-r border-surface-5 flex flex-col">
+    <aside
+      className="w-[320px] shrink-0 flex flex-col"
+      style={{
+        background: 'rgba(255,255,255,0.85)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        borderRight: '1px solid rgba(180,195,220,0.35)',
+        position: 'relative',
+        zIndex: 1,
+      }}
+    >
+      {/* ── Header ── */}
+      <div className="px-4 pt-4 pb-3 shrink-0" style={{ borderBottom: '1px solid rgba(180,195,220,0.25)' }}>
 
-      {/* Stats row */}
-      <div className="px-4 py-2.5 border-b border-surface-5 flex items-center gap-4 shrink-0">
-        <StatPill label="Open"      value={openCount} />
-        <StatPill label="Active"    value={activeCount} color="text-accent-blue" />
-        <StatPill label="Escalated" value={escalatedCount} color={escalatedCount > 0 ? 'text-brand' : undefined} />
-        <button
-          onClick={onRefresh}
-          className="ml-auto w-6 h-6 flex items-center justify-center rounded text-text-muted hover:text-text-secondary hover:bg-surface-4 transition-colors"
-          title="Refresh"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
-          </svg>
-        </button>
-      </div>
-
-      {/* View tabs */}
-      <div className="flex overflow-x-auto border-b border-surface-5 shrink-0 scrollbar-hide">
-        {VIEWS.map(v => (
+        {/* Row 1: stats + refresh */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-4">
+            <StatPill label="Open"      value={ticketStats.open} />
+            <StatPill label="Active"    value={ticketStats.active} color="#1d4ed8" />
+            <StatPill label="Escalated" value={ticketStats.escalated} color={ticketStats.escalated > 0 ? '#b91c1c' : undefined} />
+          </div>
           <button
-            key={v.id}
-            onClick={() => onViewChange(v.id)}
-            className={`shrink-0 text-xs px-3 py-2.5 border-b-2 whitespace-nowrap transition-colors duration-100 ${
-              view === v.id
-                ? 'border-brand text-text-primary font-semibold'
-                : 'border-transparent text-text-secondary hover:text-text-primary'
-            }`}
+            onClick={onRefresh}
+            title="Refresh"
+            className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
           >
-            {v.label}
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
+            </svg>
           </button>
-        ))}
+        </div>
+
+        {/* Row 2: view | status | sort — three aligned control buttons */}
+        <div className="flex items-center gap-1.5">
+
+          {/* View dropdown */}
+          <PortalDropdown
+            trigger={(open, ref) => (
+              <button
+                ref={ref}
+                className="flex items-center gap-1 text-xs font-medium text-gray-700 px-2 py-1.5 rounded-lg bg-white ring-1 ring-gray-200 hover:bg-gray-50 transition-all shrink-0"
+              >
+                <svg className="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                </svg>
+                <span className="truncate">{VIEWS.find(v => v.id === view)?.label ?? 'View'}</span>
+                <svg className={`w-3 h-3 text-gray-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
+                </svg>
+              </button>
+            )}
+            options={VIEWS}
+            value={view}
+            onChange={onViewChange}
+          />
+
+          {/* Status filter dropdown */}
+          <PortalDropdown
+            trigger={(open, ref) => (
+              <button
+                ref={ref}
+                className="flex items-center gap-1.5 text-xs font-medium text-gray-700 px-2 py-1.5 rounded-lg bg-white ring-1 ring-gray-200 hover:bg-gray-50 transition-all flex-1 min-w-0"
+              >
+                {currentFilter.dot
+                  ? <span className="w-2 h-2 rounded-full shrink-0" style={{ background: currentFilter.dot }} />
+                  : <svg className="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707l-6.414 6.414A1 1 0 0014 13.828V19a1 1 0 01-.553.894l-4 2A1 1 0 018 21v-7.172a1 1 0 00-.293-.707L1.293 6.707A1 1 0 011 6V4z"/>
+                    </svg>
+                }
+                <span className="truncate">{currentFilter.label}</span>
+                <svg className={`w-3 h-3 text-gray-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
+                </svg>
+              </button>
+            )}
+            options={STATUS_FILTERS.map(f => ({ id: f.id, label: f.label, dot: f.dot || undefined }))}
+            value={statusFilter}
+            onChange={onStatusFilterChange}
+          />
+
+          {/* Sort dropdown */}
+          <PortalDropdown
+            trigger={(open, ref) => (
+              <button
+                ref={ref}
+                className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg ring-1 transition-all shrink-0"
+                style={{
+                  background: sort !== 'newest' ? '#eef2ff' : '#ffffff',
+                  color: sort !== 'newest' ? '#4338ca' : '#374151',
+                  ringColor: sort !== 'newest' ? '#c7d2fe' : '#e5e7eb',
+                  border: `1px solid ${sort !== 'newest' ? '#c7d2fe' : '#e5e7eb'}`,
+                }}
+              >
+                <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"/>
+                </svg>
+              </button>
+            )}
+            options={SORT_OPTIONS}
+            value={sort}
+            onChange={v => setSort(v as typeof sort)}
+          />
+
+        </div>
       </div>
 
-      {/* Search */}
-      <div className="px-3 py-2 border-b border-surface-5 shrink-0">
+      {/* ── Search ── */}
+      <div className="px-4 py-2.5 shrink-0" style={{ borderBottom: '1px solid rgba(180,195,220,0.25)' }}>
         <div className="relative">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
           </svg>
           <input
             value={search}
             onChange={e => onSearchChange(e.target.value)}
-            placeholder="Search tickets, messages, name, email…"
-            className="w-full bg-surface-3 ring-1 ring-surface-5 text-text-primary text-xs pl-9 pr-3 py-2 rounded-full outline-none focus:ring-brand transition-all placeholder:text-text-muted"
+            placeholder="Search conversations…"
+            className="w-full bg-gray-50 text-gray-800 text-xs pl-9 pr-3 py-2 rounded-lg outline-none transition-all placeholder:text-gray-400"
+            style={{ border: '1px solid rgba(180,195,220,0.4)' }}
+            onFocus={e => (e.target.style.borderColor = '#818cf8')}
+            onBlur={e => (e.target.style.borderColor = 'rgba(180,195,220,0.4)')}
           />
           {search && (
-            <button onClick={() => onSearchChange('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-secondary">
+            <button onClick={() => onSearchChange('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/>
               </svg>
@@ -166,79 +415,133 @@ export default function ConversationList({
         </div>
       </div>
 
-      {/* Status filter tabs */}
-      <div className="flex overflow-x-auto border-b border-surface-5 shrink-0 scrollbar-hide bg-surface-2">
-        {STATUS_FILTERS.map(f => (
-          <button
-            key={f.id}
-            onClick={() => onStatusFilterChange(f.id)}
-            className={`shrink-0 text-[11px] px-3 py-2 border-b-2 whitespace-nowrap transition-colors duration-100 ${
-              statusFilter === f.id
-                ? 'border-brand text-text-primary font-semibold'
-                : 'border-transparent text-text-muted hover:text-text-secondary'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Bulk action bar */}
+      {/* ── Bulk action bar ── */}
       {selected.size > 0 && (
-        <div className="px-3 py-2 bg-surface-3 border-b border-surface-5 flex items-center gap-2 shrink-0 animate-slide-in-up">
-          <span className="text-xs text-text-primary font-medium">{selected.size} selected</span>
+        <div className="px-3 py-2 flex items-center gap-2 shrink-0" style={{ background: '#eef2ff', borderBottom: '1px solid #e0e7ff' }}>
+          {/* Select-all checkbox */}
           <button
-            onClick={handleBulkClose}
-            disabled={bulkLoading}
-            className="text-xs px-2.5 py-1 bg-brand/10 text-brand ring-1 ring-brand/20 rounded hover:bg-brand/20 transition-colors disabled:opacity-40"
+            onClick={toggleSelectAll}
+            className="w-4 h-4 rounded flex items-center justify-center shrink-0"
+            style={{ border: `1.5px solid ${isAllSelected ? '#6366f1' : isPartialSelected ? '#6366f1' : '#d1d5db'}`, background: isAllSelected ? '#6366f1' : '#fff', transition: 'all 0.1s' }}
+            title={isAllSelected ? 'Deselect all' : 'Select all'}
           >
-            {bulkLoading ? 'Closing…' : 'Close all'}
+            {isAllSelected
+              ? <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
+              : isPartialSelected
+              ? <span style={{ width: 8, height: 2, background: '#6366f1', borderRadius: 1, display: 'block' }} />
+              : null
+            }
           </button>
-          <button
-            onClick={() => setSelected(new Set())}
-            className="ml-auto text-text-muted hover:text-text-secondary transition-colors"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-          </button>
+
+          <span className="text-xs text-indigo-700 font-medium">{selected.size} selected</span>
+
+          {/* Select all label */}
+          {!isAllSelected && (
+            <button onClick={toggleSelectAll} className="text-[10px] text-indigo-500 hover:text-indigo-700 underline underline-offset-2">
+              Select all {sortedTickets.length}
+            </button>
+          )}
+
+          {/* Change Status dropdown trigger */}
+          <div className="ml-auto flex items-center gap-1.5">
+            <button
+              ref={statusBtnRef}
+              onClick={openStatusMenu}
+              disabled={bulkLoading}
+              className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full transition-colors disabled:opacity-40"
+              style={{ background: '#6366f1', color: '#fff', border: 'none' }}
+            >
+              {bulkLoading ? 'Updating…' : 'Change status'}
+              <svg className={`w-3 h-3 transition-transform ${statusMenuOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7"/>
+              </svg>
+            </button>
+            <button onClick={() => setSelected(new Set())} className="text-indigo-400 hover:text-indigo-700 transition-colors">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
         </div>
       )}
 
-      {/* Ticket list */}
+      {/* ── Bulk status portal dropdown ── */}
+      {statusMenuOpen && createPortal(
+        <div
+          ref={statusDropRef}
+          style={{
+            position: 'fixed', top: statusMenuPos.top, left: statusMenuPos.left, zIndex: 9999,
+            background: '#ffffff', border: '1px solid rgba(0,0,0,0.1)',
+            borderRadius: 10, boxShadow: '0 8px 32px rgba(80,100,160,0.18)',
+            minWidth: 180, padding: '4px 0', overflow: 'hidden',
+          }}
+        >
+          <div style={{ padding: '6px 14px 4px', fontSize: 10, color: '#9ca3af', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>
+            Set status for {selected.size} ticket{selected.size > 1 ? 's' : ''}
+          </div>
+          {BULK_STATUS_OPTIONS.map(opt => (
+            <button
+              key={opt.status}
+              onClick={() => handleBulkStatus(opt.status)}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                padding: '9px 14px', fontSize: 12, color: '#374151', border: 'none',
+                background: 'transparent', cursor: 'pointer', textAlign: 'left',
+                transition: 'background 0.1s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#f9fafb'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: opt.dot, flexShrink: 0 }} />
+              {opt.label}
+            </button>
+          ))}
+        </div>,
+        document.body
+      )}
+
+      {/* ── Ticket list ── */}
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           Array.from({ length: 5 }).map((_, i) => <ConversationRowSkeleton key={i} />)
         ) : tickets.length === 0 ? (
           <EmptyState
             title="No conversations"
-            description={search ? `No results for "${search}"` : statusFilter === 'all' ? 'No conversations found.' : `No ${STATUS_FILTERS.find(f => f.id === statusFilter)?.label.toLowerCase()} tickets.`}
-            className="h-40"
+            description={search ? `No results for "${search}"` : 'Nothing here right now.'}
+            className="h-48"
           />
-        ) : tickets.map(ticket => {
+        ) : sortedTickets.map(ticket => {
           const risk = isSlaRisk(ticket);
           const lastTs = ticket.last_message_at ?? ticket.updated_at ?? ticket.created_at;
-          const accentClass = STATUS_ACCENT[ticket.status] ?? 'bg-surface-5';
           const isSelected = selectedId === ticket.id;
           const isChecked = selected.has(ticket.id);
+          const accentColor = STATUS_BAR[ticket.status] ?? '#e5e7eb';
+          const preview = ticket.last_message ?? '—';
+          const catCfg = ticket.category ? CATEGORY_LABEL[ticket.category as TicketCategory] : null;
+          const chCfg = ticket.channel ? (CHANNEL_LABEL[ticket.channel.toLowerCase()] ?? CHANNEL_LABEL.web) : null;
 
           return (
             <div
               key={ticket.id}
               onClick={() => onSelect(ticket.id)}
-              className={`group relative flex items-start gap-3 px-3 py-3 border-b border-surface-5 cursor-pointer transition-colors duration-100 ${
-                isSelected ? 'bg-brand-subtle' : 'hover:bg-surface-4'
-              }`}
+              className="group flex items-start gap-2.5 px-3 py-3.5 cursor-pointer transition-all duration-100"
+              style={{
+                borderBottom: '1px solid rgba(180,195,220,0.2)',
+                background: isSelected ? '#ffffff' : undefined,
+                boxShadow: isSelected ? 'inset 3px 0 0 #6366f1' : `inset 3px 0 0 ${accentColor}`,
+              }}
+              onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.7)'; }}
+              onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = ''; }}
             >
-              {/* Status left-accent bar */}
-              <div className={`absolute left-0 top-2 bottom-2 w-0.5 rounded-r ${accentClass} ${isSelected ? 'opacity-100' : 'opacity-60 group-hover:opacity-80'}`} />
-
-              {/* Hover-reveal checkbox */}
+              {/* Checkbox — left of avatar, shown on hover or when any selected */}
               <div
-                className={`absolute left-1.5 top-3.5 z-10 transition-opacity duration-100 ${isChecked ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                className={`mt-1 shrink-0 transition-opacity duration-100 ${isChecked || selected.size > 0 ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'}`}
                 onClick={e => toggleSelect(ticket.id, e)}
               >
-                <div className={`w-4 h-4 rounded flex items-center justify-center ring-1 transition-colors ${isChecked ? 'bg-brand ring-brand' : 'bg-surface-3 ring-surface-5'}`}>
+                <div
+                  className="w-4 h-4 rounded flex items-center justify-center"
+                  style={{ border: `1.5px solid ${isChecked ? '#6366f1' : '#d1d5db'}`, background: isChecked ? '#6366f1' : '#fff', transition: 'all 0.1s' }}
+                >
                   {isChecked && <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>}
                 </div>
               </div>
@@ -247,73 +550,55 @@ export default function ConversationList({
               <Avatar
                 name={ticket.customer?.name ?? '?'}
                 size="sm"
-                className={`mt-0.5 shrink-0 transition-transform duration-100 group-hover:scale-105 ${isChecked ? 'opacity-0' : ''}`}
+                className="mt-0.5 shrink-0"
               />
 
+              {/* Content */}
               <div className="flex-1 min-w-0">
                 {/* Row 1: name + time */}
-                <div className="flex items-center justify-between mb-0.5 gap-1">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="text-xs font-semibold text-text-primary truncate">
+                <div className="flex items-center justify-between gap-1 mb-0.5">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                    <span className="text-[13px] font-semibold truncate" style={{ color: '#111827' }}>
                       {ticket.customer?.name ?? 'Unknown'}
                     </span>
                     {ticket.customer?.tier === 'VIP' && (
-                      <span className="text-[9px] font-bold text-brand bg-brand/10 px-1 rounded shrink-0">VIP</span>
-                    )}
-                    {ticket.customer?.tier === 'EA' && (
-                      <span className="text-[9px] text-accent-amber bg-accent-amber/10 px-1 rounded shrink-0">EA</span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: '#fef2f2', color: '#b91c1c' }}>VIP</span>
                     )}
                   </div>
-                  <span className="text-[10px] text-text-muted shrink-0 tabular-nums">{timeAgo(lastTs)}</span>
+                  <span className="text-[10px] text-gray-400 tabular-nums shrink-0">{timeAgo(lastTs)}</span>
                 </div>
 
-                {/* Row 2: last message */}
-                <p className="text-xs text-text-secondary truncate mb-1.5 leading-relaxed">
-                  {ticket.last_message ?? '—'}
+                {/* Row 2: last message preview */}
+                <p className="text-[12px] truncate leading-relaxed mb-1.5" style={{ color: '#6b7280' }}>
+                  {preview}
                 </p>
 
-                {/* Row 3: badges */}
-                <div className="flex items-center gap-1 flex-wrap">
-                  <ChannelBadge channel={ticket.channel as any} size="xs" />
-                  {ticket.category && (
-                    <CategoryBadge category={ticket.category} size="xs" />
-                  )}
-                  {ticket.priority !== 3 && (
-                    <PriorityBadge priority={ticket.priority as Priority} size="xs" />
-                  )}
-                  {(risk || ticket.sla_breached) && (
-                    <span className={`inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                      ticket.sla_breached ? 'bg-brand/10 text-brand' : 'bg-accent-amber/10 text-accent-amber'
-                    }`}>
-                      {ticket.sla_breached ? 'Breached' : 'SLA'}
+                {/* Row 3: category + channel + SLA */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {catCfg && (
+                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md" style={{ background: catCfg.bg, color: catCfg.color }}>
+                      {catCfg.label}
                     </span>
                   )}
-                  {ticket.tags?.slice(0, 2).map(tag => (
-                    <span key={tag} className="text-[10px] bg-surface-4 text-text-muted px-1.5 py-0.5 rounded">{tag}</span>
-                  ))}
-                  {(ticket.tags?.length ?? 0) > 2 && (
-                    <span className="text-[10px] text-text-muted">+{(ticket.tags?.length ?? 0) - 2}</span>
+                  {chCfg && (
+                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md" style={{ background: chCfg.bg, color: chCfg.color }}>
+                      {chCfg.label}
+                    </span>
+                  )}
+                  {(risk || ticket.sla_breached) && (
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md" style={{
+                      background: ticket.sla_breached ? '#fef2f2' : '#fffbeb',
+                      color: ticket.sla_breached ? '#b91c1c' : '#92400e',
+                    }}>
+                      {ticket.sla_breached ? '⚠ SLA Breached' : '⏱ SLA Risk'}
+                    </span>
                   )}
                 </div>
               </div>
-
-              {/* Selected indicator */}
-              {isSelected && (
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 w-1 h-1 rounded-full bg-brand" />
-              )}
             </div>
           );
         })}
       </div>
     </aside>
-  );
-}
-
-function StatPill({ label, value, color }: { label: string; value: number; color?: string }) {
-  return (
-    <div className="text-center">
-      <div className={`text-sm font-bold font-inter-nums ${color ?? 'text-text-primary'}`}>{value}</div>
-      <div className="text-[9px] text-text-muted uppercase tracking-wide">{label}</div>
-    </div>
   );
 }

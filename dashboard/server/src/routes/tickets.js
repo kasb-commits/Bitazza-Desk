@@ -412,24 +412,49 @@ router.patch('/:id/tags', async (req, res) => {
 
 // ── POST /api/tickets/:id/messages ───────────────────────────────────────────
 router.post('/:id/messages', requirePermission('inbox.reply'), async (req, res) => {
-  const { content, is_note = false, channel } = req.body;
-  if (!content?.trim()) return res.status(400).json({ error: 'content required' });
+  const { content, is_note = false, channel, attachment_ids } = req.body;
+  if (!content?.trim() && !attachment_ids?.length) return res.status(400).json({ error: 'content or attachment required' });
 
   const senderType = is_note ? 'internal_note' : 'agent';
   // Validate channel if provided (FR-08)
   const VALID_CHANNELS = ['web', 'line', 'facebook', 'email'];
   const replyChannel = VALID_CHANNELS.includes(channel) ? channel : null;
 
+  // Resolve attachment metadata from the Python uploads store
+  let attachments = [];
+  if (!is_note && Array.isArray(attachment_ids) && attachment_ids.length) {
+    try {
+      const uploadsDir = require('path').join(__dirname, '../../../../uploads/attachments');
+      const fs = require('fs');
+      const mime = require('mime-types');
+      attachments = attachment_ids.flatMap(aid => {
+        const match = fs.readdirSync(uploadsDir).find(f => f.startsWith(aid + '_'));
+        if (!match) return [];
+        const name = match.slice(aid.length + 1);
+        const fpath = require('path').join(uploadsDir, match);
+        const size = fs.statSync(fpath).size;
+        const mimeType = mime.lookup(match) || 'application/octet-stream';
+        const host = process.env.PYTHON_API_URL || 'http://localhost:8000';
+        return [{ id: aid, url: `${host}/uploads/attachments/${match}`, name, mime_type: mimeType, size }];
+      });
+    } catch { /* uploads dir may not exist yet */ }
+  }
+
   try {
     const rawAvatarUrl = req.user.avatar_url ?? null;
     const agentAvatarUrl = rawAvatarUrl && rawAvatarUrl.startsWith('/')
       ? `${req.protocol}://${req.get('host')}${rawAvatarUrl}`
       : rawAvatarUrl;
-    const msgMeta = { agent_name: req.user.name, agent_avatar_url: agentAvatarUrl, ...(replyChannel ? { channel: replyChannel } : {}) };
+    const msgMeta = {
+      agent_name: req.user.name,
+      agent_avatar_url: agentAvatarUrl,
+      ...(replyChannel ? { channel: replyChannel } : {}),
+      ...(attachments.length ? { attachments } : {}),
+    };
     const { rows } = await pool.query(
       `INSERT INTO messages (ticket_id, sender_type, sender_id, content, metadata)
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [req.params.id, senderType, req.user.id, content.trim(), JSON.stringify(msgMeta)]
+      [req.params.id, senderType, req.user.id, (content ?? '').trim(), JSON.stringify(msgMeta)]
     );
     // Update ticket status to In_Progress on first agent reply
     if (!is_note) {
@@ -449,6 +474,7 @@ router.post('/:id/messages', requirePermission('inbox.reply'), async (req, res) 
         agent_avatar_url: agentAvatarUrl,
         is_internal_note: senderType === 'internal_note',
         created_at: Math.floor(new Date(msg.created_at).getTime() / 1000),
+        metadata: msgMeta,
       },
     });
     res.json({ ok: true, message: msg });

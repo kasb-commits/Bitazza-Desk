@@ -118,7 +118,7 @@ def _ensure_customer(cur, user_id: str) -> str:
     cur.execute("SELECT id, name FROM customers WHERE external_id = %s", (user_id,))
     row = cur.fetchone()
     if row:
-        # Always refresh kyc_status on every new ticket so stale/missing values are fixed.
+        # Always refresh kyc_status/kyc_tier on every new ticket so stale/missing values are fixed.
         # Also backfill name/email/tier if the row was created before the profile fetch succeeded.
         try:
             profile = _fetch_user_profile(user_id)
@@ -190,7 +190,7 @@ def _ensure_customer(cur, user_id: str) -> str:
     tier         = profile.get("tier") or "regular"
     kyc_info     = profile.get("kyc") or {}
     kyc_status   = kyc_info.get("status") or None
-    kyc_tier     = kyc_info.get("kyc_tier")
+    kyc_tier     = kyc_info.get("kyc_tier") or 0
 
     cur.execute("""
         INSERT INTO customers (id, name, email, phone, tier, kyc_status, kyc_tier, external_id)
@@ -571,16 +571,25 @@ def get_ai_persona(conversation_id: str) -> dict:
 
 # ── Messages ──────────────────────────────────────────────────────────────────
 
-def add_message(conversation_id: str, role: str, content: str, metadata: dict = {}) -> str:
+def add_message(
+    conversation_id: str,
+    role: str,
+    content: str,
+    metadata: dict = {},
+    attachments: list[dict] | None = None,
+) -> str:
     """conversation_id here is the ticket_id in the dashboard schema."""
     msg_id = str(uuid.uuid4())
     sender_type = _role_to_sender_type(role)
+    meta = dict(metadata)
+    if attachments:
+        meta["attachments"] = attachments
     with _conn() as conn:
         cur = conn.cursor()
         cur.execute("""
             INSERT INTO messages (id, ticket_id, sender_type, content, metadata)
             VALUES (%s, %s, %s, %s, %s)
-        """, (msg_id, conversation_id, sender_type, content, json.dumps(metadata)))
+        """, (msg_id, conversation_id, sender_type, content, json.dumps(meta)))
         # Touch ticket updated_at
         cur.execute("UPDATE tickets SET updated_at = NOW() WHERE id = %s", (conversation_id,))
     return msg_id
@@ -662,6 +671,74 @@ def count_consecutive_low_confidence(conversation_id: str) -> int:
         meta = json.loads(raw) if isinstance(raw, str) and raw else (raw or {})
         confidence = meta.get("confidence")
         if confidence is not None and float(confidence) < ESCALATION_CONFIDENCE_THRESHOLD:
+            count += 1
+        else:
+            break
+    return count
+
+
+# ── Information collection phase ─────────────────────────────────────────────
+
+def get_info_collection_phase(conversation_id: str) -> str | None:
+    """
+    Returns the current info-collection phase for this conversation:
+      "questioning"        — AI has asked clarifying questions, awaiting answers
+      "awaiting_screenshot" — AI has asked for a screenshot, awaiting upload or refusal
+      None                 — not in collection phase
+    Stored in tickets.metadata JSONB as {"info_collection_phase": "..."}.
+    """
+    with _conn() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT metadata FROM tickets WHERE id = %s", (conversation_id,))
+        row = cur.fetchone()
+    if not row or not row["metadata"]:
+        return None
+    raw = row["metadata"]
+    meta = json.loads(raw) if isinstance(raw, str) else (raw or {})
+    return meta.get("info_collection_phase")
+
+
+def set_info_collection_phase(conversation_id: str, phase: str | None) -> None:
+    """
+    Set or clear the info-collection phase.
+    Pass phase=None to clear (used after escalation fires).
+    """
+    with _conn() as conn:
+        cur = conn.cursor()
+        # Merge into existing metadata JSONB
+        cur.execute("SELECT metadata FROM tickets WHERE id = %s", (conversation_id,))
+        row = cur.fetchone()
+        raw = row["metadata"] if row else None
+        meta = json.loads(raw) if isinstance(raw, str) and raw else (raw or {})
+        if phase is None:
+            meta.pop("info_collection_phase", None)
+        else:
+            meta["info_collection_phase"] = phase
+        cur.execute(
+            "UPDATE tickets SET metadata = %s, updated_at = NOW() WHERE id = %s",
+            (json.dumps(meta), conversation_id),
+        )
+
+
+def count_collection_turns(conversation_id: str) -> int:
+    """
+    Count how many bot messages have been sent while in collection phase.
+    Used to cap the collection phase at 2 turns before forcing escalation.
+    """
+    with _conn() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT metadata FROM messages
+            WHERE ticket_id = %s AND sender_type = 'bot'
+            ORDER BY created_at DESC
+            LIMIT 10
+        """, (conversation_id,))
+        rows = cur.fetchall()
+    count = 0
+    for r in rows:
+        raw = r["metadata"]
+        meta = json.loads(raw) if isinstance(raw, str) and raw else (raw or {})
+        if meta.get("info_collection"):
             count += 1
         else:
             break

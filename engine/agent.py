@@ -18,13 +18,15 @@ from engine.escalation import should_escalate
 from engine.prompt_templates import (
     get_system_prompt, get_guest_system_prompt, build_user_message,
     build_handoff_message, ESCALATION_MESSAGES, UNABLE_TO_HELP_MESSAGES,
+    build_collection_prompt,
 )
 from engine.mock_agents import pick_agent, detect_category_from_message, get_intro_message
 from db.conversation_store import (
     get_history, add_message, create_ticket,
     get_ai_persona, update_ticket_status,
     get_ticket_id_by_conversation, update_customer_from_profile,
-    get_ticket_meta,
+    get_ticket_meta, get_info_collection_phase, set_info_collection_phase,
+    count_collection_turns,
 )
 from db.vector_store import collection_count
 from engine.assignment_client import trigger_auto_assign
@@ -67,6 +69,16 @@ def detect_language(text: str) -> str:
     return "th" if thai_chars / max(len(text), 1) > 0.1 else "en"
 
 
+_ACCOUNT_SPECIFIC_CATEGORIES = {
+    "kyc_verification", "account_restriction", "withdrawal_issue",
+    "deposit_issue", "fraud_security", "trade_issue",
+}
+
+
+def _is_account_specific_category(category: str | None) -> bool:
+    return bool(category and category in _ACCOUNT_SPECIFIC_CATEGORIES)
+
+
 class AgentResponse:
     def __init__(self, text: str, language: str, escalated: bool = False,
                  escalation_reason: str = "", ticket_id: str | None = None,
@@ -74,7 +86,8 @@ class AgentResponse:
                  agent_avatar_url: str | None = None, resolved: bool = False,
                  specialist_intro: str | None = None, confidence: float = 1.0,
                  upgraded_category: str | None = None,
-                 transition_message: str | None = None):
+                 transition_message: str | None = None,
+                 info_collection: bool = False):
         self.text = text
         self.language = language
         self.escalated = escalated
@@ -88,6 +101,7 @@ class AgentResponse:
         self.confidence = confidence
         self.upgraded_category = upgraded_category  # set when mid-convo category switch occurs
         self.transition_message: str | None = transition_message  # outgoing-agent farewell shown before specialist reply
+        self.info_collection = info_collection  # True when this reply is a collection-phase question
 
 
 _UPGRADE_TRANSITION_MESSAGES: dict[str, dict[str, str]] = {
@@ -498,6 +512,36 @@ def chat(
         escalate = False
 
     if escalate:
+        # ── Information collection phase intercept ─────────────────────────
+        # Before escalating, check if we should collect more context first.
+        # Only for model-initiated escalations on account-specific categories.
+        # User-requested, sensitive keywords, and service errors skip this.
+        _intercept_reasons = ("model_requested", "low_confidence")
+        if (
+            reason in _intercept_reasons
+            and _is_account_specific_category(category)
+            and not is_guest_session
+        ):
+            _phase = get_info_collection_phase(conversation_id)
+            if _phase is None:
+                # First time we've tried to escalate — enter collection phase
+                set_info_collection_phase(conversation_id, "questioning")
+                collection_text = build_collection_prompt(category, language)
+                return AgentResponse(
+                    text=collection_text,
+                    language=language,
+                    escalated=False,
+                    info_collection=True,
+                )
+            # Already in collection phase — check turn cap (max 2 collection turns)
+            if count_collection_turns(conversation_id) < 2:
+                # One more collection turn allowed — let the escalation proceed below
+                # but the phase stays set; next attachment or decline will fire escalation
+                # from chat.py. Clear the phase here so the agent doesn't re-intercept.
+                pass
+            # Phase is set and cap reached (or second pass) — fall through to escalate
+            set_info_collection_phase(conversation_id, None)
+
         ticket_id = get_ticket_id_by_conversation(conversation_id)
         if ticket_id:
             _escalation_status = "Escalated" if platform == "email" else "pending_human"

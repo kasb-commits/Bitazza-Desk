@@ -9,6 +9,7 @@ from db.conversation_store import (
     update_ticket_category, count_consecutive_low_confidence,
     get_customer_id_for_user, get_customer_tickets, get_open_ticket_for_customer,
     get_ticket_by_id, update_ticket_status, get_ticket_id_by_conversation,
+    get_info_collection_phase, set_info_collection_phase, count_collection_turns,
 )
 from workflow_engine.interceptor import workflow_interceptor as chat
 from engine.mock_agents import pick_agent
@@ -52,6 +53,15 @@ class MessageRequest(BaseModel):
     message: str
     consecutive_low_confidence: int = 0  # deprecated — server computes this now; kept for backwards compatibility
     category: str | None = None  # issue category selected by user in widget
+    attachment_ids: list[str] | None = None  # UUIDs returned by POST /api/uploads/attachment
+
+
+class AttachmentMeta(BaseModel):
+    id: str
+    url: str
+    name: str
+    mime_type: str
+    size: int
 
 
 class MessageResponse(BaseModel):
@@ -165,9 +175,37 @@ def greet(body: GreetRequest, user_id: str | None = Depends(get_optional_user_id
     )
 
 
+def _resolve_attachments(attachment_ids: list[str] | None) -> list[dict]:
+    """
+    Resolve attachment UUIDs to their stored metadata.
+    Reads the uploads/attachments directory to find matching files and rebuilds metadata.
+    Returns a list of dicts with {id, url, name, mime_type, size}.
+    """
+    if not attachment_ids:
+        return []
+    import os, mimetypes
+    upload_dir = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+        "uploads", "attachments",
+    )
+    result = []
+    for aid in attachment_ids:
+        # Files are stored as <uuid>_<name>
+        matches = [f for f in os.listdir(upload_dir) if f.startswith(aid + "_")]
+        if not matches:
+            continue
+        fname = matches[0]
+        fpath = os.path.join(upload_dir, fname)
+        safe_name = fname[len(aid) + 1:]
+        mime = mimetypes.guess_type(fname)[0] or "application/octet-stream"
+        size = os.path.getsize(fpath)
+        result.append({"id": aid, "name": safe_name, "mime_type": mime, "size": size})
+    return result
+
+
 @router.post("/message", response_model=MessageResponse)
 async def send_message(body: MessageRequest, user_id: str | None = Depends(get_optional_user_id)):
-    if not body.message.strip():
+    if not body.message.strip() and not body.attachment_ids:
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
     # Intent resolution: on the first user turn, refine the picked category using
@@ -191,8 +229,16 @@ async def send_message(body: MessageRequest, user_id: str | None = Depends(get_o
                 _intent_resolved_agent["avatar_url"],
             )
 
-    # Persist user message
-    add_message(body.conversation_id, "user", body.message)
+    # Resolve any attachment IDs to metadata
+    _attachments = _resolve_attachments(body.attachment_ids)
+
+    # Persist user message (with attachments in metadata if present)
+    add_message(
+        body.conversation_id,
+        "user",
+        body.message,
+        attachments=_attachments if _attachments else None,
+    )
 
     # Guard: once a human agent has sent their first reply, the AI must not reply.
     # Before that first reply, even escalated tickets can still get AI answers —
@@ -248,7 +294,49 @@ async def send_message(body: MessageRequest, user_id: str | None = Depends(get_o
     if _ticket_id:
         update_ticket_status(_ticket_id, "in_progress")
 
-    # Run agent — workflow_interceptor is sync+blocking (Gemini HTTP calls inside);
+    # ── Attachment escalation ──────────────────────────────────────────────────
+    # If the user sent an attachment, escalate immediately — AI never reads files.
+    # Also fires if the user is in the collection phase and attaches or declines.
+    _collection_phase = get_info_collection_phase(body.conversation_id)
+    _NO_SCREENSHOT_PHRASES = [
+        "can't send", "cannot send", "no screenshot", "don't have", "don't have it",
+        "ไม่มี", "ไม่สามารถ", "ส่งไม่ได้", "ไม่มีรูป",
+    ]
+    _user_declined_screenshot = any(
+        p in body.message.lower() for p in _NO_SCREENSHOT_PHRASES
+    )
+    _force_escalate = bool(_attachments) or (
+        _collection_phase is not None and _user_declined_screenshot
+    )
+
+    if _force_escalate:
+        # Clear collection phase — handoff is happening now
+        if _collection_phase is not None:
+            set_info_collection_phase(body.conversation_id, None)
+        if _ticket_id:
+            update_ticket_status(_ticket_id, "pending_human")
+            from db.conversation_store import get_ticket_meta
+            from engine.assignment_client import trigger_auto_assign
+            _meta = get_ticket_meta(_ticket_id)
+            if _meta.get("customer_id"):
+                trigger_auto_assign(_ticket_id, effective_category, _meta["priority"], str(_meta["customer_id"]))
+        from engine.prompt_templates import build_handoff_message
+        from engine.agent import AgentResponse
+        _lang = "en"  # language will be refined by agent on next turn; handoff is brief
+        _handoff_text = build_handoff_message(effective_category or "general", _lang)
+        _ack = "Thank you for sharing that." if _attachments else "No problem."
+        _reply_text = f"{_ack} {_handoff_text}"
+        add_message(body.conversation_id, "assistant", _reply_text, {"escalated": True, "escalation_reason": "attachment"})
+        update_ticket_status(_ticket_id, "pending_human")
+        return MessageResponse(
+            reply=_reply_text,
+            language=_lang,
+            escalated=True,
+            ticket_id=_ticket_id,
+        )
+
+    # ── Run agent ─────────────────────────────────────────────────────────────
+    # workflow_interceptor is sync+blocking (Gemini HTTP calls inside);
     # run in a thread pool to avoid blocking the event loop.
     import asyncio as _asyncio
     result = await _asyncio.to_thread(
@@ -269,11 +357,14 @@ async def send_message(body: MessageRequest, user_id: str | None = Depends(get_o
         update_ticket_category(body.conversation_id, result.upgraded_category)
 
     # Persist assistant reply — include confidence so server-side counter can read it
-    add_message(body.conversation_id, "assistant", result.text, {
+    _reply_meta: dict = {
         "escalated": result.escalated,
         "escalation_reason": result.escalation_reason,
         "confidence": result.confidence,
-    })
+    }
+    if getattr(result, "info_collection", False):
+        _reply_meta["info_collection"] = True
+    add_message(body.conversation_id, "assistant", result.text, _reply_meta)
 
     # After the AI replies, move status to Pending_Customer (ball is in customer's court).
     # Skip if the AI escalated — agent.py already wrote the correct Escalated status.
