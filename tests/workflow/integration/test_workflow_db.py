@@ -76,7 +76,7 @@ class TestWorkflowStoreCRUD:
     def test_save_and_load_workflow(self, sqlite_conn):
         import json
         with _patch_db(sqlite_conn):
-            from workflow_engine.store import save_workflow, load_workflow_by_id
+            from workflow_engine.store import load_workflow_by_id
 
             wf_id = str(uuid.uuid4())
             sqlite_conn.execute("""
@@ -327,9 +327,10 @@ class TestAutoTransitionGuard:
             """, (wf_id,))
             sqlite_conn.commit()
 
+            # In this system conversation_id == ticket_id
             create_execution(
                 execution_id=str(uuid.uuid4()), workflow_id=wf_id,
-                conversation_id="conv-active-1",
+                conversation_id="ticket-active-1",
                 current_node_id="n1", variables={},
                 status=ExecutionStatus.RUNNING,
                 channel="widget", category="kyc_verification",

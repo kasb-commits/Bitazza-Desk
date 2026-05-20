@@ -2,7 +2,7 @@
 E2E tests: AI Studio test execution mode.
 
 Verifies that:
-- POST /api/studio/flows/{id}/test-run executes workflow in dry-run mode
+- POST /studio/test-run executes workflow in dry-run mode
 - Dry-run produces per-node step output without touching any live conversation
 - Dry-run never persists execution state to DB
 - Dry-run never sends replies (no WebSocket, no email)
@@ -15,22 +15,10 @@ from unittest.mock import MagicMock, patch
 
 @pytest.fixture
 def client():
-    with patch("db.conversation_store.get_connection"), \
-         patch("db.vector_store.chromadb"):
+    with patch("db.vector_store.chromadb"):
         from api.main import app
         from fastapi.testclient import TestClient
         return TestClient(app)
-
-
-def _agent_headers():
-    import os, jwt
-    secret = os.environ.get("JWT_SECRET", "test-secret-key")
-    token = jwt.encode(
-        {"sub": "agent-1", "role": "supervisor",
-         "permissions": ["section.studio", "studio.publish"]},
-        secret, algorithm="HS256"
-    )
-    return {"Authorization": f"Bearer {token}"}
 
 
 def _sample_flow_json():
@@ -59,24 +47,37 @@ def _sample_flow_json():
     }
 
 
+def _workflow_body(**kwargs):
+    """Build a TestRunRequest body — workflow is passed directly (not fetched by ID)."""
+    return {
+        "workflow": {
+            "id": "flow-test-1",
+            "name": "Test Flow",
+            "nodes_json": "[]",
+            "edges_json": "[]",
+            "trigger_channel": "widget",
+            "trigger_category": "kyc_verification",
+            "published": True,
+            "version": 1,
+        },
+        "sample_message": "What is my KYC status?",
+        "channel": "widget",
+        "category": "kyc_verification",
+        "language": "en",
+        **kwargs,
+    }
+
+
 # ── Test execution mode: dry run ──────────────────────────────────────────────
 
 class TestStudioTestExecution:
 
     def test_test_run_returns_per_node_steps(self, client):
         """
-        POST /api/studio/flows/{id}/test-run returns a list of step results,
+        POST /studio/test-run returns a list of step results,
         one per node executed.
         """
-        flow_id = "flow-test-1"
-
-        with patch("dashboard.server.routes.studio.pool") as mock_pool, \
-             patch("workflow_engine.test_runner.run_test_execution") as mock_runner:
-
-            mock_pool.query.return_value.rows = [{
-                "id": flow_id,
-                "flow_json": _sample_flow_json(),
-            }]
+        with patch("workflow_engine.test_runner.run_test_execution") as mock_runner:
 
             mock_runner.return_value = {
                 "steps": [
@@ -94,16 +95,7 @@ class TestStudioTestExecution:
                 "error": None,
             }
 
-            response = client.post(
-                f"/api/studio/flows/{flow_id}/test-run",
-                json={
-                    "sample_message": "What is my KYC status?",
-                    "channel": "widget",
-                    "category": "kyc_verification",
-                    "language": "en",
-                },
-                headers=_agent_headers(),
-            )
+            response = client.post("/studio/test-run", json=_workflow_body())
 
         assert response.status_code == 200
         data = response.json()
@@ -117,12 +109,9 @@ class TestStudioTestExecution:
 
             mock_runner.return_value = {"steps": [], "completed": True, "error": None}
 
-            client.post(
-                "/api/studio/flows/flow-1/test-run",
-                json={"sample_message": "hello", "channel": "widget",
-                      "category": "other", "language": "en"},
-                headers=_agent_headers(),
-            )
+            client.post("/studio/test-run", json=_workflow_body(
+                sample_message="hello", category="other"
+            ))
 
         mock_create.assert_not_called()
 
@@ -140,12 +129,7 @@ class TestStudioTestExecution:
                 "completed": True, "error": None,
             }
 
-            client.post(
-                "/api/studio/flows/flow-1/test-run",
-                json={"sample_message": "hello", "channel": "widget",
-                      "category": "other", "language": "en"},
-                headers=_agent_headers(),
-            )
+            client.post("/studio/test-run", json=_workflow_body(sample_message="hello"))
 
         mock_ws.assert_not_called()
         mock_email.assert_not_called()
@@ -166,12 +150,7 @@ class TestStudioTestExecution:
                 "error": "Execution stopped at node n-broken",
             }
 
-            response = client.post(
-                "/api/studio/flows/flow-1/test-run",
-                json={"sample_message": "hello", "channel": "widget",
-                      "category": "other", "language": "en"},
-                headers=_agent_headers(),
-            )
+            response = client.post("/studio/test-run", json=_workflow_body(sample_message="hello"))
 
         assert response.status_code == 200
         data = response.json()
@@ -201,12 +180,9 @@ class TestStudioTestExecution:
                 "completed": True, "error": None,
             }
 
-            response = client.post(
-                "/api/studio/flows/flow-1/test-run",
-                json={"sample_message": "my kyc", "channel": "widget",
-                      "category": "kyc_verification", "language": "en"},
-                headers=_agent_headers(),
-            )
+            response = client.post("/studio/test-run", json=_workflow_body(
+                sample_message="my kyc", category="kyc_verification"
+            ))
 
         assert response.status_code == 200
         step = response.json()["steps"][0]

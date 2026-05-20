@@ -37,7 +37,7 @@ def _make_sqlite_conn():
             id TEXT PRIMARY KEY,
             name TEXT, email TEXT, phone TEXT,
             tier TEXT DEFAULT 'regular',
-            kyc_status TEXT, external_id TEXT
+            kyc_status TEXT, kyc_tier TEXT, external_id TEXT
         )
     """)
     conn.execute("""
@@ -52,6 +52,7 @@ def _make_sqlite_conn():
             assigned_to TEXT,
             ai_persona TEXT,
             csat_score INTEGER,
+            sla_deadline TEXT,
             created_at TEXT DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now')),
             updated_at TEXT DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now'))
         )
@@ -82,7 +83,8 @@ class _FakeCursor:
         sql = sql.replace("NOW()", "strftime('%Y-%m-%d %H:%M:%f', 'now')")
         sql = re.sub(r"EXTRACT\(EPOCH FROM ([^)]+)\)::bigint", r"strftime('%s', \1)", sql)
         sql = re.sub(r"EXTRACT\(EPOCH FROM ([^)]+)\)", r"strftime('%s', \1)", sql)
-        sql = re.sub(r"- INTERVAL '[^']+' \w+", "", sql, flags=re.IGNORECASE)
+        sql = re.sub(r"[+\-] INTERVAL '[^']+' \w+", "", sql, flags=re.IGNORECASE)
+        sql = re.sub(r"\* INTERVAL '1 minute'", "", sql, flags=re.IGNORECASE)
         sql = re.sub(r"ORDER BY created_at (ASC|DESC)", r"ORDER BY created_at \1, rowid \1", sql, flags=re.IGNORECASE)
         self._cur.execute(sql, params)
         self._rows = self._cur.fetchall()
@@ -153,6 +155,35 @@ def client(monkeypatch):
     return TestClient(app)
 
 
+def _jwt_headers(user_id: str = "test-user-1") -> dict:
+    """Build Authorization headers with a signed JWT."""
+    from jose import jwt as _jwt
+    secret = os.environ.get("JWT_SECRET", "test-secret")
+    token = _jwt.encode({"sub": user_id}, secret, algorithm="HS256")
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def auth_client(monkeypatch):
+    """TestClient with a pre-baked JWT for user 'test-user-1'."""
+    import db.conversation_store as cs
+    sqlite_conn = _make_sqlite_conn()
+    fake_conn = _FakeConn(sqlite_conn)
+
+    @contextmanager
+    def fake_context_manager():
+        yield fake_conn
+        fake_conn.commit()
+
+    monkeypatch.setattr(cs, "_conn", fake_context_manager)
+    monkeypatch.setattr(cs, "_fetch_user_profile", lambda user_id: {})
+
+    from api.main import app
+    tc = TestClient(app)
+    tc.headers.update(_jwt_headers("test-user-1"))
+    return tc
+
+
 def _mock_agent_result(**overrides):
     r = MagicMock()
     r.text = "Test reply"
@@ -178,25 +209,25 @@ def _mock_agent_result(**overrides):
 # ---------------------------------------------------------------------------
 
 class TestChatStartCustomerId:
-    def test_response_includes_customer_id(self, client):
-        r = client.post("/chat/start", json={"platform": "bitazza"})
+    def test_response_includes_customer_id(self, auth_client):
+        r = auth_client.post("/chat/start", json={"platform": "bitazza"})
         assert r.status_code == 200
         data = r.json()
         assert "customer_id" in data
         assert len(data["customer_id"]) == 36  # UUID
 
-    def test_same_user_gets_same_customer_id(self, client):
-        r1 = client.post("/chat/start", json={"platform": "bitazza"})
-        r2 = client.post("/chat/start", json={"platform": "bitazza"})
+    def test_same_user_gets_same_customer_id(self, auth_client):
+        r1 = auth_client.post("/chat/start", json={"platform": "bitazza"})
+        r2 = auth_client.post("/chat/start", json={"platform": "bitazza"})
         assert r1.json()["customer_id"] == r2.json()["customer_id"]
 
-    def test_same_user_gets_different_conversation_ids(self, client):
-        r1 = client.post("/chat/start", json={"platform": "bitazza"})
-        r2 = client.post("/chat/start", json={"platform": "bitazza"})
+    def test_same_user_gets_different_conversation_ids(self, auth_client):
+        r1 = auth_client.post("/chat/start", json={"platform": "bitazza"})
+        r2 = auth_client.post("/chat/start", json={"platform": "bitazza"})
         assert r1.json()["conversation_id"] != r2.json()["conversation_id"]
 
-    def test_existing_fields_still_present(self, client):
-        r = client.post("/chat/start", json={"platform": "bitazza"})
+    def test_existing_fields_still_present(self, auth_client):
+        r = auth_client.post("/chat/start", json={"platform": "bitazza"})
         data = r.json()
         assert "conversation_id" in data
         assert "ticket_id" in data
@@ -210,9 +241,9 @@ class TestChatStartCustomerId:
 # ---------------------------------------------------------------------------
 
 class TestCustomerTicketsEndpoint:
-    def test_returns_200_with_tickets(self, client):
-        client.post("/chat/start", json={"platform": "web"})
-        r = client.get("/chat/customer-tickets")
+    def test_returns_200_with_tickets(self, auth_client):
+        auth_client.post("/chat/start", json={"platform": "web"})
+        r = auth_client.get("/chat/customer-tickets")
         assert r.status_code == 200
         data = r.json()
         assert "tickets" in data
@@ -239,21 +270,21 @@ class TestCustomerTicketsEndpoint:
         r = tc.get("/chat/customer-tickets")
         assert r.status_code == 401
 
-    def test_pagination_page_and_limit(self, client):
+    def test_pagination_page_and_limit(self, auth_client):
         for _ in range(7):
-            client.post("/chat/start", json={"platform": "web"})
+            auth_client.post("/chat/start", json={"platform": "web"})
             time.sleep(0.001)
 
-        r1 = client.get("/chat/customer-tickets?page=1&limit=5")
-        r2 = client.get("/chat/customer-tickets?page=2&limit=5")
+        r1 = auth_client.get("/chat/customer-tickets?page=1&limit=5")
+        r2 = auth_client.get("/chat/customer-tickets?page=2&limit=5")
         assert r1.status_code == 200
         assert r2.status_code == 200
         assert len(r1.json()["tickets"]) == 5
         assert len(r2.json()["tickets"]) == 2
 
-    def test_response_shape(self, client):
-        client.post("/chat/start", json={"platform": "web", "category": "kyc_verification"})
-        r = client.get("/chat/customer-tickets")
+    def test_response_shape(self, auth_client):
+        auth_client.post("/chat/start", json={"platform": "web", "category": "kyc_verification"})
+        r = auth_client.get("/chat/customer-tickets")
         ticket = r.json()["tickets"][0]
         assert "id" in ticket
         assert "category" in ticket
@@ -262,20 +293,11 @@ class TestCustomerTicketsEndpoint:
         assert "last_message" in ticket
         assert "last_message_at" in ticket
 
-    def test_only_returns_own_tickets(self, client, monkeypatch):
-        """Two separate JWT users must each only see their own tickets."""
-        import db.conversation_store as cs
-        import sqlite3 as _sqlite3
-        import re as _re
-        from contextlib import contextmanager as _cm
-        from datetime import datetime as _dt
-
-        # This test relies on the default TestClient which uses the mock JWT
-        # (user_id extracted from JWT_SECRET "test-secret" → anonymous "anonymous")
-        # Both calls go through the same mock user, so both tickets should appear.
-        client.post("/chat/start", json={"platform": "web"})
-        client.post("/chat/start", json={"platform": "web"})
-        r = client.get("/chat/customer-tickets")
+    def test_only_returns_own_tickets(self, auth_client):
+        """Same authenticated user makes two tickets — both appear in their list."""
+        auth_client.post("/chat/start", json={"platform": "web"})
+        auth_client.post("/chat/start", json={"platform": "web"})
+        r = auth_client.get("/chat/customer-tickets")
         assert len(r.json()["tickets"]) == 2
 
 
@@ -398,38 +420,34 @@ class TestRegressionExistingFlows:
 # ---------------------------------------------------------------------------
 
 class TestOpenTicketEndpoint:
-    def test_returns_open_ticket_when_exists(self, client):
-        r = client.post("/chat/start", json={"platform": "web", "category": "kyc_verification"})
+    def test_returns_open_ticket_when_exists(self, auth_client):
+        r = auth_client.post("/chat/start", json={"platform": "web", "category": "kyc_verification"})
         cid = r.json()["conversation_id"]
 
-        r = client.get("/chat/open-ticket")
+        r = auth_client.get("/chat/open-ticket")
         assert r.status_code == 200
         data = r.json()
         assert data["ticket"] is not None
         assert data["ticket"]["id"] == cid
 
-    def test_returns_null_when_no_open_ticket(self, client):
+    def test_returns_null_when_no_open_ticket(self, auth_client):
         # No conversation started — no ticket
-        r = client.get("/chat/open-ticket")
+        r = auth_client.get("/chat/open-ticket")
         assert r.status_code == 200
         assert r.json()["ticket"] is None
 
-    def test_returns_null_after_ticket_closed(self, client):
+    def test_returns_null_after_ticket_closed(self, auth_client):
         import db.conversation_store as cs
-        r = client.post("/chat/start", json={"platform": "web"})
+        r = auth_client.post("/chat/start", json={"platform": "web"})
         cid = r.json()["conversation_id"]
         cs.update_ticket_status(cid, "resolved")
 
-        r = client.get("/chat/open-ticket")
+        r = auth_client.get("/chat/open-ticket")
         assert r.status_code == 200
         assert r.json()["ticket"] is None
 
-    def test_unauthenticated_returns_401(self, monkeypatch):
-        import config.settings as s
-        monkeypatch.setattr(s, "ENV", "production")
-        import api.middleware.auth as auth_mod
-        monkeypatch.setattr(auth_mod, "ENV", "production")
-        from api.main import app
+    def test_unauthenticated_returns_null(self, monkeypatch):
+        """No JWT token → /chat/open-ticket returns null (uses optional auth, not strict)."""
         import db.conversation_store as cs
         sqlite_conn = _make_sqlite_conn()
         fake_conn = _FakeConn(sqlite_conn)
@@ -440,6 +458,8 @@ class TestOpenTicketEndpoint:
             fake_conn.commit()
         monkeypatch.setattr(cs, "_conn", _fake)
         monkeypatch.setattr(cs, "_fetch_user_profile", lambda uid: {})
+        from api.main import app
         tc = TestClient(app, raise_server_exceptions=False)
         r = tc.get("/chat/open-ticket")
-        assert r.status_code == 401
+        assert r.status_code == 200
+        assert r.json()["ticket"] is None

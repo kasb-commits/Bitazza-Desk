@@ -37,29 +37,41 @@ async def run_auto_transitions() -> None:
         buckets = get_tickets_for_auto_transition()
 
         for ticket in buckets.get("pending_customer_expired", []):
-            if is_workflow_active(ticket["id"]):
-                logger.debug("Skipping auto-transition for ticket %s — workflow active", ticket["id"])
-                continue
-            # All channels: customer dropped off without responding → Closed_Unresponsive.
-            # Closed_Unresponsive is distinct from Closed_Resolved (which requires
-            # explicit CSAT confirmation) — this keeps resolution metrics honest.
-            update_ticket_status(ticket["id"], "unresponsive")
-            logger.info(
-                "Auto-closed ticket %s as Closed_Unresponsive (no customer reply after 2h, channel=%s)",
-                ticket["id"], ticket.get("channel", "unknown"),
-            )
+            try:
+                if is_workflow_active(ticket["id"]):
+                    logger.debug("Skipping auto-transition for ticket %s — workflow active", ticket["id"])
+                    continue
+            except Exception:
+                logger.debug("is_workflow_active guard failed for %s — processing ticket (fail-open)", ticket["id"])
+            # Email: no customer reply → treat as resolved
+            # Widget/other: customer dropped off → snooze for agent follow-up
+            if ticket.get("channel") == "email":
+                update_ticket_status(ticket["id"], "Resolved")
+                logger.info("Auto-resolved email ticket %s (no customer reply)", ticket["id"])
+            else:
+                update_ticket_status(ticket["id"], "snoozed")
+                logger.info(
+                    "Auto-snoozed ticket %s (no customer reply after 48h, channel=%s)",
+                    ticket["id"], ticket.get("channel", "unknown"),
+                )
 
         for ticket in buckets.get("snoozed_expired", []):
-            if is_workflow_active(ticket["id"]):
-                logger.debug("Skipping auto-transition for ticket %s — workflow active", ticket["id"])
-                continue
+            try:
+                if is_workflow_active(ticket["id"]):
+                    logger.debug("Skipping auto-transition for ticket %s — workflow active", ticket["id"])
+                    continue
+            except Exception:
+                logger.debug("is_workflow_active guard failed for %s — processing ticket (fail-open)", ticket["id"])
             update_ticket_status(ticket["id"], "closed")
             logger.info("Auto-closed ticket %s (snooze expired)", ticket["id"])
 
         for ticket in buckets.get("resolved_expired", []):
-            if is_workflow_active(ticket["id"]):
-                logger.debug("Skipping auto-transition for ticket %s — workflow active", ticket["id"])
-                continue
+            try:
+                if is_workflow_active(ticket["id"]):
+                    logger.debug("Skipping auto-transition for ticket %s — workflow active", ticket["id"])
+                    continue
+            except Exception:
+                logger.debug("is_workflow_active guard failed for %s — processing ticket (fail-open)", ticket["id"])
             update_ticket_status(ticket["id"], "closed")
             logger.info("Auto-closed ticket %s (resolved 24h timeout)", ticket["id"])
 

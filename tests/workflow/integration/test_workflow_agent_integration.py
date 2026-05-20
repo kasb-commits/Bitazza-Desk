@@ -84,6 +84,7 @@ class TestAiReplyNodeAgentIntegration:
             platform="widget",
             category="kyc_verification",
             consecutive_low_confidence=0,
+            suppress_handoff=True,
         )
 
     def test_email_channel_passes_platform_email_to_agent(self):
@@ -278,7 +279,7 @@ class TestLegacyAgentFallthrough:
 
         with patch("workflow_engine.router.WorkflowRouter.route") as mock_route, \
              patch("workflow_engine.interceptor.legacy_agent_chat", mock_legacy), \
-             patch("workflow_engine.interceptor.WorkflowExecutionEngine.start",
+             patch("workflow_engine.engine.WorkflowExecutionEngine.start",
                    side_effect=RuntimeError("engine crashed")):
 
             mock_route.return_value = MagicMock(

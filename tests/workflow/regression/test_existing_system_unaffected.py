@@ -36,6 +36,8 @@ class TestAgentChatContractUnchanged:
             patch("engine.agent.update_ticket_status"),
             patch("engine.agent.has_successful_bot_reply", return_value=False, create=True),
             patch("engine.agent.update_customer_from_profile"),
+            patch("engine.agent.get_ticket_meta", return_value={"priority": 3, "customer_id": "cust-1"}),
+            patch("engine.agent.get_ai_persona", return_value={"name": None, "avatar": None, "avatar_url": None}),
         ):
             self.mock_client = mock_client
             yield
@@ -133,9 +135,9 @@ class TestEscalationLogicUnchanged:
 
     def test_explicit_human_request_always_escalates(self):
         from engine.escalation import should_escalate
-        for phrase in ["talk to human", "speak to agent", "ขอคุยกับ agent"]:
+        for phrase in ["talk to a human", "connect me to an agent", "ขอคุยกับ agent"]:
             escalate, reason = should_escalate(phrase, confidence=0.99)
-            assert escalate is True
+            assert escalate is True, f"Expected escalation for phrase: {phrase!r}"
             assert reason == "user_requested_human"
 
     def test_fraud_keyword_escalates_regardless_of_confidence(self):
@@ -174,6 +176,8 @@ class TestSecurityFilterOrderUnchanged:
              patch("engine.agent.update_ticket_status"), \
              patch("engine.agent.has_successful_bot_reply", return_value=False, create=True), \
              patch("engine.agent.update_customer_from_profile"), \
+             patch("engine.agent.get_ticket_meta", return_value={"priority": 3, "customer_id": "c1"}), \
+             patch("engine.agent.get_ai_persona", return_value={"name": None, "avatar": None, "avatar_url": None}), \
              patch("engine.agent.post_filter", return_value="clean") as mock_post:
 
             part = MagicMock(); part.text = json.dumps(

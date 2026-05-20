@@ -26,7 +26,7 @@ def _make_sqlite_conn():
             id TEXT PRIMARY KEY,
             name TEXT, email TEXT, phone TEXT,
             tier TEXT DEFAULT 'regular',
-            kyc_status TEXT, external_id TEXT
+            kyc_status TEXT, kyc_tier TEXT, external_id TEXT
         )
     """)
     conn.execute("""
@@ -41,6 +41,7 @@ def _make_sqlite_conn():
             assigned_to TEXT,
             ai_persona TEXT,
             csat_score INTEGER,
+            sla_deadline TEXT,
             created_at TEXT DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now')),
             updated_at TEXT DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now'))
         )
@@ -92,7 +93,8 @@ class _FakeCursor:
         sql = re.sub(r"EXTRACT\(EPOCH FROM ([^)]+)\)::bigint", r"strftime('%s', \1)", sql)
         sql = re.sub(r"EXTRACT\(EPOCH FROM ([^)]+)\)", r"strftime('%s', \1)", sql)
         # Remove INTERVAL expressions (not supported in sqlite)
-        sql = re.sub(r"- INTERVAL '[^']+' \w+", "", sql, flags=re.IGNORECASE)
+        sql = re.sub(r"[+\-] INTERVAL '[^']+' \w+", "", sql, flags=re.IGNORECASE)
+        sql = re.sub(r"\* INTERVAL '1 minute'", "", sql, flags=re.IGNORECASE)
         # Add rowid tiebreaker to ORDER BY created_at to ensure stable ordering
         sql = re.sub(r"ORDER BY created_at (ASC|DESC)", r"ORDER BY created_at \1, rowid \1", sql, flags=re.IGNORECASE)
         self._cur.execute(sql, params)

@@ -38,7 +38,7 @@ def _make_sqlite_conn():
             id TEXT PRIMARY KEY,
             name TEXT, email TEXT, phone TEXT,
             tier TEXT DEFAULT 'regular',
-            kyc_status TEXT, external_id TEXT
+            kyc_status TEXT, kyc_tier TEXT, external_id TEXT
         )
     """)
     conn.execute("""

@@ -171,10 +171,12 @@ class TestCategoryUpgradeOptionC:
              patch.object(engine, "run_node",
                           return_value=NodeResult(output={}, next_node_id=None)), \
              patch("workflow_engine.engine.detect_upgrade", return_value=None) as mock_detect:
-            engine.resume(execution, workflow, message)
+            result = engine.resume(execution, workflow, message)
 
-        # detect_upgrade was called but returned None — no upgrade happened
-        assert mock_detect.called
+        # detect_upgrade is invoked by the router (not the engine directly),
+        # so the engine never calls it — no upgrade should have happened.
+        assert result.category == "kyc_verification"
+        assert not mock_detect.called
 
     def test_upgrade_carries_transition_message(self):
         """Upgrade event must include the specialist transition message."""

@@ -69,11 +69,18 @@ class TestEngineStart:
         workflow = _make_workflow(nodes=[node])
         message = _make_message()
 
-        engine = WorkflowExecutionEngine()
-        with patch.object(engine, "_persist_execution") as mock_persist, \
-             patch.object(engine, "_run_from_node", return_value=MagicMock(status="completed")):
-            execution = engine.start(workflow, message)
+        captured = {}
 
+        def capture_and_return(execution, workflow, message):
+            captured["execution"] = execution
+            return execution
+
+        engine = WorkflowExecutionEngine()
+        with patch.object(engine, "_persist_execution"), \
+             patch.object(engine, "_run_from_node", side_effect=capture_and_return):
+            engine.start(workflow, message)
+
+        execution = captured["execution"]
         assert execution.workflow_id == "wf-1"
         assert execution.conversation_id == "conv-1"
 
@@ -164,14 +171,14 @@ class TestEngineNodeSequence:
         message = _make_message()
 
         engine = WorkflowExecutionEngine()
-        with patch.object(engine, "_persist_execution") as mock_persist, \
-             patch.object(engine, "run_node", side_effect=fake_run_node):
+        with patch.object(engine, "_persist_execution"), \
+             patch.object(engine, "run_node", side_effect=fake_run_node) as mock_run:
             engine.start(workflow, message)
 
-        # n3 should never have been executed
-        executed_nodes = [c.args[0].id for c in engine.run_node.call_args_list]
-        assert "n3" not in executed_nodes
-        assert "n2" in executed_nodes
+            # n3 should never have been executed
+            executed_nodes = [c.args[0].id for c in mock_run.call_args_list]
+            assert "n3" not in executed_nodes
+            assert "n2" in executed_nodes
 
     def test_execution_status_waiting_after_pause(self):
         from workflow_engine.engine import WorkflowExecutionEngine

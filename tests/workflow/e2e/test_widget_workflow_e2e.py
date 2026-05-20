@@ -15,8 +15,7 @@ from unittest.mock import MagicMock, patch
 
 @pytest.fixture
 def client():
-    with patch("db.conversation_store.get_connection"), \
-         patch("db.vector_store.chromadb"):
+    with patch("db.vector_store.chromadb"):
         from api.main import app
         from fastapi.testclient import TestClient
         return TestClient(app)
@@ -24,7 +23,7 @@ def client():
 
 def _auth_headers():
     import os
-    import jwt
+    from jose import jwt
     secret = os.environ.get("JWT_SECRET", "test-secret-key")
     token = jwt.encode(
         {"sub": "user-widget-1", "role": "agent", "permissions": []},
@@ -50,27 +49,28 @@ class TestWidgetNoWorkflowFallthrough:
         When no workflow is published for this channel+category,
         the message must be handled by the existing agent unchanged.
         """
+        from engine.agent import AgentResponse
         conv_id = "conv-widget-fallthrough-1"
 
         with patch("workflow_engine.router.WorkflowRouter.route") as mock_route, \
-             patch("api.routes.chat.engine") as mock_engine, \
+             patch("api.routes.chat.chat") as mock_chat, \
              patch("api.routes.chat.add_message"), \
              patch("api.routes.chat.get_history", return_value=[]), \
              patch("api.routes.chat.count_consecutive_low_confidence", return_value=0), \
+             patch("api.routes.chat.is_human_handling", return_value=False), \
+             patch("api.routes.chat.has_human_agent_replied", return_value=False), \
+             patch("api.routes.chat.get_ticket_id_by_conversation", return_value=None), \
+             patch("api.routes.chat.get_info_collection_phase", return_value=None), \
              patch("api.routes.chat.get_ai_persona",
-                   return_value={"name": "Kai", "avatar": "🤖", "avatar_url": None}), \
-             patch("api.routes.chat.get_ticket_category", return_value="other"):
+                   return_value={"name": "Kai", "avatar": "🤖", "avatar_url": None}):
 
             mock_route.return_value = MagicMock(
                 fallthrough=True, matched_workflow=None,
                 active_execution=None, category_upgrade=None,
             )
-            mock_engine.chat.return_value = MagicMock(
+            mock_chat.return_value = AgentResponse(
                 text="Hello! How can I help?",
                 escalated=False, language="en",
-                confidence=0.9, resolved=False,
-                specialist_intro=None, upgraded_category=None,
-                transition_message=None,
             )
 
             response = client.post("/chat/message", json={
@@ -86,11 +86,14 @@ class TestWidgetNoWorkflowFallthrough:
         assert data["escalated"] is False
 
     def test_human_handling_active_suppresses_bot_reply(self, client):
-        """If human_handling is active, bot must return null reply — unchanged behavior."""
+        """If human_handling is active and a human has replied, bot returns null reply."""
         conv_id = "conv-human-handling-1"
 
-        with patch("api.routes.chat.get_human_handling_status", return_value=True), \
+        with patch("api.routes.chat.is_human_handling", return_value=True), \
+             patch("api.routes.chat.has_human_agent_replied", return_value=True), \
              patch("api.routes.chat.add_message"), \
+             patch("api.routes.chat.get_history", return_value=[]), \
+             patch("api.routes.chat.get_ticket_by_id", return_value=None), \
              patch("api.routes.chat.get_ai_persona",
                    return_value={"name": "Kai", "avatar": "🤖", "avatar_url": None}):
 
@@ -118,6 +121,8 @@ class TestWidgetActiveWorkflowRuns:
         mock_execution_result.output_reply = "Your KYC is approved."
         mock_execution_result.escalated = False
         mock_execution_result.resolved = False
+        mock_execution_result.variables = {}
+        mock_execution_result.transition_message = None
 
         with patch("workflow_engine.router.WorkflowRouter.route") as mock_route, \
              patch("workflow_engine.engine.WorkflowExecutionEngine.start",
@@ -125,10 +130,12 @@ class TestWidgetActiveWorkflowRuns:
              patch("api.routes.chat.add_message"), \
              patch("api.routes.chat.get_history", return_value=[]), \
              patch("api.routes.chat.count_consecutive_low_confidence", return_value=0), \
+             patch("api.routes.chat.is_human_handling", return_value=False), \
+             patch("api.routes.chat.has_human_agent_replied", return_value=False), \
+             patch("api.routes.chat.get_ticket_id_by_conversation", return_value=None), \
+             patch("api.routes.chat.get_info_collection_phase", return_value=None), \
              patch("api.routes.chat.get_ai_persona",
-                   return_value={"name": "Kai", "avatar": "🤖", "avatar_url": None}), \
-             patch("api.routes.chat.get_ticket_category", return_value="kyc_verification"), \
-             patch("api.routes.chat.get_human_handling_status", return_value=False):
+                   return_value={"name": "Kai", "avatar": "🤖", "avatar_url": None}):
 
             mock_route.return_value = MagicMock(
                 fallthrough=False,
@@ -160,6 +167,8 @@ class TestWidgetActiveWorkflowRuns:
         mock_execution_result.output_reply = "Continuing your KYC flow."
         mock_execution_result.escalated = False
         mock_execution_result.resolved = False
+        mock_execution_result.variables = {}
+        mock_execution_result.transition_message = None
 
         with patch("workflow_engine.router.WorkflowRouter.route") as mock_route, \
              patch("workflow_engine.engine.WorkflowExecutionEngine.resume",
@@ -168,10 +177,12 @@ class TestWidgetActiveWorkflowRuns:
              patch("api.routes.chat.add_message"), \
              patch("api.routes.chat.get_history", return_value=[]), \
              patch("api.routes.chat.count_consecutive_low_confidence", return_value=0), \
+             patch("api.routes.chat.is_human_handling", return_value=False), \
+             patch("api.routes.chat.has_human_agent_replied", return_value=False), \
+             patch("api.routes.chat.get_ticket_id_by_conversation", return_value=None), \
+             patch("api.routes.chat.get_info_collection_phase", return_value=None), \
              patch("api.routes.chat.get_ai_persona",
-                   return_value={"name": "Kai", "avatar": "🤖", "avatar_url": None}), \
-             patch("api.routes.chat.get_ticket_category", return_value="kyc_verification"), \
-             patch("api.routes.chat.get_human_handling_status", return_value=False):
+                   return_value={"name": "Kai", "avatar": "🤖", "avatar_url": None}):
 
             mock_route.return_value = MagicMock(
                 fallthrough=False,
@@ -201,6 +212,8 @@ class TestWidgetWorkflowEscalation:
         mock_execution_result.output_reply = "Connecting you to a specialist."
         mock_execution_result.escalated = True
         mock_execution_result.resolved = False
+        mock_execution_result.variables = {}
+        mock_execution_result.transition_message = None
 
         with patch("workflow_engine.router.WorkflowRouter.route") as mock_route, \
              patch("workflow_engine.engine.WorkflowExecutionEngine.start",
@@ -208,10 +221,12 @@ class TestWidgetWorkflowEscalation:
              patch("api.routes.chat.add_message"), \
              patch("api.routes.chat.get_history", return_value=[]), \
              patch("api.routes.chat.count_consecutive_low_confidence", return_value=0), \
+             patch("api.routes.chat.is_human_handling", return_value=False), \
+             patch("api.routes.chat.has_human_agent_replied", return_value=False), \
+             patch("api.routes.chat.get_ticket_id_by_conversation", return_value=None), \
+             patch("api.routes.chat.get_info_collection_phase", return_value=None), \
              patch("api.routes.chat.get_ai_persona",
-                   return_value={"name": "Kai", "avatar": "🤖", "avatar_url": None}), \
-             patch("api.routes.chat.get_ticket_category", return_value="fraud_security"), \
-             patch("api.routes.chat.get_human_handling_status", return_value=False):
+                   return_value={"name": "Kai", "avatar": "🤖", "avatar_url": None}):
 
             mock_route.return_value = MagicMock(
                 fallthrough=False,
@@ -254,6 +269,7 @@ class TestWidgetCategoryUpgradeE2E:
         mock_result.escalated = False
         mock_result.resolved = False
         mock_result.transition_message = "Connecting you to Ploy..."
+        mock_result.variables = {}
 
         with patch("workflow_engine.router.WorkflowRouter.route") as mock_route, \
              patch("workflow_engine.engine.WorkflowExecutionEngine.resume",
@@ -261,10 +277,14 @@ class TestWidgetCategoryUpgradeE2E:
              patch("api.routes.chat.add_message"), \
              patch("api.routes.chat.get_history", return_value=[]), \
              patch("api.routes.chat.count_consecutive_low_confidence", return_value=0), \
+             patch("api.routes.chat.is_human_handling", return_value=False), \
+             patch("api.routes.chat.has_human_agent_replied", return_value=False), \
+             patch("api.routes.chat.get_ticket_id_by_conversation", return_value=None), \
+             patch("api.routes.chat.get_info_collection_phase", return_value=None), \
+             patch("api.routes.chat.update_ticket_category"), \
+             patch("api.routes.chat.assign_ai_persona"), \
              patch("api.routes.chat.get_ai_persona",
-                   return_value={"name": "Kai", "avatar": "🤖", "avatar_url": None}), \
-             patch("api.routes.chat.get_ticket_category", return_value="other"), \
-             patch("api.routes.chat.get_human_handling_status", return_value=False):
+                   return_value={"name": "Kai", "avatar": "🤖", "avatar_url": None}):
 
             mock_route.return_value = MagicMock(
                 fallthrough=False,

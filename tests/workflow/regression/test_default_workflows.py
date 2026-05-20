@@ -71,6 +71,8 @@ class TestDefaultWorkflowOutputEquivalence:
              patch("engine.agent.retrieve_with_fallback", return_value=[]), \
              patch("engine.agent.get_ticket_id_by_conversation", return_value="t1"), \
              patch("engine.agent.update_ticket_status"), \
+             patch("engine.agent.get_ticket_meta", return_value={"priority": 3, "customer_id": "c1"}), \
+             patch("engine.agent.get_ai_persona", return_value={"name": None, "avatar": None, "avatar_url": None}), \
              patch("db.conversation_store.has_successful_bot_reply", return_value=True), \
              patch("engine.agent.update_customer_from_profile", create=True):
 
@@ -100,7 +102,10 @@ class TestDefaultWorkflowOutputEquivalence:
 
         with patch("engine.agent.client") as mock_client, \
              patch("engine.agent.get_ticket_id_by_conversation", return_value="t1"), \
-             patch("engine.agent.update_ticket_status"):
+             patch("engine.agent.update_ticket_status"), \
+             patch("engine.agent.get_ticket_meta", return_value={"priority": 3, "customer_id": "c1"}), \
+             patch("engine.agent.get_ai_persona", return_value={"name": None, "avatar": None, "avatar_url": None}), \
+             patch("workflow_engine.store.get_published_workflows_by_trigger", return_value=[]):
 
             result = chat("conv-1", "user-1", "KYC status?", category="kyc_verification")
 
@@ -118,6 +123,8 @@ class TestDefaultWorkflowOutputEquivalence:
              patch("engine.agent.retrieve_with_fallback", return_value=[]), \
              patch("engine.agent.get_ticket_id_by_conversation", return_value="t1"), \
              patch("engine.agent.update_ticket_status"), \
+             patch("engine.agent.get_ticket_meta", return_value={"priority": 3, "customer_id": "c1"}), \
+             patch("engine.agent.get_ai_persona", return_value={"name": None, "avatar": None, "avatar_url": None}), \
              patch("engine.agent.has_successful_bot_reply", return_value=True, create=True), \
              patch("engine.agent.update_customer_from_profile"):
 
@@ -125,7 +132,7 @@ class TestDefaultWorkflowOutputEquivalence:
             mock_client.models.generate_content.return_value = _gemini_resp(
                 {"response": "FAQ answer", "confidence": 0.9, "needs_human": False, "resolved": False}
             )
-            result = chat("conv-1", "user-1", "How do I deposit?", category="other")
+            result = chat("conv-1", "user-1", "How do I use the app?", category="other")
 
         # Only one Gemini call (no tool call loop)
         assert mock_client.models.generate_content.call_count == 1

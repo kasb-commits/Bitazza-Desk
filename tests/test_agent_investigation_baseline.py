@@ -65,7 +65,8 @@ def mock_base():
         patch("engine.agent.retrieve_with_fallback", return_value=[]),
         patch("engine.agent.get_ticket_id_by_conversation", return_value="t-baseline"),
         patch("engine.agent.update_ticket_status"),
-        patch("engine.agent.get_ai_persona", return_value=None),
+        patch("engine.agent.get_ticket_meta", return_value={"priority": 3, "customer_id": "cust-uuid"}),
+        patch("engine.agent.get_ai_persona", return_value={"name": None, "avatar": None, "avatar_url": None}),
         patch("engine.agent.update_customer_from_profile"),
     ):
         yield mock_client

@@ -48,7 +48,8 @@ def mock_dependencies():
         patch("engine.agent.retrieve_with_fallback", return_value=[]),
         patch("engine.agent.get_ticket_id_by_conversation", return_value="ticket-123"),
         patch("engine.agent.update_ticket_status"),
-        patch("engine.agent.get_ai_persona", return_value=None),
+        patch("engine.agent.get_ticket_meta", return_value={"priority": 3, "customer_id": "cust-uuid"}),
+        patch("engine.agent.get_ai_persona", return_value={"name": None, "avatar": None, "avatar_url": None}),
     ):
         yield mock_client
 
@@ -148,6 +149,7 @@ def test_agent_calls_update_customer_from_profile_after_tool_success(mock_depend
     from unittest.mock import patch
 
     with (
+        patch("workflow_engine.store.get_published_workflows_by_trigger", return_value=[]),
         patch("engine.agent.get_ticket_id_by_conversation", return_value="t-backfill"),
         patch("engine.agent.update_ticket_status") as mock_status,
     ):
@@ -181,6 +183,7 @@ def test_agent_does_not_call_update_customer_if_profile_has_error(mock_dependenc
     fake_tools = {"get_user_profile": lambda **kwargs: error_profile}
 
     with (
+        patch("workflow_engine.store.get_published_workflows_by_trigger", return_value=[]),
         patch("engine.agent.TOOLS", fake_tools),
         patch("engine.agent.update_customer_from_profile") as mock_backfill,
     ):

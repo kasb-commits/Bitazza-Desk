@@ -94,6 +94,7 @@ class TestAiReplyNode:
             platform="widget",
             category="kyc_verification",
             consecutive_low_confidence=ctx.variables.get("consecutive_low_confidence", 0),
+            suppress_handoff=True,
         )
         assert result.output["reply"] == "Your KYC is pending review."
 
@@ -339,7 +340,9 @@ class TestEscalateNode:
 
         with patch("workflow_engine.nodes.escalate.update_ticket_status") as mock_status, \
              patch("workflow_engine.nodes.escalate.get_ticket_id_by_conversation",
-                   return_value="ticket-1"):
+                   return_value="ticket-1"), \
+             patch("workflow_engine.nodes.escalate.get_ticket_meta",
+                   return_value={"priority": 3, "customer_id": "cust-1"}):
             result = EscalateNode().run(node, ctx)
 
         mock_status.assert_called_once_with("ticket-1", "pending_human")
@@ -352,7 +355,9 @@ class TestEscalateNode:
 
         with patch("workflow_engine.nodes.escalate.update_ticket_status") as mock_status, \
              patch("workflow_engine.nodes.escalate.get_ticket_id_by_conversation",
-                   return_value="ticket-2"):
+                   return_value="ticket-2"), \
+             patch("workflow_engine.nodes.escalate.get_ticket_meta",
+                   return_value={"priority": 3, "customer_id": "cust-2"}):
             result = EscalateNode().run(node, ctx)
 
         mock_status.assert_called_once_with("ticket-2", "Escalated")
@@ -365,7 +370,9 @@ class TestEscalateNode:
 
         with patch("workflow_engine.nodes.escalate.update_ticket_status"), \
              patch("workflow_engine.nodes.escalate.get_ticket_id_by_conversation",
-                   return_value="ticket-3"):
+                   return_value="ticket-3"), \
+             patch("workflow_engine.nodes.escalate.get_ticket_meta",
+                   return_value={"priority": 3, "customer_id": "cust-3"}):
             result = EscalateNode().run(node, ctx)
 
         assert result.output.get("escalated") is True
@@ -407,7 +414,9 @@ class TestWaitForTriggerNode:
                           config={"trigger_type": "email_verification"},
                           next_node_id="n2")
         ctx = _make_context()
-        result = WaitForTriggerNode().run(node, ctx)
+        with patch("workflow_engine.nodes.wait_for_trigger.create_verification_token",
+                   return_value="tok-test"):
+            result = WaitForTriggerNode().run(node, ctx)
         assert result.pause is True
         assert result.waiting_for.startswith("external_trigger:")
 
