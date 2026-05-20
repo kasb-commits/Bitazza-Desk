@@ -4,6 +4,39 @@ All delivered changes to Bitazza-Desk, newest first.
 
 ---
 
+## [2026-05-20] File Attachments + Agent Improvements + Dashboard UI Polish
+
+**Commits:** `f582bd4`, `f191b47`
+
+### File Attachments
+- `api/routes/uploads.py` — new `POST /api/uploads/attachment` endpoint; stores files to `uploads/attachments/` with UUID prefix
+- `api/main.py` — registers uploads router at `/api/uploads`
+- `api/routes/chat.py` — `attachment_ids` field in `MessageRequest`; `_resolve_attachments` helper maps UUIDs to metadata; bot escalates immediately when attachment is received (AI never reads files); info-collection phase support: escalates if user declines screenshot during fraud/restriction flow
+- `frontend/widget/src/ChatWindow.tsx` — attachment upload UI (file picker, preview strip, sends attachment_ids with message)
+- `frontend/widget/src/MessageBubble.tsx` — renders attachment thumbnails/links in chat bubbles
+- `frontend/widget/src/api.ts` + `types.ts` — attachment upload API call; `attachment_ids` in `SendMessageRequest`
+- `db/conversation_store.py` — `get_info_collection_phase`, `set_info_collection_phase`, `count_collection_turns`
+
+### Agent Improvements
+- `engine/agent.py` — `suppress_handoff` param prevents double-escalation when `ai_reply` workflow node calls `chat()` internally; `no_active_workflow` escalation guard: account-specific categories (`kyc_verification`, `account_restriction`, etc.) escalate to human when no published workflow exists for that category
+- `engine/prompt_templates.py` — `GUEST_PREAMBLE` added (clarify before responding, login nudge only for account queries, conciseness cap); base EN prompt gains conciseness + no-repeat rules
+
+### Dashboard UI
+- `ConversationList`, `MessageThread`, `SupervisorDashboard`, `User360`, `AdminSettings`, `HomeDashboard`, `CopilotPanel`, `PropertiesPanel` — UI polish pass across all major dashboard views
+- `ui/Badge`, `ui/KpiCard`, `ui/Select` components updated; `index.css` additions
+- Node server: `tickets.js` includes `kyc_tier`; `roles.js` fix; `migrate.js` updates
+
+### Test Suite Fixes (34 failures resolved)
+- Workflow unit tests: `suppress_handoff`, `get_ticket_meta`, `create_verification_token` mocks added
+- Execution engine tests: fixed execution capture pattern and `run_node` call_args scope
+- Category upgrade test: corrected assertion — `detect_upgrade` lives in router, not engine
+- Regression tests: added missing `get_ticket_meta`/`get_ai_persona` mocks; fixed escalation phrase values
+- Integration tests: aligned `conversation_id == ticket_id` invariant; fixed `WorkflowExecutionEngine` patch path
+- E2E studio tests: rewrote to use `/studio/test-run` with correct `TestRunRequest` body format
+- `engine/auto_transitions.py`: fail-open `try/except` around `is_workflow_active` guard; `pending_customer_expired` now routes email→`Resolved`, widget→`snoozed`
+
+---
+
 ## [2026-05-19] KYC Tier — Full Stack
 
 **Commit:** `a2af4fa`
@@ -29,7 +62,7 @@ Added KYC tier (0=Unverified, 1=Basic, 2=Enhanced, 3=Full/Professional) across t
 
 ---
 
-## [2026-05-14] Agent Max Chats Ceiling
+## [2026-05-19] Agent Max Chats Ceiling
 
 **Commit:** `25c87c9`
 
@@ -47,6 +80,27 @@ Fixed missing `assignment_client` module that caused Railway boot crash.
 
 ## [2026-05-14] Guest (Unauthenticated) Widget Support
 
-**Commit:** `ddbe2a3` / `57de5c0`
+**Commits:** `57de5c0` → `ddbe2a3` → `b7992c2`
 
-Added support for unauthenticated (guest) users in the chat widget — name/email capture form, guest ticket creation path in `conversation_store.py`, guest customer row in DB.
+Full freeform guest chat flow for unauthenticated users.
+
+**Flow**
+- Widget detects guest mode via `?guest=1` URL param (`cfg.guestMode`)
+- Greeting message + language chips shown first; name/email form appears after language selection
+- On form submit (or skip), `startConversation` is called and Ploy sends an intro message before input is unlocked (`awaitingFirstReply` gate)
+- No category picker for guests — free-form input routed through `other` category directly to Ploy
+
+**Backend**
+- `engine/agent.py` — guest escalation guard: `low_confidence` alone does not escalate guest sessions; keywords, consecutive failures, AI failures, and model `needs_human=true` still escalate normally
+- `engine/prompt_templates.py` — `GUEST_PREAMBLE` added: clarify-before-responding rule, login nudge only for genuinely account-specific queries, 3–4 sentence conciseness cap, no paraphrasing rule; base EN system prompt also gains conciseness + no-repeat rules
+- `workflow_engine/interceptor.py` — guest sessions skip Gemini category classification (`and user_id is not None` guard)
+- `db/conversation_store.py` — guest ticket creation path; guest customer row written with name/email or placeholder
+- `engine/assignment_client.py` — new module for async/sync auto-assign HTTP calls to dashboard internal API (was untracked; committed in `b7992c2` to fix Railway boot crash)
+
+**Frontend**
+- `frontend/widget/src/ChatWindow.tsx` — dual-mode logic: guest path defers `startConversation` until after form, hides category picker, disables input until Ploy intro arrives
+- `frontend/widget/src/GuestIdentityForm.tsx` — redesigned as a chat bubble matching the widget's premium design language (primaryColor ring focus, gradient CTA, skip ghost button)
+
+**Tests**
+- `frontend/widget/e2e/widget-guest.spec.ts` — 21 Playwright E2E tests covering full guest flow (opening, form submit/skip, chat, returning guest, authenticated user unaffected)
+- `tests/test_guest_widget.py` — 39 pytest unit tests for backend guest widget behaviour
