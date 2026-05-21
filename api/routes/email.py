@@ -1160,6 +1160,7 @@ async def agent_email_reply(ticket_id: str, request: Request):
     body = await request.json()
     message_text: str = body.get("message", "").strip()
     is_closing: bool = body.get("is_closing", False)
+    email_attachments: list[dict] | None = body.get("attachments") or None
 
     if not message_text:
         raise HTTPException(status_code=400, detail="message is required")
@@ -1187,6 +1188,7 @@ async def agent_email_reply(ticket_id: str, request: Request):
         language="en",
         is_closing=is_closing,
         csat_tokens=csat_tokens,
+        attachments=email_attachments,
     )
 
     add_message(ticket_id, "agent", message_text, metadata={
@@ -1194,6 +1196,7 @@ async def agent_email_reply(ticket_id: str, request: Request):
         "gmail_message_id": sent_id,
         "sent_by": agent_user_id,
         "is_closing": is_closing,
+        **({"attachments": email_attachments} if email_attachments else {}),
     })
 
     from db.email_store import log_email_message as _log

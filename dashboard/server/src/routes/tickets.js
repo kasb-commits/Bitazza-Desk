@@ -424,7 +424,7 @@ router.post('/:id/messages', requirePermission('inbox.reply'), async (req, res) 
   let attachments = [];
   if (!is_note && Array.isArray(attachment_ids) && attachment_ids.length) {
     try {
-      const uploadsDir = require('path').join(__dirname, '../../../../uploads/attachments');
+      const uploadsDir = require('path').join(__dirname, '..', '..', 'uploads', 'attachments');
       const fs = require('fs');
       const mime = require('mime-types');
       attachments = attachment_ids.flatMap(aid => {
@@ -434,7 +434,7 @@ router.post('/:id/messages', requirePermission('inbox.reply'), async (req, res) 
         const fpath = require('path').join(uploadsDir, match);
         const size = fs.statSync(fpath).size;
         const mimeType = mime.lookup(match) || 'application/octet-stream';
-        const host = process.env.PYTHON_API_URL || 'http://localhost:8000';
+        const host = `${req.protocol}://${req.get('host')}`;
         return [{ id: aid, url: `${host}/uploads/attachments/${match}`, name, mime_type: mimeType, size }];
       });
     } catch { /* uploads dir may not exist yet */ }
@@ -490,7 +490,12 @@ router.post('/:id/messages', requirePermission('inbox.reply'), async (req, res) 
               'Content-Type': 'application/json',
               'X-Internal-Token': process.env.INTERNAL_SERVICE_TOKEN || 'internal-dev-token',
             },
-            body: JSON.stringify({ message: content.trim(), agent_name: req.user.name }),
+            body: JSON.stringify({
+              message: content.trim(),
+              agent_name: req.user.name,
+              // Pass resolved attachment metadata so the Python email sender can embed them inline
+              attachments: attachments.length ? attachments : undefined,
+            }),
           });
         } catch (emailErr) {
           console.error('Failed to send agent email reply:', emailErr.message);

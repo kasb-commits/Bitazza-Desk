@@ -1,5 +1,5 @@
 """Chat API routes — user-facing message endpoint."""
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from api.middleware.auth import get_user_id, get_optional_user_id
 from api.ws_manager import manager
@@ -175,11 +175,13 @@ def greet(body: GreetRequest, user_id: str | None = Depends(get_optional_user_id
     )
 
 
-def _resolve_attachments(attachment_ids: list[str] | None) -> list[dict]:
+def _resolve_attachments(attachment_ids: list[str] | None, base_url: str = "") -> list[dict]:
     """
     Resolve attachment UUIDs to their stored metadata.
     Reads the uploads/attachments directory to find matching files and rebuilds metadata.
     Returns a list of dicts with {id, url, name, mime_type, size}.
+    base_url should be the Python API origin (e.g. http://localhost:8000) so the URL
+    is absolute and works from any client (widget, dashboard, email).
     """
     if not attachment_ids:
         return []
@@ -188,6 +190,8 @@ def _resolve_attachments(attachment_ids: list[str] | None) -> list[dict]:
         os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
         "uploads", "attachments",
     )
+    if not os.path.isdir(upload_dir):
+        return []
     result = []
     for aid in attachment_ids:
         # Files are stored as <uuid>_<name>
@@ -199,12 +203,13 @@ def _resolve_attachments(attachment_ids: list[str] | None) -> list[dict]:
         safe_name = fname[len(aid) + 1:]
         mime = mimetypes.guess_type(fname)[0] or "application/octet-stream"
         size = os.path.getsize(fpath)
-        result.append({"id": aid, "name": safe_name, "mime_type": mime, "size": size})
+        url = f"{base_url}/uploads/attachments/{fname}"
+        result.append({"id": aid, "url": url, "name": safe_name, "mime_type": mime, "size": size})
     return result
 
 
 @router.post("/message", response_model=MessageResponse)
-async def send_message(body: MessageRequest, user_id: str | None = Depends(get_optional_user_id)):
+async def send_message(request: Request, body: MessageRequest, user_id: str | None = Depends(get_optional_user_id)):
     if not body.message.strip() and not body.attachment_ids:
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
@@ -229,8 +234,9 @@ async def send_message(body: MessageRequest, user_id: str | None = Depends(get_o
                 _intent_resolved_agent["avatar_url"],
             )
 
-    # Resolve any attachment IDs to metadata
-    _attachments = _resolve_attachments(body.attachment_ids)
+    # Resolve any attachment IDs to metadata (absolute URL so both widget and dashboard can load them)
+    _base_url = str(request.base_url).rstrip("/")
+    _attachments = _resolve_attachments(body.attachment_ids, _base_url)
 
     # Persist user message (with attachments in metadata if present)
     add_message(
@@ -320,12 +326,10 @@ async def send_message(body: MessageRequest, user_id: str | None = Depends(get_o
             _meta = get_ticket_meta(_ticket_id)
             if _meta.get("customer_id"):
                 trigger_auto_assign(_ticket_id, effective_category, _meta["priority"], str(_meta["customer_id"]))
-        from engine.prompt_templates import build_handoff_message
-        from engine.agent import AgentResponse
-        _lang = "en"  # language will be refined by agent on next turn; handoff is brief
-        _handoff_text = build_handoff_message(effective_category or "general", _lang)
-        _ack = "Thank you for sharing that." if _attachments else "No problem."
-        _reply_text = f"{_ack} {_handoff_text}"
+        from engine.prompt_templates import build_attachment_handoff_message
+        from engine.agent import detect_language
+        _lang = detect_language(body.message) if body.message.strip() else "en"
+        _reply_text = build_attachment_handoff_message(bool(_attachments), _lang)
         add_message(body.conversation_id, "assistant", _reply_text, {"escalated": True, "escalation_reason": "attachment"})
         update_ticket_status(_ticket_id, "pending_human")
         return MessageResponse(

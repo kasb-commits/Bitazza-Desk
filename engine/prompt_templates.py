@@ -212,9 +212,10 @@ CATEGORY_OVERLAYS = {
         "en": """
 ACTIVE SPECIALISATION: KYC & Identity Verification
 
-STEP 1 — Profile (already forced): get_user_profile has been called first. Read the KYC status.
+FIRST TURN ONLY — call get_user_profile to read the KYC status, then follow STEP 2 and STEP 3 below.
+SUBSEQUENT TURNS — the KYC status is already in the conversation history. Do NOT call get_user_profile again unless the user explicitly says the status shown in the app differs from what you reported (e.g. "it still shows pending"). Read the status from the conversation history and answer the follow-up directly.
 
-STEP 2 — Check for downstream impact: If kyc.status is "rejected" or "suspended", also call get_account_restrictions — a KYC failure can trigger an account restriction. Only mention the restriction if it was caused by the KYC rejection; do not surface unrelated account flags.
+STEP 2 — Check for downstream impact (first turn only): If kyc.status is "rejected" or "suspended", also call get_account_restrictions — a KYC failure can trigger an account restriction. Only mention the restriction if it was caused by the KYC rejection; do not surface unrelated account flags.
 
 STEP 3 — Respond with only what is relevant to the user's KYC question:
   * approved → confirm KYC is verified and they are good to go
@@ -229,7 +230,8 @@ STEP 3 — Respond with only what is relevant to the user's KYC question:
 - Only set needs_human=true if the tool returns an error OR status is suspended. All other statuses you can answer directly with high confidence.
 
 CRITICAL — Follow-up handling:
-- Read the FULL conversation history before every reply. Never repeat the same response you already gave.
+- Read the FULL conversation history before every reply. Never repeat a response you already gave verbatim.
+- When the user asks a follow-up question after you confirmed KYC is approved (e.g. "can I trade now?", "so I'm all set?"), answer that follow-up directly and naturally — do NOT call get_user_profile again and do NOT restate "Great news — your KYC is approved" word for word.
 - If the user reports a problem that your previous answer did not solve and KYC is approved, do NOT repeat that KYC is approved. Instead, investigate the specific symptom they describe:
   * "can't trade" / "trading disabled" → call get_account_restrictions and get_trading_availability
   * "can't deposit" / "deposit failed" → call get_account_restrictions first (a restriction often blocks deposits), then get_deposit_status if they mention a specific transaction
@@ -242,9 +244,10 @@ CRITICAL — Follow-up handling:
         "th": """
 ความเชี่ยวชาญเฉพาะทาง: KYC และการยืนยันตัวตน
 
-ขั้นตอน 1 — ข้อมูลโปรไฟล์ (บังคับแล้ว): get_user_profile ถูกเรียกก่อนแล้ว อ่านสถานะ KYC
+รอบแรกเท่านั้น — เรียก get_user_profile เพื่ออ่านสถานะ KYC จากนั้นทำตามขั้นตอน 2 และ 3 ด้านล่าง
+รอบถัดไป — สถานะ KYC อยู่ในประวัติการสนทนาแล้ว ห้ามเรียก get_user_profile อีก ยกเว้นผู้ใช้บอกว่าสถานะในแอปแตกต่างจากที่รายงาน (เช่น "ยังขึ้นว่ารอดำเนินการ") ให้อ่านสถานะจากประวัติการสนทนาและตอบคำถามติดตามโดยตรง
 
-ขั้นตอน 2 — ตรวจสอบผลกระทบที่ตามมา: หาก kyc.status เป็น "rejected" หรือ "suspended" ให้เรียก get_account_restrictions ด้วย การปฏิเสธ KYC อาจทำให้เกิดการระงับบัญชีตามมา กล่าวถึงการจำกัดเฉพาะเมื่อเกิดจาก KYC เท่านั้น ไม่เปิดเผยข้อมูลบัญชีที่ไม่เกี่ยวข้อง
+ขั้นตอน 2 — ตรวจสอบผลกระทบที่ตามมา (รอบแรกเท่านั้น): หาก kyc.status เป็น "rejected" หรือ "suspended" ให้เรียก get_account_restrictions ด้วย การปฏิเสธ KYC อาจทำให้เกิดการระงับบัญชีตามมา กล่าวถึงการจำกัดเฉพาะเมื่อเกิดจาก KYC เท่านั้น ไม่เปิดเผยข้อมูลบัญชีที่ไม่เกี่ยวข้อง
 
 ขั้นตอน 3 — ตอบเฉพาะสิ่งที่เกี่ยวข้องกับคำถาม KYC ของผู้ใช้:
   * approved → ยืนยันว่า KYC ผ่านแล้ว พร้อมใช้งาน
@@ -259,7 +262,8 @@ CRITICAL — Follow-up handling:
 - ตั้ง needs_human=true เฉพาะเมื่อเครื่องมือส่งคืนข้อผิดพลาด หรือสถานะเป็น suspended เท่านั้น
 
 สำคัญมาก — การจัดการข้อความติดตาม:
-- อ่านประวัติการสนทนาทั้งหมดก่อนตอบทุกครั้ง ห้ามตอบซ้ำคำตอบที่ให้ไปแล้ว
+- อ่านประวัติการสนทนาทั้งหมดก่อนตอบทุกครั้ง ห้ามตอบซ้ำคำตอบที่ให้ไปแล้วคำต่อคำ
+- เมื่อผู้ใช้ถามต่อหลังจากที่ยืนยัน KYC ผ่านแล้ว (เช่น "เทรดได้เลยไหม?" หรือ "โอเคแล้วใช่ไหม?") ให้ตอบคำถามนั้นโดยตรงตามธรรมชาติ ห้ามเรียก get_user_profile อีกและห้ามพูดซ้ำว่า "KYC ผ่านแล้ว" แบบเดิมทุกตัวอักษร
 - หากผู้ใช้แจ้งปัญหาที่คำตอบก่อนหน้าไม่ได้แก้ไข และ KYC ผ่านแล้ว อย่าบอกซ้ำว่า KYC ผ่าน ให้ตรวจสอบตามอาการที่ผู้ใช้แจ้ง:
   * "เทรดไม่ได้" / "ซื้อขายไม่ได้" → เรียก get_account_restrictions และ get_trading_availability
   * "ฝากเงินไม่ได้" / "ฝากไม่เข้า" → เรียก get_account_restrictions ก่อน (การจำกัดบัญชีมักบล็อกการฝากเงินด้วย) แล้ว get_deposit_status หากผู้ใช้ระบุธุรกรรมเฉพาะ
@@ -647,7 +651,7 @@ CRITICAL — Follow-up handling:
         "en": """
 ACTIVE SPECIALISATION: General Inquiry
 - Do NOT call any account tools (get_user_profile, get_account_restrictions, get_withdrawal_status, etc.). This user has not indicated an account-specific issue.
-- Your first response must ask the user what they need help with, in a warm and open-ended way.
+- Your first response must ask the user what they need help with, in a warm and open-ended way. When you are asking this opening question (i.e. the user has not yet described their issue), always set confidence=0.9 and needs_human=false — asking the user what they need is always the right action here, regardless of KB context.
 - Once they describe their issue, answer using only the knowledge base context provided. Do not look up account data.
 - Be as helpful as possible. If the answer is clearly in the knowledge base, give it directly and confidently.
 - If after a genuine attempt you cannot answer with confidence (confidence < 0.6), set needs_human=true so a human agent can take over.
@@ -655,7 +659,7 @@ ACTIVE SPECIALISATION: General Inquiry
         "th": """
 ความเชี่ยวชาญเฉพาะทาง: คำถามทั่วไป
 - ห้ามเรียกใช้เครื่องมือบัญชีใดๆ (get_user_profile, get_account_restrictions, get_withdrawal_status ฯลฯ) ผู้ใช้รายนี้ยังไม่ได้ระบุว่ามีปัญหาเฉพาะด้านบัญชี
-- การตอบกลับครั้งแรกต้องถามผู้ใช้ว่าต้องการความช่วยเหลืออะไร ในลักษณะที่อบอุ่นและเปิดกว้าง
+- การตอบกลับครั้งแรกต้องถามผู้ใช้ว่าต้องการความช่วยเหลืออะไร ในลักษณะที่อบอุ่นและเปิดกว้าง เมื่อถามคำถามเปิดนี้ (คือผู้ใช้ยังไม่ได้อธิบายปัญหา) ให้ตั้ง confidence=0.9 และ needs_human=false เสมอ — การถามผู้ใช้ว่าต้องการความช่วยเหลืออะไรคือการตอบสนองที่ถูกต้องเสมอในขั้นตอนนี้ ไม่ว่าจะมีบริบทจาก KB หรือไม่
 - เมื่อผู้ใช้อธิบายปัญหาแล้ว ให้ตอบโดยใช้เฉพาะบริบทจากฐานความรู้ที่ได้รับ ไม่ต้องดึงข้อมูลบัญชี
 - พยายามให้ความช่วยเหลืออย่างเต็มที่ หากคำตอบอยู่ในฐานความรู้ให้ตอบตรงๆ อย่างมั่นใจ
 - หากหลังจากพยายามอย่างจริงจังแล้วยังไม่สามารถตอบได้อย่างมั่นใจ (confidence < 0.6) ให้ตั้ง needs_human=true เพื่อให้เจ้าหน้าที่มนุษย์รับช่วงต่อ
@@ -839,6 +843,29 @@ _COLLECTION_FALLBACK = {
         "คุณเห็นอะไรในแอป เริ่มเกิดขึ้นเมื่อไร และมีข้อความแสดงข้อผิดพลาดอะไรบ้าง?"
     ),
 }
+
+
+_ATTACHMENT_HANDOFF_ACK = {
+    "en": "Thank you for sending that over — it'll help us investigate much faster. I'm now passing you to a specialist who will take it from here.",
+    "th": "ขอบคุณที่ส่งไฟล์มาให้นะคะ ทีมเราจะตรวจสอบได้เร็วขึ้นมากเลย หนูจะส่งต่อให้ผู้เชี่ยวชาญดูแลต่อจากนี้นะคะ",
+}
+
+_DECLINED_SCREENSHOT_HANDOFF_ACK = {
+    "en": "No worries at all! I'm now passing you to a specialist who will be able to help you directly.",
+    "th": "ไม่เป็นไรเลยค่ะ! หนูจะส่งต่อให้ผู้เชี่ยวชาญที่จะช่วยคุณได้โดยตรงนะคะ",
+}
+
+
+def build_attachment_handoff_message(has_attachment: bool, language: str) -> str:
+    """
+    Return a handoff message that acknowledges the customer's action and announces
+    the specialist transfer. Called from chat.py when an attachment triggers escalation
+    or the user declines to send a screenshot during the collection phase.
+    """
+    lang = language if language in ("en", "th") else "en"
+    if has_attachment:
+        return _ATTACHMENT_HANDOFF_ACK[lang]
+    return _DECLINED_SCREENSHOT_HANDOFF_ACK[lang]
 
 
 def build_collection_prompt(category: str | None, language: str) -> str:

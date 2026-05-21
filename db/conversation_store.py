@@ -419,6 +419,8 @@ def get_paginated_history(conversation_id: str, page: int = 1, limit: int = 10) 
             entry["agent_avatar"] = meta.get("agent_avatar", meta["agent_name"][0].upper())
             if meta.get("agent_avatar_url"):
                 entry["agent_avatar_url"] = meta["agent_avatar_url"]
+        if meta.get("attachments"):
+            entry["attachments"] = meta["attachments"]
         result.append(entry)
     return result
 
@@ -595,6 +597,19 @@ def add_message(
     return msg_id
 
 
+def get_message_attachments(message_id: str) -> list[dict]:
+    """Return the attachments list stored in a message's metadata, or []."""
+    with _conn() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT metadata FROM messages WHERE id = %s", (message_id,))
+        row = cur.fetchone()
+    if not row or not row["metadata"]:
+        return []
+    raw = row["metadata"]
+    meta = json.loads(raw) if isinstance(raw, str) else (raw or {})
+    return meta.get("attachments", [])
+
+
 def get_history(conversation_id: str, limit: int = 10) -> list[dict]:
     with _conn() as conn:
         cur = conn.cursor()
@@ -624,6 +639,8 @@ def get_history(conversation_id: str, limit: int = 10) -> list[dict]:
             entry["agent_avatar"] = meta.get("agent_avatar", meta["agent_name"][0].upper())
             if meta.get("agent_avatar_url"):
                 entry["agent_avatar_url"] = meta["agent_avatar_url"]
+        if meta.get("attachments"):
+            entry["attachments"] = meta["attachments"]
         result.append(entry)
     return result
 

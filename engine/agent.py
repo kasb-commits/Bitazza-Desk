@@ -299,9 +299,14 @@ def chat(
         system_prompt = get_system_prompt(language, category, platform=platform, agent_name=_agent_name)
     augmented_message = build_user_message(user_message, rag_chunks, {})
 
-    # Convert history to Gemini format
+    # Convert history to Gemini format.
+    # chat.py calls add_message() before calling this function, so get_history() already
+    # includes the current user message as the last entry. Strip it here — augmented_message
+    # below re-adds it with RAG context prepended. Sending it twice causes two consecutive
+    # user messages which makes Gemini repeat its previous answer and ignore the follow-up.
+    history_for_gemini = history[:-1] if history and history[-1]["role"] == "user" else history
     gemini_history = []
-    for msg in history:
+    for msg in history_for_gemini:
         role = "model" if msg["role"] == "assistant" else "user"
         gemini_history.append(
             genai_types.Content(role=role, parts=[genai_types.Part(text=msg["content"])])
@@ -369,7 +374,18 @@ def chat(
 
     # For "other" category or guest sessions, omit account tools so Gemini cannot call them.
     is_other_category = category == "other"
-    tools = [] if (is_other_category or is_guest_session) else [genai_types.Tool(function_declarations=TOOL_DEFINITIONS)]
+    if is_other_category or is_guest_session:
+        active_tool_defs = []
+    elif prior_successful_reply:
+        # After the first successful reply, remove get_user_profile from the tool list.
+        # The profile data is already in the conversation history — re-calling the tool
+        # causes the model to regenerate the same canned answer on every follow-up.
+        # Other tools (get_account_restrictions, get_withdrawal_status, etc.) stay available
+        # so the model can still investigate new symptoms the user reports.
+        active_tool_defs = [t for t in TOOL_DEFINITIONS if t.get("name") != "get_user_profile"]
+    else:
+        active_tool_defs = TOOL_DEFINITIONS
+    tools = [genai_types.Tool(function_declarations=active_tool_defs)] if active_tool_defs else []
     tool_config = (
         genai_types.ToolConfig(
             function_calling_config=genai_types.FunctionCallingConfig(
@@ -509,6 +525,26 @@ def chat(
 
     # Guests: suppress single-turn low confidence only — everything else escalates normally.
     if escalate and is_guest_session and reason == "low_confidence":
+        escalate = False
+
+    # Trust the model's needs_human judgment over the confidence threshold when either:
+    #
+    # (a) No tools were available — confidence < 0.6 only means no KB chunk matched,
+    #     not that the model failed to help. The model cannot fetch more data, so its
+    #     needs_human=False IS its final, best assessment. Applies to "other" category
+    #     (tools excluded), guest sessions (already caught above), and any future
+    #     tool-free path. Sensitive keywords / explicit human requests still fire.
+    #
+    # (b) Follow-up turns (prior_successful_reply=True) — the model has full conversation
+    #     context by this point. Low confidence on "ok thanks" or "so i can trade now?"
+    #     reflects missing KB context, not inability to answer. If the model says it can
+    #     handle it, trust that over a raw number.
+    #
+    # In both cases only the confidence-based path ("low_confidence") is suppressed.
+    # Sensitive keywords, explicit human requests, and repeated-unclear-exchanges are
+    # unaffected and still escalate normally.
+    _no_tools = not active_tool_defs
+    if escalate and reason == "low_confidence" and not needs_human and (_no_tools or prior_successful_reply):
         escalate = False
 
     if escalate:
