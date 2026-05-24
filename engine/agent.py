@@ -550,14 +550,12 @@ def chat(
     if escalate:
         # ── Information collection phase intercept ─────────────────────────
         # Before escalating, check if we should collect more context first.
-        # Only for model-initiated escalations on account-specific categories.
+        # Applies to all users (guests and authenticated) for any model-initiated
+        # escalation — collecting info/screenshot before handing off improves
+        # agent context regardless of category or auth state.
         # User-requested, sensitive keywords, and service errors skip this.
         _intercept_reasons = ("model_requested", "low_confidence")
-        if (
-            reason in _intercept_reasons
-            and _is_account_specific_category(category)
-            and not is_guest_session
-        ):
+        if reason in _intercept_reasons:
             _phase = get_info_collection_phase(conversation_id)
             if _phase is None:
                 # First time we've tried to escalate — enter collection phase
