@@ -174,7 +174,7 @@ export async function greetConversation(cfg: CSBotConfig, conversationId: string
 }
 
 export interface HistoryResult {
-  messages: { role: string; content: string; created_at: number; agent_name?: string; agent_avatar?: string; agent_avatar_url?: string }[];
+  messages: { role: string; content: string; created_at: number; agent_name?: string; agent_avatar?: string; agent_avatar_url?: string; attachments?: { id: string; url: string; name: string; mime_type: string; size: number }[] }[];
   humanHandling: boolean;
 }
 
@@ -249,7 +249,7 @@ export async function uploadAttachment(
   form.append('file', file);
   const headers: Record<string, string> = {};
   if (cfg.token) headers['Authorization'] = `Bearer ${cfg.token}`;
-  const res = await fetch(`${cfg.apiUrl}/uploads/attachment`, {
+  const res = await fetch(`${cfg.apiUrl}/api/uploads/attachment`, {
     method: 'POST',
     headers,
     body: form,

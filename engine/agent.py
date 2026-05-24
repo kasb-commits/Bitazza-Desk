@@ -69,6 +69,25 @@ def detect_language(text: str) -> str:
     return "th" if thai_chars / max(len(text), 1) > 0.1 else "en"
 
 
+def _clean_response(text: str) -> str:
+    """Strip markdown formatting artifacts from Gemini output.
+
+    The widget renders plain text (whitespace-pre-wrap, no markdown parser),
+    so bold markers, bullet asterisks, and excess blank lines appear as raw
+    characters if left in. This normalises the text before it reaches the user.
+    """
+    # Remove bold/italic markers (**text**, *text*, __text__, _text_)
+    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+    text = re.sub(r"\*(.+?)\*", r"\1", text)
+    text = re.sub(r"__(.+?)__", r"\1", text)
+    text = re.sub(r"_(.+?)_", r"\1", text)
+    # Remove leading bullet/list markers (lines starting with * or - followed by space)
+    text = re.sub(r"(?m)^[\*\-]\s+", "", text)
+    # Collapse 3+ consecutive blank lines down to 2
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
 _ACCOUNT_SPECIFIC_CATEGORIES = {
     "kyc_verification", "account_restriction", "withdrawal_issue",
     "deposit_issue", "fraud_security", "trade_issue",
@@ -107,11 +126,11 @@ class AgentResponse:
 _UPGRADE_TRANSITION_MESSAGES: dict[str, dict[str, str]] = {
     "kyc_verification": {
         "en": "For KYC and identity verification questions I'll hand you over to {specialist} — our verification specialist. They'll have our full conversation and can pull up your case directly. One moment! 🪪",
-        "th": "สำหรับเรื่อง KYC และการยืนยันตัวตน ขอส่งต่อให้ {specialist} ผู้เชี่ยวชาญด้านการยืนยันตัวตนของเรานะคะ เขาจะเห็นการสนทนาทั้งหมดและดึงข้อมูลเคสของคุณได้โดยตรงเลยค่ะ รอสักครู่นะคะ 🪪",
+        "th": "สำหรับเรื่อง KYC และการยืนยันตัวตน ขอส่งต่อให้ {specialist} ผู้เชี่ยวชาญด้านการยืนยันตัวตนของเรานะคะ เจ้าหน้าที่จะเห็นการสนทนาทั้งหมดและดึงข้อมูลเคสของคุณลูกค้าได้โดยตรงเลยค่ะ รอสักครู่นะคะ 🪪",
     },
     "withdrawal_issue": {
         "en": "Withdrawal questions are best handled by {specialist} — our withdrawal specialist who can trace transactions directly. Passing you over now, they'll have everything we've discussed! 💸",
-        "th": "เรื่องการถอนเงินให้ {specialist} ผู้เชี่ยวชาญด้านการถอนเงินของเราจัดการดีกว่าค่ะ เขาสามารถติดตามธุรกรรมได้โดยตรงเลย กำลังส่งต่อให้เดี๋ยวนี้เลยค่ะ 💸",
+        "th": "เรื่องการถอนเงินให้ {specialist} ผู้เชี่ยวชาญด้านการถอนเงินของเราจัดการดีกว่าค่ะ เจ้าหน้าที่สามารถติดตามธุรกรรมได้โดยตรงเลย กำลังส่งต่อให้เดี๋ยวนี้เลยค่ะ 💸",
     },
     "account_restriction": {
         "en": "Account restriction cases need a senior specialist — let me bring in {specialist} who can investigate and take action on your account directly. They'll be right with you! 🔒",
@@ -119,11 +138,11 @@ _UPGRADE_TRANSITION_MESSAGES: dict[str, dict[str, str]] = {
     },
     "deposit_issue": {
         "en": "Deposit problems are handled by {specialist} — our deposits specialist who can trace your transaction directly. Passing you over now, they'll have everything we've discussed! 💳",
-        "th": "เรื่องการฝากเงินให้ {specialist} ผู้เชี่ยวชาญด้านการฝากเงินของเราจัดการดีกว่าค่ะ เขาสามารถติดตามธุรกรรมได้โดยตรงเลย กำลังส่งต่อให้เดี๋ยวนี้เลยค่ะ 💳",
+        "th": "เรื่องการฝากเงินให้ {specialist} ผู้เชี่ยวชาญด้านการฝากเงินของเราจัดการดีกว่าค่ะ เจ้าหน้าที่สามารถติดตามธุรกรรมได้โดยตรงเลย กำลังส่งต่อให้เดี๋ยวนี้เลยค่ะ 💳",
     },
     "trade_issue": {
         "en": "For trading and order issues, let me bring in {specialist} — our trading specialist who can pull up your order history and investigate directly. One moment! 📊",
-        "th": "สำหรับปัญหาการเทรดและออเดอร์ ขอให้ {specialist} ผู้เชี่ยวชาญด้านการเทรดของเรามาช่วยค่ะ เขาสามารถดึงประวัติออเดอร์และตรวจสอบได้โดยตรงเลย รอสักครู่นะคะ 📊",
+        "th": "สำหรับปัญหาการเทรดและออเดอร์ ขอให้ {specialist} ผู้เชี่ยวชาญด้านการเทรดของเรามาช่วยค่ะ เจ้าหน้าที่สามารถดึงประวัติออเดอร์และตรวจสอบได้โดยตรงเลย รอสักครู่นะคะ 📊",
     },
 }
 
@@ -185,12 +204,16 @@ def chat(
     category: str | None = None,
     suppress_handoff: bool = False,
     _skip_upgrade: bool = False,
+    override_language: str | None = None,
 ) -> AgentResponse:
     """
     Process a user message and return an AgentResponse.
     Caller is responsible for persisting messages via conversation_store.
+    override_language: when set, use this instead of per-message detection.
+    Pass the language the user selected at session start so the bot doesn't
+    switch to English just because the message contains English crypto terms.
     """
-    language = detect_language(user_message)
+    language = override_language if override_language else detect_language(user_message)
 
     # 1. Security pre-filter
     check = pre_filter(user_message)
@@ -255,6 +278,7 @@ def chat(
             consecutive_low_confidence=consecutive_low_confidence,
             category=upgrade,
             _skip_upgrade=True,
+            override_language=override_language,
         )
         upgraded_result.upgraded_category = upgrade
         upgraded_result.agent_name = specialist["name"]
@@ -285,7 +309,19 @@ def chat(
         )
 
     # 4. RAG retrieval
-    rag_chunks = retrieve_with_fallback(user_message) if collection_count() > 0 else []
+    # Short follow-up messages (< 8 words) often lack enough terms for the retriever
+    # to find the right KB chunks — especially when the embedding fallback kicks in.
+    # Prepend the last user message to add topic context without inflating long queries.
+    _prior_history = get_history(conversation_id, limit=4)
+    _retrieval_query = user_message
+    if len(user_message.split()) < 8 and _prior_history:
+        _prev_user = next(
+            (h["content"] for h in reversed(_prior_history) if h["role"] == "user"),
+            None,
+        )
+        if _prev_user:
+            _retrieval_query = _prev_user + " " + user_message
+    rag_chunks = retrieve_with_fallback(_retrieval_query) if collection_count() > 0 else []
 
     # 5. Conversation history
     history = get_history(conversation_id, limit=10)
@@ -514,8 +550,9 @@ def chat(
     if not resolved and not needs_human:
         resolved = _is_farewell_reply(response_text, language)
 
-    # 10. Compliance post-filter
+    # 10. Compliance post-filter + markdown cleanup
     response_text = post_filter(response_text)
+    response_text = _clean_response(response_text)
 
     # 11. Escalation: Gemini's own needs_human flag OR keyword triggers
     keyword_escalate, reason = should_escalate(user_message, confidence, consecutive_low_confidence)

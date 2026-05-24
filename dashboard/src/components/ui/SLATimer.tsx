@@ -32,7 +32,7 @@ export function SLATimer({ deadline, className = '', showLabel = false }: SLATim
 
   if (!deadline || isNaN(ms)) {
     return (
-      <span className={`font-mono font-medium text-xs tabular-nums text-text-muted ${className}`}>
+      <span className={`font-mono font-medium text-xs tabular-nums ${className}`} style={{ color: '#9ca3af' }}>
         {showLabel && <span className="font-sans mr-1">SLA</span>}
         No SLA
       </span>
@@ -42,11 +42,14 @@ export function SLATimer({ deadline, className = '', showLabel = false }: SLATim
   const breached = ms <= 0;
   const critical = ms > 0 && ms < 10 * 60 * 1000;
   const warning  = ms > 0 && ms < 30 * 60 * 1000;
-  const colorClass = breached ? 'text-brand animate-pulse' : critical ? 'text-brand' : warning ? 'text-accent-amber' : 'text-accent-green';
+  const color = breached || critical ? '#ef4444' : warning ? '#f59e0b' : '#22c55e';
 
   return (
-    <span className={`font-mono font-medium text-xs tabular-nums ${colorClass} ${className}`}>
-      {showLabel && <span className="text-text-muted font-sans mr-1">SLA</span>}
+    <span
+      className={`font-mono font-medium text-xs tabular-nums ${breached ? 'animate-pulse' : ''} ${className}`}
+      style={{ color }}
+    >
+      {showLabel && <span className="font-sans mr-1" style={{ color: '#9ca3af' }}>SLA</span>}
       {formatMs(ms)}
     </span>
   );

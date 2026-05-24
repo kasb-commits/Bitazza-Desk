@@ -161,6 +161,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
           agentName: m.agent_name ?? restoredAgent?.name,
           agentAvatar: m.agent_avatar ?? restoredAgent?.avatar,
           agentAvatarUrl: m.agent_avatar_url ?? restoredAgent?.avatarUrl ?? undefined,
+          attachments: m.attachments?.map(a => ({ id: a.id, url: a.url, name: a.name, mimeType: a.mime_type, size: a.size })),
         }));
         setMessages(restored);
         // If any agent message exists, mark as escalated
@@ -404,6 +405,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
             agentName: m.agent_name,
             agentAvatar: m.agent_avatar,
             agentAvatarUrl: m.agent_avatar_url ?? undefined,
+            attachments: m.attachments?.map(a => ({ id: a.id, url: a.url, name: a.name, mimeType: a.mime_type, size: a.size })),
           })),
         ]);
       } else if (humanHandling) {
@@ -559,7 +561,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
       setAwaitingFirstReply(false);
       inputRef.current?.focus();
     }
-  }, [convId, loading, consecutiveLow, selectedCategory, cfg, t]);
+  }, [convId, loading, consecutiveLow, selectedCategory, cfg, t, pendingAttachments, botName, botAvatarUrl]);
 
   // Keep sendRef current so selectCategory can call send before it's in scope
   useEffect(() => { sendRef.current = send; }, [send]);

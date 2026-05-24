@@ -25,10 +25,10 @@ function initials(name: string): string {
 }
 
 const SIZE = {
-  xs: { outer: 'w-5 h-5',  text: 'text-[8px]',  ring: 'ring-1' },
-  sm: { outer: 'w-7 h-7',  text: 'text-[10px]', ring: 'ring-2' },
-  md: { outer: 'w-9 h-9',  text: 'text-xs',     ring: 'ring-2' },
-  lg: { outer: 'w-11 h-11', text: 'text-sm',    ring: 'ring-2' },
+  xs: { outer: 'w-5 h-5',   text: 'text-[8px]'  },
+  sm: { outer: 'w-7 h-7',   text: 'text-[10px]' },
+  md: { outer: 'w-9 h-9',   text: 'text-xs'     },
+  lg: { outer: 'w-11 h-11', text: 'text-sm'     },
 };
 
 interface AvatarProps {
@@ -47,8 +47,8 @@ export function Avatar({ name, src, size = 'sm', statusColor, className = '' }: 
   return (
     <div className={`relative shrink-0 ${className}`}>
       <div
-        className={`${sz.outer} rounded-full flex items-center justify-center font-bold text-white ${sz.ring}`}
-        style={{ backgroundColor: color, '--tw-ring-color': color + '30' } as React.CSSProperties}
+        className={`${sz.outer} rounded-full flex items-center justify-center font-bold text-white`}
+        style={{ backgroundColor: color, boxShadow: `0 0 0 2px ${color}30` }}
       >
         {src ? (
           <img src={src} alt={name} className="w-full h-full rounded-full object-cover" />
@@ -58,8 +58,8 @@ export function Avatar({ name, src, size = 'sm', statusColor, className = '' }: 
       </div>
       {statusColor && (
         <span
-          className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-surface-1"
-          style={{ backgroundColor: statusColor }}
+          className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full"
+          style={{ backgroundColor: statusColor, boxShadow: '0 0 0 2px #ffffff' }}
         />
       )}
     </div>

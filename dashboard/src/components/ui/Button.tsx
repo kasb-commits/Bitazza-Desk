@@ -1,3 +1,4 @@
+import React from 'react';
 import { Spinner } from './Spinner';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -8,11 +9,18 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   rightIcon?: React.ReactNode;
 }
 
-const VARIANT = {
-  primary:   'bg-brand hover:bg-brand-dim text-white ring-1 ring-brand/20',
-  secondary: 'bg-surface-3 hover:bg-surface-4 text-text-primary ring-1 ring-surface-5',
-  ghost:     'bg-transparent hover:bg-surface-4 text-text-secondary hover:text-text-primary',
-  danger:    'bg-brand/10 hover:bg-brand/20 text-brand ring-1 ring-brand/20',
+const VARIANT_CLS: Record<string, string> = {
+  primary:   'hover:opacity-90 text-white',
+  secondary: 'hover:opacity-80',
+  ghost:     'hover:opacity-80',
+  danger:    'hover:opacity-90',
+};
+
+const VARIANT_STY: Record<string, React.CSSProperties> = {
+  primary:   { background: '#6366f1', color: '#ffffff' },
+  secondary: { background: '#f3f4f6', border: '1px solid rgba(0,0,0,0.08)', color: '#1a1d2e' },
+  ghost:     { background: 'transparent', color: '#4b5563' },
+  danger:    { background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444' },
 };
 
 const SIZE = {
@@ -30,21 +38,21 @@ export function Button({
   children,
   disabled,
   className = '',
+  style,
   ...props
 }: ButtonProps) {
   return (
     <button
       {...props}
       disabled={disabled || loading}
+      style={{ ...VARIANT_STY[variant], ...style }}
       className={`
         inline-flex items-center justify-center font-medium transition-all duration-100
         active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed
-        ${VARIANT[variant]} ${SIZE[size]} ${className}
+        ${VARIANT_CLS[variant]} ${SIZE[size]} ${className}
       `.trim()}
     >
-      {loading ? (
-        <Spinner size="xs" className="text-current" />
-      ) : leftIcon}
+      {loading ? <Spinner size="xs" className="text-current" /> : leftIcon}
       {children}
       {!loading && rightIcon}
     </button>

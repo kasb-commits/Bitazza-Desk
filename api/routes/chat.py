@@ -51,6 +51,7 @@ class GreetResponse(BaseModel):
 class MessageRequest(BaseModel):
     conversation_id: str
     message: str
+    language: str | None = None  # session language set when user picked EN/TH in widget
     consecutive_low_confidence: int = 0  # deprecated — server computes this now; kept for backwards compatibility
     category: str | None = None  # issue category selected by user in widget
     attachment_ids: list[str] | None = None  # UUIDs returned by POST /api/uploads/attachment
@@ -164,7 +165,9 @@ def greet(body: GreetRequest, user_id: str | None = Depends(get_optional_user_id
     """
     lang = body.language if body.language in ("en", "th") else "en"
     persona = get_ai_persona(body.conversation_id)
-    greeting = build_greeting(persona["name"], lang)
+    from engine.mock_agents import _AGENTS_BY_NAME
+    gender = _AGENTS_BY_NAME.get(persona["name"] or "", {}).get("gender", "f")
+    greeting = build_greeting(persona["name"], lang, gender)
     add_message(body.conversation_id, "assistant", greeting)
     return GreetResponse(
         greeting=greeting,
@@ -328,7 +331,7 @@ async def send_message(request: Request, body: MessageRequest, user_id: str | No
                 trigger_auto_assign(_ticket_id, effective_category, _meta["priority"], str(_meta["customer_id"]))
         from engine.prompt_templates import build_attachment_handoff_message
         from engine.agent import detect_language
-        _lang = detect_language(body.message) if body.message.strip() else "en"
+        _lang = body.language if body.language in ("en", "th") else (detect_language(body.message) if body.message.strip() else "en")
         _reply_text = build_attachment_handoff_message(bool(_attachments), _lang)
         add_message(body.conversation_id, "assistant", _reply_text, {"escalated": True, "escalation_reason": "attachment"})
         update_ticket_status(_ticket_id, "pending_human")
@@ -350,6 +353,7 @@ async def send_message(request: Request, body: MessageRequest, user_id: str | No
         user_message=body.message,
         consecutive_low_confidence=consecutive_low,
         category=effective_category,
+        override_language=body.language if body.language in ("en", "th") else None,
     )
 
     # If the agent detected a mid-conversation category upgrade, update the DB persona
