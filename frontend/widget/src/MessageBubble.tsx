@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Message } from './types';
 
 const AGENT_AVATARS: Record<string, string> = {
@@ -22,6 +23,7 @@ interface Props {
 }
 
 export default function MessageBubble({ message, primaryColor = '#6366f1', botName, botAvatarUrl, escalatedAgent }: Props) {
+  const [lightbox, setLightbox] = useState<string | null>(null);
   const isUser = message.role === 'user';
   const isAgent = message.role === 'agent';
   const isAssistant = message.role === 'assistant';
@@ -81,13 +83,13 @@ export default function MessageBubble({ message, primaryColor = '#6366f1', botNa
           <div className={`flex flex-wrap gap-2 ${message.content ? 'mt-2' : ''}`}>
             {message.attachments.map((a) => (
               a.mimeType.startsWith('image/') ? (
-                <a key={a.id} href={a.url} target="_blank" rel="noopener noreferrer">
-                  <img
-                    src={a.url}
-                    alt={a.name}
-                    className="w-20 h-20 object-cover rounded-lg border border-white/20 hover:opacity-90 transition-opacity cursor-pointer"
-                  />
-                </a>
+                <img
+                  key={a.id}
+                  src={a.url}
+                  alt={a.name}
+                  onClick={() => setLightbox(a.url)}
+                  className="w-20 h-20 object-cover rounded-lg border border-white/20 hover:opacity-90 transition-opacity cursor-zoom-in"
+                />
               ) : (
                 <a
                   key={a.id}
@@ -108,6 +110,25 @@ export default function MessageBubble({ message, primaryColor = '#6366f1', botNa
       </div>
 
       <span className="text-[10px] text-gray-400/60 mt-1 mx-1">{time}</span>
+
+      {/* Lightbox */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80"
+          onClick={() => setLightbox(null)}
+        >
+          <img
+            src={lightbox}
+            alt="full size"
+            className="max-w-[90vw] max-h-[90vh] rounded-xl shadow-2xl object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 text-white flex items-center justify-center hover:bg-white/40 transition-colors"
+            onClick={() => setLightbox(null)}
+          >✕</button>
+        </div>
+      )}
     </div>
   );
 }

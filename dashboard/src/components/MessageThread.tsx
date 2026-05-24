@@ -177,7 +177,29 @@ function getSenderType(msg: Message): SenderType {
 
 interface BubbleProps { msg: Message; showTs: boolean }
 
+function ImageLightbox({ url, onClose }: { url: string; onClose: () => void }) {
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80"
+      onClick={onClose}
+    >
+      <img
+        src={url}
+        alt="full size"
+        className="max-w-[90vw] max-h-[90vh] rounded-xl shadow-2xl object-contain"
+        onClick={(e) => e.stopPropagation()}
+      />
+      <button
+        className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/20 text-white flex items-center justify-center hover:bg-white/40 transition-colors text-lg"
+        onClick={onClose}
+      >✕</button>
+    </div>,
+    document.body,
+  );
+}
+
 function MessageBubble({ msg, showTs }: BubbleProps) {
+  const [lightbox, setLightbox] = useState<string | null>(null);
   const type = getSenderType(msg);
   const ts = formatTime(msg.created_at);
 
@@ -300,9 +322,13 @@ function MessageBubble({ msg, showTs }: BubbleProps) {
           <div className={`flex flex-wrap gap-2 ${msg.content ? 'mt-2' : ''}`}>
             {attachments.map((a) => (
               a.mime_type.startsWith('image/') ? (
-                <a key={a.id} href={a.url} target="_blank" rel="noopener noreferrer">
-                  <img src={a.url} alt={a.name} className="w-20 h-20 object-cover rounded-lg border border-white/20 hover:opacity-90 transition-opacity cursor-pointer" />
-                </a>
+                <img
+                  key={a.id}
+                  src={a.url}
+                  alt={a.name}
+                  onClick={() => setLightbox(a.url)}
+                  className="w-20 h-20 object-cover rounded-lg border border-white/20 hover:opacity-90 transition-opacity cursor-zoom-in"
+                />
               ) : (
                 <a key={a.id} href={a.url} target="_blank" rel="noopener noreferrer"
                   className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-xs">
@@ -315,6 +341,7 @@ function MessageBubble({ msg, showTs }: BubbleProps) {
             ))}
           </div>
         )}
+        {lightbox && <ImageLightbox url={lightbox} onClose={() => setLightbox(null)} />}
       </div>
     </div>
   );

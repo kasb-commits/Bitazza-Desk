@@ -38,10 +38,16 @@ _FINANCIAL_ADVICE_PATTERNS = [
     r"\bbest (coin|token|crypto|investment)\b",
 ]
 
-_PII_PATTERNS = [
+# Applied to bot OUTPUT — scrub sensitive data that account tools might return
+_PII_PATTERNS_OUTPUT = [
     (r"\b\d{13}\b", "[PHONE_OR_ID]"),                        # Thai national ID / phone
     (r"\b[A-Z]{2}\d{7}\b", "[PASSPORT]"),                   # Passport
     (r"\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b", "[CARD_NUMBER]"),  # Card number
+]
+
+# Applied to user INPUT only — emails are intentionally excluded from bot output scrubbing
+# so the bot can safely mention addresses like support@bitazza.com
+_PII_PATTERNS_INPUT = _PII_PATTERNS_OUTPUT + [
     (r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b", "[EMAIL]"),  # Email
 ]
 
@@ -60,7 +66,8 @@ class FilterResult:
 
 
 def pre_filter(user_message: str) -> FilterResult:
-    """Block prompt injection and social engineering before calling Claude."""
+    """Block prompt injection and social engineering before calling Claude.
+    Also scrubs PII (including email addresses) from the user message."""
     if _matches_any(user_message, _INJECTION_PATTERNS):
         return FilterResult(False, "prompt_injection")
     if _matches_any(user_message, _SOCIAL_ENGINEERING_PATTERNS):
@@ -68,11 +75,20 @@ def pre_filter(user_message: str) -> FilterResult:
     return FilterResult(True)
 
 
+def scrub_user_input(user_message: str) -> str:
+    """Redact PII from user input before it reaches the AI."""
+    text = user_message
+    for pattern, replacement in _PII_PATTERNS_INPUT:
+        text = re.sub(pattern, replacement, text)
+    return text
+
+
 def post_filter(response_text: str) -> str:
-    """Scrub PII and flag policy violations in Claude's response."""
+    """Scrub sensitive account data from bot responses.
+    Email addresses are NOT scrubbed here — the bot must be able to mention
+    addresses like support@bitazza.com in its replies."""
     text = response_text
-    # Redact PII patterns
-    for pattern, replacement in _PII_PATTERNS:
+    for pattern, replacement in _PII_PATTERNS_OUTPUT:
         text = re.sub(pattern, replacement, text)
     return text
 

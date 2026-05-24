@@ -16,11 +16,13 @@ export interface ToastItem {
 
 interface ToastContextValue {
   toast: (message: string, variant?: ToastVariant, opts?: { duration?: number; action?: ToastItem['action'] }) => void;
+  addToast: (message: string, variant?: ToastVariant) => void;
   dismiss: (id: string) => void;
 }
 
 const ToastContext = createContext<ToastContextValue>({
   toast: () => {},
+  addToast: () => {},
   dismiss: () => {},
 });
 
@@ -53,16 +55,16 @@ const ICONS: Record<ToastVariant, React.ReactNode> = {
   ),
 };
 
-const VARIANT_STYLE: Record<ToastVariant, string> = {
-  success: 'text-accent-green',
-  error:   'text-brand',
-  warning: 'text-accent-amber',
-  info:    'text-accent-blue',
+const VARIANT_COLOR: Record<ToastVariant, string> = {
+  success: '#22c55e',
+  error:   '#ef4444',
+  warning: '#f59e0b',
+  info:    '#6366f1',
 };
 
 // ── Single Toast ──────────────────────────────────────────────────────────────
 
-function ToastItem({ item, onDismiss }: { item: ToastItem; onDismiss: (id: string) => void }) {
+function ToastItemComponent({ item, onDismiss }: { item: ToastItem; onDismiss: (id: string) => void }) {
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
@@ -72,7 +74,6 @@ function ToastItem({ item, onDismiss }: { item: ToastItem; onDismiss: (id: strin
     return () => clearTimeout(timer);
   }, [item.duration]);
 
-  // After exit animation, actually remove
   const handleAnimEnd = () => {
     if (!visible) onDismiss(item.id);
   };
@@ -80,24 +81,29 @@ function ToastItem({ item, onDismiss }: { item: ToastItem; onDismiss: (id: strin
   return (
     <div
       onAnimationEnd={handleAnimEnd}
+      style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 4px 20px rgba(0,0,0,0.10)' }}
       className={`
-        flex items-start gap-3 bg-surface-3 ring-1 ring-surface-5 rounded-lg px-4 py-3
-        shadow-panel w-80 max-w-full
+        flex items-start gap-3 rounded-lg px-4 py-3 w-80 max-w-full
         ${visible ? 'animate-slide-in-right' : 'opacity-0 transition-opacity duration-150'}
       `}
     >
-      <span className={VARIANT_STYLE[item.variant]}>{ICONS[item.variant]}</span>
-      <p className="flex-1 text-sm text-text-primary leading-snug">{item.message}</p>
+      <span style={{ color: VARIANT_COLOR[item.variant] }}>{ICONS[item.variant]}</span>
+      <p className="flex-1 text-sm leading-snug" style={{ color: '#1a1d2e' }}>{item.message}</p>
       <div className="flex items-center gap-2 shrink-0">
         {item.action && (
           <button
             onClick={() => { item.action?.onClick(); onDismiss(item.id); }}
-            className="text-xs text-brand hover:text-brand-dim font-medium transition-colors"
+            className="text-xs font-medium transition-colors hover:opacity-70"
+            style={{ color: '#6366f1' }}
           >
             {item.action.label}
           </button>
         )}
-        <button onClick={() => onDismiss(item.id)} className="text-text-muted hover:text-text-secondary transition-colors">
+        <button
+          onClick={() => onDismiss(item.id)}
+          className="transition-colors hover:opacity-70"
+          style={{ color: '#9ca3af' }}
+        >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/>
           </svg>
@@ -125,14 +131,17 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     setToasts(prev => [...prev, { id, message, variant, ...opts }]);
   }, []);
 
+  const addToast = useCallback((message: string, variant: ToastVariant = 'info') => {
+    toast(message, variant);
+  }, [toast]);
+
   return (
-    <ToastContext.Provider value={{ toast, dismiss }}>
+    <ToastContext.Provider value={{ toast, addToast, dismiss }}>
       {children}
-      {/* Toast container */}
       <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
         {toasts.map(t => (
           <div key={t.id} className="pointer-events-auto">
-            <ToastItem item={t} onDismiss={dismiss} />
+            <ToastItemComponent item={t} onDismiss={dismiss} />
           </div>
         ))}
       </div>
