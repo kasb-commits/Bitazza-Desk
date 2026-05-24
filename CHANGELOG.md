@@ -4,6 +4,14 @@ All delivered changes to Bitazza-Desk, newest first.
 
 ---
 
+## [2026-05-24] Fix 500 on POST /chat/message
+
+**Commit:** `TBD`
+
+- `workflow_engine/interceptor.py` — added missing `override_language` param to both `workflow_interceptor` and `legacy_agent_chat`; threaded it through to `engine.agent.chat`. This was the sole cause of the 500: `chat.py` was passing `override_language` but the interceptor signature didn't accept it.
+
+---
+
 ## [2026-05-20] File Attachments + Agent Improvements + Dashboard UI Polish
 
 **Commits:** `f582bd4`, `f191b47`
