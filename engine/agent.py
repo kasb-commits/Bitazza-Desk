@@ -68,8 +68,16 @@ Recent conversation:
 {history}
 Current message: "{message}"
 
-Does answering the current message require looking up this specific user's account data \
-(their KYC status, their transactions, their restrictions, their account profile)?
+Does answering the current message require looking up this specific user's personal account data \
+(their specific KYC application status or rejection reason, their personal transaction history, \
+their account restrictions, their account profile)?
+
+IMPORTANT: General questions about how the platform works are informational — NOT account_specific. \
+Examples of informational: "how many KYC levels are there?", "what is the difference between KYC levels?", \
+"what documents are required?", "what withdrawal limit does each level have?", \
+"what level would I be on after approval?", "how long does verification take?". \
+Examples of account_specific: "why was my KYC rejected?", "what is my current KYC status?", \
+"why is my account restricted?", "where is my deposit?", "why was my withdrawal declined?".
 
 Reply with exactly one word: informational OR account_specific"""
 
@@ -423,10 +431,10 @@ def chat(
     # Prepend the last user message to add topic context without inflating long queries.
     _retrieval_query = user_message
     if len(user_message.split()) < 8 and _prior_history:
-        _prev_user = next(
-            (h["content"] for h in reversed(_prior_history) if h["role"] == "user"),
-            None,
-        )
+        # chat.py adds the current message to history before calling the agent,
+        # so reversed history[0] is the current message — skip it to get the real previous turn.
+        _prev_user_msgs = [h["content"] for h in reversed(_prior_history) if h["role"] == "user"]
+        _prev_user = _prev_user_msgs[1] if len(_prev_user_msgs) > 1 else None
         if _prev_user:
             _retrieval_query = _prev_user + " " + user_message
     rag_chunks = retrieve_with_fallback(_retrieval_query) if collection_count() > 0 else []
