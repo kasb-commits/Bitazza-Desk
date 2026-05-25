@@ -23,6 +23,7 @@ def legacy_agent_chat(
     platform: str = "web",
     category: str | None = None,
     consecutive_low_confidence: int = 0,
+    override_language: str | None = None,
 ) -> AgentResponse:
     """Direct delegation to the existing agent — exists for test patching."""
     from engine.agent import chat
@@ -33,6 +34,7 @@ def legacy_agent_chat(
         platform=platform,
         category=category,
         consecutive_low_confidence=consecutive_low_confidence,
+        override_language=override_language,
     )
 
 
@@ -54,6 +56,7 @@ def workflow_interceptor(
     platform: str = "web",
     category: str | None = None,
     consecutive_low_confidence: int = 0,
+    override_language: str | None = None,
 ) -> AgentResponse:
     from workflow_engine.router import WorkflowRouter
     from workflow_engine.engine import WorkflowExecutionEngine
@@ -120,6 +123,7 @@ def workflow_interceptor(
             platform=platform,
             category=category,
             consecutive_low_confidence=consecutive_low_confidence,
+            override_language=override_language,
         )
 
     engine = WorkflowExecutionEngine()
@@ -151,4 +155,5 @@ def workflow_interceptor(
             platform=platform,
             category=category,
             consecutive_low_confidence=consecutive_low_confidence,
+            override_language=override_language,
         )

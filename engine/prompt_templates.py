@@ -783,18 +783,74 @@ _COLLECTION_QUESTIONS: dict[str, dict[str, str]] = {
             "- ส่งเอกสารไปเมื่อประมาณวันไหน?"
         ),
     },
-    "account_restriction": {
+    # account_restriction is handled per-symptom in build_collection_prompt —
+    # this entry is intentionally absent; the symptom-keyed dict below is used instead.
+    "account_restriction__transaction_failed": {
         "en": (
-            "I'd like to pass along as much detail as possible to the team. Could you tell me:\n"
-            "- Which specific action is blocked — trading, deposits, or withdrawals?\n"
-            "- What message does the app show when you try?\n"
-            "- When did you first notice this restriction?"
+            "To help the team look into this, could you share a few details:\n"
+            "- What is the transaction ID or reference number (if you have it)?\n"
+            "- Which currency and approximate amount?\n"
+            "- What date did it occur, and what status does it show now?"
         ),
         "th": (
-            "เพื่อให้ทีมตรวจสอบได้ครบถ้วน ช่วยบอกรายละเอียดเหล่านี้ได้ไหมคะ:\n"
-            "- การดำเนินการใดที่ถูกบล็อก — การเทรด, การฝาก หรือการถอน?\n"
-            "- แอปแสดงข้อความอะไรเมื่อคุณพยายามทำ?\n"
-            "- คุณสังเกตเห็นข้อจำกัดนี้ครั้งแรกเมื่อไร?"
+            "เพื่อให้ทีมตรวจสอบได้ ช่วยบอกรายละเอียดเหล่านี้ได้ไหมคะ:\n"
+            "- รหัสธุรกรรมหรือเลขอ้างอิง (ถ้ามี)?\n"
+            "- สกุลเงินและจำนวนเงินโดยประมาณ?\n"
+            "- เกิดขึ้นวันไหน และสถานะตอนนี้แสดงว่าอะไร?"
+        ),
+    },
+    "account_restriction__transaction_pending": {
+        "en": (
+            "Thanks for letting us know. To help the team trace this:\n"
+            "- What is the transaction ID or reference number (if you have it)?\n"
+            "- Which currency and approximate amount?\n"
+            "- When did you initiate it, and how long has it been pending?"
+        ),
+        "th": (
+            "ขอบคุณที่แจ้งนะคะ เพื่อให้ทีมติดตามรายการได้:\n"
+            "- รหัสธุรกรรมหรือเลขอ้างอิง (ถ้ามี)?\n"
+            "- สกุลเงินและจำนวนเงินโดยประมาณ?\n"
+            "- ทำรายการไปเมื่อไร และรอนานแค่ไหนแล้ว?"
+        ),
+    },
+    "account_restriction__feature_blocked": {
+        "en": (
+            "To make sure the team has the right context:\n"
+            "- Which feature or action are you trying to use?\n"
+            "- What does the app show when you try (any message or status)?\n"
+            "- When did you first notice this?"
+        ),
+        "th": (
+            "เพื่อให้ทีมมีบริบทที่ถูกต้อง:\n"
+            "- กำลังพยายามใช้ฟีเจอร์หรือดำเนินการอะไรอยู่?\n"
+            "- แอปแสดงอะไรเมื่อพยายามทำ (มีข้อความหรือสถานะอะไรบ้าง)?\n"
+            "- สังเกตเห็นปัญหานี้ครั้งแรกเมื่อไร?"
+        ),
+    },
+    "account_restriction__ui_error": {
+        "en": (
+            "That sounds like a technical issue. To help the team investigate:\n"
+            "- Which page or screen does the error appear on?\n"
+            "- What does the error message say exactly?\n"
+            "- What device and OS are you using (e.g. iPhone iOS 17, Android 14)?"
+        ),
+        "th": (
+            "ฟังดูเหมือนปัญหาทางเทคนิคนะคะ เพื่อให้ทีมตรวจสอบได้:\n"
+            "- error ขึ้นที่หน้าหรือหน้าจอไหน?\n"
+            "- ข้อความ error บอกว่าอะไรกันแน่?\n"
+            "- ใช้อุปกรณ์และ OS อะไรอยู่ (เช่น iPhone iOS 17, Android 14)?"
+        ),
+    },
+    "account_restriction__unclear": {
+        "en": (
+            "To point you in the right direction, could you tell me a bit more:\n"
+            "- What were you trying to do when you ran into the issue?\n"
+            "- What exactly happened (or didn't happen)?"
+        ),
+        "th": (
+            "เพื่อให้ช่วยได้ถูกต้อง ช่วยเล่าให้ฟังอีกนิดได้ไหมคะ:\n"
+            "- กำลังจะทำอะไรอยู่ตอนที่เจอปัญหา?\n"
+            "- เกิดอะไรขึ้นกันแน่ (หรือไม่เกิดอะไรขึ้น)?"
         ),
     },
     "withdrawal_issue": {
@@ -896,20 +952,49 @@ def build_attachment_handoff_message(has_attachment: bool, language: str) -> str
     return _DECLINED_SCREENSHOT_HANDOFF_ACK[lang]
 
 
-def build_collection_prompt(category: str | None, language: str) -> str:
+def build_collection_prompt(category: str | None, language: str, symptom_type: str | None = None) -> str:
     """
     Build the information-collection message shown to the user when the AI cannot
     resolve an account-specific issue on its own. Asks targeted questions and
     optionally invites a screenshot.
 
-    Called from engine/agent.py when the collection phase is first entered.
-    Both questions and screenshot ask are language-aware (EN/TH).
+    For account_restriction, symptom_type selects the right question set:
+      transaction_failed, transaction_pending, feature_blocked, ui_error, unclear.
+
+    Screenshot ask behaviour:
+      - ui_error: always appended (visual evidence is critical)
+      - transaction_failed, transaction_pending, feature_blocked: humble optional ask
+      - unclear and all other categories: no screenshot ask
     """
     lang = language if language in ("en", "th") else "en"
     cat = category or ""
-    questions = (
-        _COLLECTION_QUESTIONS.get(cat, {}).get(lang)
-        or _COLLECTION_FALLBACK[lang]
-    )
-    screenshot_ask = _COLLECTION_SCREENSHOT_ASK[lang]
-    return f"{questions}\n\n{screenshot_ask}"
+
+    # For account_restriction, use the symptom-keyed question set
+    if cat == "account_restriction" and symptom_type:
+        key = f"account_restriction__{symptom_type}"
+        questions = (
+            _COLLECTION_QUESTIONS.get(key, {}).get(lang)
+            or _COLLECTION_QUESTIONS.get("account_restriction__unclear", {}).get(lang)
+            or _COLLECTION_FALLBACK[lang]
+        )
+    else:
+        questions = (
+            _COLLECTION_QUESTIONS.get(cat, {}).get(lang)
+            or _COLLECTION_FALLBACK[lang]
+        )
+
+    # Screenshot ask: always for ui_error; optional for transaction/feature; omit for unclear
+    _screenshot_always = {"ui_error"}
+    _screenshot_optional = {"transaction_failed", "transaction_pending", "feature_blocked"}
+    if symptom_type in _screenshot_always:
+        screenshot_ask = _COLLECTION_SCREENSHOT_ASK[lang]
+        return f"{questions}\n\n{screenshot_ask}"
+    if symptom_type in _screenshot_optional:
+        screenshot_ask = _COLLECTION_SCREENSHOT_ASK[lang]
+        return f"{questions}\n\n{screenshot_ask}"
+    # unclear or non-account_restriction categories — use existing screenshot ask
+    if cat != "account_restriction":
+        screenshot_ask = _COLLECTION_SCREENSHOT_ASK[lang]
+        return f"{questions}\n\n{screenshot_ask}"
+    # unclear symptom: no screenshot ask, questions only
+    return questions

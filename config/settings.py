@@ -7,7 +7,8 @@ load_dotenv()
 # AI
 GEMINI_API_KEY: str = os.environ["GEMINI_API_KEY"]
 MODEL: str = os.getenv("MODEL", "gemini-2.5-flash")
-MAX_TOKENS: int = 1024
+CLASSIFIER_MODEL: str = os.getenv("CLASSIFIER_MODEL", "gemini-2.5-flash-lite")
+MAX_TOKENS: int = int(os.getenv("MAX_TOKENS", "2048"))
 MAX_RAG_CHUNKS: int = int(os.getenv("MAX_RAG_CHUNKS", "5"))
 
 # Freshdesk

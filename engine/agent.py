@@ -10,7 +10,7 @@ import json, logging, re, time
 from google import genai
 from google.genai import types as genai_types
 from google.genai import errors as genai_errors
-from config.settings import GEMINI_API_KEY, MODEL, MAX_TOKENS, ESCALATION_CONFIDENCE_THRESHOLD
+from config.settings import GEMINI_API_KEY, MODEL, CLASSIFIER_MODEL, MAX_TOKENS, ESCALATION_CONFIDENCE_THRESHOLD
 from engine.retriever import retrieve_with_fallback
 from engine.account_tools import TOOLS, TOOL_DEFINITIONS, get_user_profile
 from engine.security_filter import pre_filter, post_filter, contains_financial_advice_request
@@ -58,6 +58,49 @@ def _call_with_retry(fn, max_attempts: int = 3, base_delay: float = 0.5):
                     max_attempts, e,
                 )
     raise last_exc  # type: ignore[misc]
+
+
+_INTENT_CLASSIFIER_PROMPT = """\
+You are an intent classifier for a customer support system. Respond with exactly one word.
+
+Active support category: {category}
+Recent conversation:
+{history}
+Current message: "{message}"
+
+Does answering the current message require looking up this specific user's account data \
+(their KYC status, their transactions, their restrictions, their account profile)?
+
+Reply with exactly one word: informational OR account_specific"""
+
+
+def _classify_intent(user_message: str, recent_history: list, category: str | None) -> bool:
+    """
+    Returns True if the message is informational (no account data needed),
+    False if it is account-specific (account tools required).
+    Defaults to False (account_specific) on any failure — safer to over-fetch than under-fetch.
+    """
+    history_lines = ""
+    for msg in recent_history[-3:]:
+        role = "User" if msg["role"] == "user" else "Agent"
+        history_lines += f"{role}: {msg['content']}\n"
+
+    prompt = _INTENT_CLASSIFIER_PROMPT.format(
+        category=category or "general",
+        history=history_lines.strip() or "(no prior turns)",
+        message=user_message,
+    )
+    try:
+        resp = client.models.generate_content(
+            model=CLASSIFIER_MODEL,
+            contents=prompt,
+            config=genai_types.GenerateContentConfig(max_output_tokens=10),
+        )
+        result = (resp.text or "").strip().lower()
+        return "informational" in result
+    except Exception as e:
+        logging.warning("Intent classifier failed: %s — defaulting to account_specific", e)
+        return False
 
 
 _LANG_KEYWORDS_TH = ["ขอ", "คุณ", "ไม่", "ได้", "ว่า", "ใน", "และ", "มี", "การ", "ที่"]
@@ -151,7 +194,17 @@ _UPGRADE_TRANSITION_MESSAGES: dict[str, dict[str, str]] = {
 # mid-conversation (e.g. while chatting in "other" category).
 _UPGRADE_KEYWORDS: dict[str, list[str]] = {
     "kyc_verification":    ["kyc", "verify", "verification", "identity", "id check", "document", "passport",
-                            "selfie", "ยืนยัน", "ตัวตน", "kyc status", "my kyc"],
+                            "selfie", "ยืนยัน", "ตัวตน", "kyc status", "my kyc",
+                            # kyc submission signals — catches from account_restriction
+                            "kyc failed", "kyc rejected", "kyc error", "document upload", "upload failed",
+                            "submission failed", "kyc submission", "resubmit", "id upload",
+                            "ส่ง kyc", "kyc ไม่ผ่าน", "อัปโหลดเอกสาร", "ส่งเอกสาร", "kyc ถูกปฏิเสธ"],
+    "password_2fa_reset":  ["can't log in", "cant log in", "cannot log in", "login failed", "can't login",
+                            "locked out", "account locked", "can't access", "cannot access",
+                            "forgot password", "reset password", "lost access", "sign in",
+                            "2fa", "authenticator", "otp not working",
+                            "log in ไม่ได้", "เข้าไม่ได้", "ล็อกอินไม่ได้", "ลืมรหัสผ่าน",
+                            "รหัสผ่านผิด", "เข้าสู่ระบบไม่ได้", "บัญชีถูกล็อก"],
     "account_restriction": ["restricted", "suspended", "blocked", "locked", "freeze", "restriction",
                             "ระงับ", "บล็อก", "account status", "why is my account"],
     "withdrawal_issue":    ["withdraw", "withdrawal", "transfer out", "stuck withdrawal", "pending withdrawal",
@@ -165,7 +218,7 @@ _UPGRADE_KEYWORDS: dict[str, list[str]] = {
                             "เทรด", "ซื้อขาย", "ออเดอร์", "คำสั่งซื้อ", "คำสั่งขาย", "ฟิวเจอร์ส"],
 }
 
-_UPGRADEABLE_FROM = {"other", "deposit_issue", "trade_issue"}  # upgrade from generic/new categories; specialist categories locked
+_UPGRADEABLE_FROM = {"other", "deposit_issue", "trade_issue", "account_restriction"}  # account_restriction upgrades to kyc/password when signals are clear
 
 # Matches platform transaction IDs (TXN-001, TXN-9999) and blockchain tx hashes (0x…).
 # Used to detect when a user provides a specific transaction reference mid-conversation
@@ -193,6 +246,50 @@ def _detect_upgrade(message: str, current_category: str | None) -> str | None:
         if any(kw in msg for kw in keywords):
             return category
     return None
+
+
+# Keyword sets for detecting what kind of problem a customer is describing
+# within account_restriction, used to select the right collection questions.
+_SYMPTOM_KEYWORDS: dict[str, list[str]] = {
+    "transaction_failed": [
+        "failed", "rejected", "declined", "didn't go through", "did not go through",
+        "not received", "not arrived", "never arrived", "didn't arrive", "transaction failed",
+        "transfer failed", "payment failed",
+        "ล้มเหลว", "ไม่สำเร็จ", "ไม่ผ่าน", "ถูกปฏิเสธ", "ไม่เข้า", "ไม่ได้รับ",
+    ],
+    "transaction_pending": [
+        "pending", "stuck", "processing", "hasn't arrived", "not showing",
+        "still processing", "waiting", "delayed", "not confirmed", "unconfirmed",
+        "รอดำเนินการ", "ค้าง", "ยังไม่เข้า", "ยังไม่ได้รับ", "รออยู่", "ยังรอ",
+    ],
+    "feature_blocked": [
+        "can't", "cannot", "can not", "won't let me", "not letting me",
+        "unable to", "disabled", "greyed out", "grayed out", "not available",
+        "not working", "doesn't work", "isn't working", "button", "option missing",
+        "ทำไม่ได้", "ใช้ไม่ได้", "กดไม่ได้", "ปุ่มเป็นสีเทา", "ไม่สามารถ", "ฟีเจอร์ใช้งานไม่ได้",
+    ],
+    "ui_error": [
+        "error", "error message", "crash", "won't load", "not loading", "blank screen",
+        "spinning", "keeps loading", "error code", "something went wrong", "page not found",
+        "500", "404", "broken", "white screen",
+        "โหลดไม่ได้", "แสดงข้อผิดพลาด", "error ขึ้น", "หน้าเปล่า", "ค้างโหลด",
+        "หน้าไม่โหลด", "แอปค้าง", "แอปพัง",
+    ],
+}
+
+
+def detect_symptom_type(message: str) -> str:
+    """
+    Classify what kind of problem the customer is describing within account_restriction.
+    Returns one of: transaction_failed, transaction_pending, feature_blocked, ui_error, unclear.
+    Checked in priority order — transaction_failed before transaction_pending to avoid
+    ambiguity when both signals appear.
+    """
+    msg = message.lower()
+    for symptom in ("transaction_failed", "transaction_pending", "ui_error", "feature_blocked"):
+        if any(kw in msg for kw in _SYMPTOM_KEYWORDS[symptom]):
+            return symptom
+    return "unclear"
 
 
 def chat(
@@ -308,11 +405,22 @@ def chat(
             escalation_reason=reason, ticket_id=ticket_id,
         )
 
+    # 3c. Intent classification
+    # Determines whether the question is informational (no account data needed) or
+    # account-specific (account tools required). Only runs for account categories on
+    # authenticated sessions — guest and "other" are already tool-free, skip those.
+    # On classifier failure, defaults to account_specific (safe over-fetch > under-fetch).
+    _CLASSIFY_CATEGORIES = {"kyc_verification", "account_restriction", "withdrawal_issue",
+                            "deposit_issue", "trade_issue", "fraud_security", "password_2fa_reset"}
+    _prior_history = get_history(conversation_id, limit=4)
+    _is_informational = False
+    if not (user_id is None) and category in _CLASSIFY_CATEGORIES:
+        _is_informational = _classify_intent(user_message, _prior_history, category)
+
     # 4. RAG retrieval
     # Short follow-up messages (< 8 words) often lack enough terms for the retriever
     # to find the right KB chunks — especially when the embedding fallback kicks in.
     # Prepend the last user message to add topic context without inflating long queries.
-    _prior_history = get_history(conversation_id, limit=4)
     _retrieval_query = user_message
     if len(user_message.split()) < 8 and _prior_history:
         _prev_user = next(
@@ -408,9 +516,11 @@ def chat(
         ):
             force_tool_name = "get_futures_positions"
 
-    # For "other" category or guest sessions, omit account tools so Gemini cannot call them.
+    # For "other" category, guest sessions, or informational questions, omit account tools.
     is_other_category = category == "other"
-    if is_other_category or is_guest_session:
+    if _is_informational:
+        force_tool_name = None
+    if is_other_category or is_guest_session or _is_informational:
         active_tool_defs = []
     elif prior_successful_reply:
         # After the first successful reply, remove get_user_profile from the tool list.
@@ -597,7 +707,10 @@ def chat(
             if _phase is None:
                 # First time we've tried to escalate — enter collection phase
                 set_info_collection_phase(conversation_id, "questioning")
-                collection_text = build_collection_prompt(category, language)
+                # For account_restriction, detect what the user described so the
+                # right collection questions are asked rather than the generic set.
+                _symptom = detect_symptom_type(user_message) if category == "account_restriction" else None
+                collection_text = build_collection_prompt(category, language, symptom_type=_symptom)
                 return AgentResponse(
                     text=collection_text,
                     language=language,

@@ -4,6 +4,24 @@ All delivered changes to Bitazza-Desk, newest first.
 
 ---
 
+## [2026-05-25] Intent Classification + KYC Workflow Loop Fix + Response Truncation Fix
+
+### Intent Classifier
+- `engine/agent.py` — new `_classify_intent()` function: dedicated lightweight Gemini call (`CLASSIFIER_MODEL`) before the main generation that classifies each message as `informational` or `account_specific`; informational questions have tools stripped so the model answers from KB context only and cannot trigger account tool calls or the collection phase
+- `engine/agent.py` — step 3c added to `chat()`: classifier runs for all account categories on authenticated sessions; on classifier failure defaults to `account_specific` (safe over-fetch)
+- `engine/agent.py` — short follow-up query expansion: messages under 8 words are prepended with the previous user turn before RAG retrieval to prevent word-hash fallback from returning wrong chunks
+- `config/settings.py` — `CLASSIFIER_MODEL` env var added (default `gemini-2.5-flash-lite`); `MAX_TOKENS` now env-overridable (default raised from 1024 → 2048 to accommodate `gemini-2.5-flash` thinking token overhead)
+
+### Prompt Improvements
+- `engine/prompt_templates.py` — rule 5 (EN + TH base prompts) rewritten: model now applies a reasoning test ("could I answer this the same way for any user?") to classify intent instead of pattern-matching on surface words; informational questions answered from conversation context; account-specific questions use tools or escalate
+- `engine/prompt_templates.py` — new global rule (EN + TH base prompts): when listing requirements, steps, or items of any kind, list every item completely; process/system notes must not replace actual requirement items; tier/level listings are cumulative
+- `engine/prompt_templates.py` — KYC overlay (EN + TH): removed now-redundant KYC-specific versions of both rules (covered by base prompt)
+
+### KYC Workflow Bug Fix
+- DB patch to KYC Verification workflow: approved branch (`n3`) previously went directly to `resolve_ticket` (`n4`) with no follow-up handling, causing every subsequent message to restart a new execution and replay the same approved message. Added `wait_for_reply → ai_reply → condition(escalated?) → escalate/condition(resolved?) → resolve_ticket/wait_for_reply_loop` after the approved message node, matching the pattern used by all other branches
+
+---
+
 ## [2026-05-20] File Attachments + Agent Improvements + Dashboard UI Polish
 
 **Commits:** `f582bd4`, `f191b47`
