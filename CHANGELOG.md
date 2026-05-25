@@ -4,6 +4,14 @@ All delivered changes to Bitazza-Desk, newest first.
 
 ---
 
+## [2026-05-25] Intent Classifier Bias Fix + RAG Short-Query Augmentation Bug
+
+### Bug Fixes
+- `engine/agent.py` — `_INTENT_CLASSIFIER_PROMPT`: prompt listed "KYC status" as an example of account-specific data, causing general KYC knowledge questions ("what level would I be on after approval?", "what is the difference between KYC levels?") to be classified as `account_specific`; account tools were called unnecessarily, muddying LLM context and triggering incorrect escalations; added explicit `informational`/`account_specific` examples so general platform questions are correctly identified
+- `engine/agent.py` — RAG short-query augmentation: `chat.py` adds the user message to history before calling the agent, so `reversed(_prior_history)[0]` was the current message itself — the "previous user turn" prepend was doubling the current query instead of adding topic context; fixed by skipping index 0 (current message) and using index 1 (actual previous user turn)
+
+---
+
 ## [2026-05-25] Attachment UI fixes + Info collection for all users
 
 ### Bug Fixes
