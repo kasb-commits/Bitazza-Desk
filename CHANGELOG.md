@@ -4,6 +4,16 @@ All delivered changes to Bitazza-Desk, newest first.
 
 ---
 
+## [2026-05-25] Attachment UI fixes + Info collection for all users
+
+### Bug Fixes
+- `dashboard/src/api.ts` — added missing `uploadAttachment(file)` function (was called in `MessageThread` but never implemented); calls `POST /api/uploads/attachment` on the Node server
+- `dashboard/src/api.ts` — `reply()` extended with `attachmentIds?: string[]`; passed as `attachment_ids` so attachments are stored with the message
+- `dashboard/server/src/routes/tickets.js` — `metadata` column (stored as JSON string) was not being parsed before returning ticket history; attachments, agent name, and avatar URL were lost on reload; now parsed correctly
+- `engine/agent.py` — removed account-specific category and guest-session gates from the collection phase intercept; all users (guests and authenticated) now go through info + screenshot collection before any model-initiated escalation
+
+---
+
 ## [2026-05-25] Fix: Ticket Properties Missing in Production
 
 ### Bug Fix

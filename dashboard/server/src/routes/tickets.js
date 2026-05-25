@@ -278,16 +278,21 @@ router.get('/:id', async (req, res) => {
         line_uid:   ticket.line_uid,
         fb_psid:    ticket.fb_psid,
       },
-      history: msgs.map(m => ({
-        id: m.id,
-        role: m.sender_type,
-        sender_type: m.sender_type,
-        content: m.content,
-        agent_name: null, // TODO: join users
-        is_internal_note: m.sender_type === 'internal_note',
-        created_at: Math.floor(new Date(m.created_at).getTime() / 1000),
-        metadata: m.metadata ?? {},
-      })),
+      history: msgs.map(m => {
+        let meta = m.metadata ?? {};
+        if (typeof meta === 'string') { try { meta = JSON.parse(meta); } catch { meta = {}; } }
+        return {
+          id: m.id,
+          role: m.sender_type,
+          sender_type: m.sender_type,
+          content: m.content,
+          agent_name: meta.agent_name ?? null,
+          agent_avatar_url: meta.agent_avatar_url ?? null,
+          is_internal_note: m.sender_type === 'internal_note',
+          created_at: Math.floor(new Date(m.created_at).getTime() / 1000),
+          metadata: meta,
+        };
+      }),
     });
   } catch (err) {
     console.error('[tickets] get error:', err.message, err.stack);

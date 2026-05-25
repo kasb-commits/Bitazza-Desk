@@ -100,10 +100,10 @@ export const api = {
   escalate: (id: string, reason?: string) =>
     req(`/api/tickets/${id}/escalate`, { method: 'POST', body: JSON.stringify({ reason }) }),
 
-  reply: (id: string, content: string, is_note = false, channel?: string) =>
+  reply: (id: string, content: string, is_note = false, channel?: string, attachmentIds?: string[]) =>
     req(`/api/tickets/${id}/messages`, {
       method: 'POST',
-      body: JSON.stringify({ content, is_note, channel }),
+      body: JSON.stringify({ content, is_note, channel, ...(attachmentIds?.length ? { attachment_ids: attachmentIds } : {}) }),
     }),
 
   claimTicket: (id: string) =>
@@ -146,6 +146,20 @@ export const api = {
     }).then(async r => {
       if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error((b as {error?:string}).error ?? `${r.status}`); }
       return r.json() as Promise<{ avatar_url: string }>;
+    });
+  },
+
+  uploadAttachment: (file: File) => {
+    const token = getToken();
+    const form = new FormData();
+    form.append('file', file);
+    return fetch(`${API}/api/uploads/attachment`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    }).then(async r => {
+      if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error((b as { detail?: string }).detail ?? `${r.status}`); }
+      return r.json() as Promise<{ id: string; url: string; name: string; mime_type: string; size: number }>;
     });
   },
 
