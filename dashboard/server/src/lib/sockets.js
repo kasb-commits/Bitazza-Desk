@@ -39,8 +39,10 @@ function init(httpServer) {
     const { id: agentId, role } = socket.user;
     console.log(`[WS] connected: ${agentId} (${role})`);
 
-    // Register socket in Redis
-    await setAgentSession(agentId, { socket_id: socket.id });
+    // Register socket in Redis (best-effort — non-fatal if Redis is down)
+    try { await setAgentSession(agentId, { socket_id: socket.id }); } catch (e) {
+      console.warn(`[WS] Redis unavailable, skipping session register for ${agentId}:`, e.message);
+    }
 
     // Join personal room for targeted messages
     socket.join(`agent:${agentId}`);
@@ -51,7 +53,7 @@ function init(httpServer) {
     socket.on('agent:state_change', async ({ state }) => {
       const valid = ['Available', 'Busy', 'Break', 'Offline'];
       if (!valid.includes(state)) return;
-      await setAgentSession(agentId, { state });
+      try { await setAgentSession(agentId, { state }); } catch {}
       // Broadcast presence to supervisors
       io.to('supervisors').emit('agent_presence', { agentId, state });
     });
@@ -102,7 +104,7 @@ function init(httpServer) {
         const session = await getAgentSession(agentId);
         if (session?.socket_id && session.socket_id !== socket.id) return; // reconnected
         // Grace expired — force Offline
-        await setAgentSession(agentId, { state: 'Offline', socket_id: '' });
+        try { await setAgentSession(agentId, { state: 'Offline', socket_id: '' }); } catch {}
         io.to('supervisors').emit('agent_presence', { agentId, state: 'Offline' });
 
         // Notify supervisors if agent had open tickets assigned

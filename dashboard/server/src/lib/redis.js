@@ -20,8 +20,17 @@ let connecting = null;
 async function ensureConnected() {
   if (client.isReady) return;
   if (!connecting) {
+    // Normalize "Socket already opened" — thrown when connect() is called after
+    // a previous attempt already opened the socket (e.g. after reconnect gave up).
+    // Treat it the same as any other connection failure so callers don't crash.
+    const connectPromise = client.connect().catch(err => {
+      if (err.message && err.message.includes('already opened')) {
+        throw new Error('Redis unavailable');
+      }
+      throw err;
+    });
     connecting = Promise.race([
-      client.connect(),
+      connectPromise,
       new Promise((_, reject) => setTimeout(() => reject(new Error('Redis connect timeout')), 2000)),
     ]).catch(err => { connecting = null; throw err; });
   }
