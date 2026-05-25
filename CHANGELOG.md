@@ -4,6 +4,39 @@ All delivered changes to Bitazza-Desk, newest first.
 
 ---
 
+## [2026-05-25] Fix: Ticket Properties Missing in Production
+
+### Bug Fix
+- `dashboard/server/src/db/migrate.js` — migration 010 (`ticket_property_definitions` + `ticket_property_values` tables, trigger, role permissions, and 11 default property seeds) was never included in the Node migrate script, so the tables were never created in production. Appended the full idempotent migration; tables and seeded properties will be created on next Railway deploy.
+
+---
+
+## [2026-05-25] CS Team Feedback — Bug Fixes, Thai Language Quality, Account Restriction Overhaul
+
+### Bug Fixes
+- `engine/security_filter.py` — split PII patterns into `_PII_PATTERNS_OUTPUT` and `_PII_PATTERNS_INPUT`; `post_filter` now uses output-safe set which excludes email addresses — fixes `support@bitazza.com` being masked in bot replies; new `scrub_user_input()` function scrubs email from customer input only
+- `api/routes/chat.py` — `language` field added to `MessageRequest`; widget session language passed as `override_language` to `chat()` so bot never re-detects language mid-conversation and switches to English on crypto terms
+- `engine/agent.py` — `override_language` param added to `chat()`; passed through recursive upgrade calls
+
+### Thai Language & Tone
+- `engine/mock_agents.py` — `gender` field added to all 5 agents (James/Arm = m, Ploy/Mint/Nook = f); fixed all Thai intro strings: หนู → ดิฉัน/name, gender pronouns corrected (ค่ะ/ครับ), ! removed; all `CATEGORY_INTROS` Thai strings gender-corrected and หนู removed
+- `engine/prompt_templates.py` — `AI_GREETING_TEMPLATES` split into `th_f`/`th_m` keys; `build_greeting()` accepts `gender` param; all `ESCALATION_MESSAGES`, `CATEGORY_HANDOFF_MESSAGES`, `UNABLE_TO_HELP_MESSAGES`, and collection prompts Thai strings: หนู removed, เขา/พวกเขา → เจ้าหน้าที่, ! removed, คุณลูกค้า added where appropriate
+- `engine/prompt_templates.py` — Thai base system prompt: rules 10–15 added covering conciseness, no-repeat, no หนู, คุณลูกค้า address, no ! in Thai, and list of terms that must stay in English (Guest Session, Live Chat, Log in, Log out, KYC, 2FA, OTP, Live Agent)
+- `api/routes/chat.py` — `/greet` endpoint looks up agent gender from `_AGENTS_BY_NAME` and passes to `build_greeting()`
+- `engine/email_prompt_overlay.py` — "แชทสด" → "Live Chat" in Thai email channel instruction
+
+### Account Restriction Overhaul
+- `engine/prompt_templates.py` — account_restriction overlay (EN + TH): Step 0 triage added — bot asks open-ended "describe what's happening" question before calling any tools; replaces old binary login-vs-functional question; skipped if customer's first message already contains enough context
+- `engine/prompt_templates.py` — account_restriction overlay (EN + TH): Step 3 no-anomaly path replaced with tiered logic per symptom type: transaction → collect tx details once then escalate; trading block → escalate immediately if tool finds nothing; UI/feature issues → escalate immediately, no tx ID asked; unclear → one clarifying question then escalate unconditionally
+- `engine/agent.py` — `detect_symptom_type()` added: classifies customer message into `transaction_failed`, `transaction_pending`, `feature_blocked`, `ui_error`, or `unclear` using keyword matching (EN + TH)
+- `engine/agent.py` — collection phase intercept: calls `detect_symptom_type()` for `account_restriction` category and passes result to `build_collection_prompt`
+- `engine/agent.py` — `_UPGRADE_KEYWORDS`: added `password_2fa_reset` entry with login/access/2FA signals; added KYC submission signals to `kyc_verification`; both targeting upgrades from `account_restriction`
+- `engine/agent.py` — `_UPGRADEABLE_FROM`: added `account_restriction` — bot upgrades to `kyc_verification` or `password_2fa_reset` when context clearly signals either
+- `engine/prompt_templates.py` — `_COLLECTION_QUESTIONS["account_restriction"]` replaced with 5 symptom-keyed entries: `account_restriction__transaction_failed`, `__transaction_pending`, `__feature_blocked`, `__ui_error`, `__unclear`; each with targeted EN + TH questions
+- `engine/prompt_templates.py` — `build_collection_prompt()` gains `symptom_type` param; screenshot ask logic: always for `ui_error`, optional for transaction/feature, omitted for `unclear`
+
+---
+
 ## [2026-05-25] Intent Classification + KYC Workflow Loop Fix + Response Truncation Fix
 
 ### Intent Classifier
