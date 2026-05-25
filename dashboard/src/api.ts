@@ -313,6 +313,41 @@ export const api = {
   bulkMarkNotifications: (ids: string[], read: boolean) =>
     req('/api/notifications/bulk', { method: 'PATCH', body: JSON.stringify({ ids, read }) }),
 
+  // Ticket Properties
+  getPropertyDefinitions: (includeInactive = false) =>
+    req<import('./types').PropertyDefinition[]>(
+      `/api/ticket-properties/definitions${includeInactive ? '?include_inactive=true' : ''}`
+    ),
+
+  createPropertyDefinition: (body: Omit<import('./types').PropertyDefinition, 'id' | 'created_at' | 'updated_at'>) =>
+    req<import('./types').PropertyDefinition>(
+      '/api/ticket-properties/definitions',
+      { method: 'POST', body: JSON.stringify(body) }
+    ),
+
+  updatePropertyDefinition: (id: string, body: Partial<import('./types').PropertyDefinition>) =>
+    req<import('./types').PropertyDefinition>(
+      `/api/ticket-properties/definitions/${id}`,
+      { method: 'PATCH', body: JSON.stringify(body) }
+    ),
+
+  deletePropertyDefinition: (id: string) =>
+    req<{ deleted: boolean; deactivated: boolean; message?: string }>(
+      `/api/ticket-properties/definitions/${id}`,
+      { method: 'DELETE' }
+    ),
+
+  getTicketPropertyValues: (ticketId: string) =>
+    req<import('./types').PropertyValuesMap>(
+      `/api/ticket-properties/tickets/${ticketId}/values`
+    ),
+
+  setTicketPropertyValue: (ticketId: string, propertyId: string, value: string | string[] | number | boolean | null) =>
+    req<import('./types').PropertyValue>(
+      `/api/ticket-properties/tickets/${ticketId}/values`,
+      { method: 'PATCH', body: JSON.stringify({ property_id: propertyId, value }) }
+    ),
+
   // FR-09: Core API — live customer profile from Bitazza backend (5s timeout)
   getCoreProfile: async (bitazzaUid: string) => {
     const controller = new AbortController();
