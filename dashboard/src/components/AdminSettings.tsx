@@ -7,6 +7,17 @@ import { Avatar } from './ui/Avatar';
 import { Spinner } from './ui/Spinner';
 import { useToast } from './ui/Toast';
 
+// ── Design tokens ─────────────────────────────────────────────────────────────
+const BR   = '#6366f1';
+const BRL  = 'rgba(99,102,241,0.10)';
+const T1   = '#1a1d2e';
+const T2   = '#4b5563';
+const TM   = '#9ca3af';
+const SEP  = 'rgba(0,0,0,0.06)';
+const SIDE_S: React.CSSProperties  = { background: 'rgba(255,255,255,0.72)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderRight: `1px solid ${SEP}` };
+const CARD_S: React.CSSProperties  = { background: '#ffffff', border: `1px solid ${SEP}`, borderRadius: 14 };
+const HEADER_S: React.CSSProperties = { background: 'linear-gradient(135deg,rgba(99,102,241,0.07) 0%,rgba(255,255,255,0) 60%)', borderBottom: `1px solid ${SEP}` };
+
 const TABS = ['Agents', 'Roles', 'Tags', 'Ticket Properties', 'Canned Responses', 'Assignment Rules', 'SLA Targets', 'Bot Config', 'Report Settings'] as const;
 type Tab = typeof TABS[number];
 
@@ -46,21 +57,20 @@ export default function AdminSettings({ currentUser }: Props) {
   const setTab = (t: Tab) => navigate(`/admin/${TAB_SLUG[t]}`, { replace: true });
 
   return (
-    <div className="flex flex-1 overflow-hidden bg-surface-0">
+    <div className="flex flex-1 overflow-hidden" style={{ background: '#eef2f7' }}>
 
       {/* Vertical tab sidebar */}
-      <div className="w-[200px] shrink-0 border-r border-surface-5 bg-surface-1 py-3">
-        <p className="text-[10px] text-text-muted uppercase tracking-wider px-4 mb-3 font-semibold">Settings</p>
+      <div className="w-[200px] shrink-0 py-3" style={SIDE_S}>
+        <p className="text-[10px] uppercase tracking-wider px-4 mb-3 font-semibold" style={{ color: TM }}>Settings</p>
         <nav className="space-y-0.5 px-2">
           {TABS.map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={`w-full flex items-center gap-2.5 text-xs px-3 py-2 rounded-md text-left transition-colors ${
-                tab === t
-                  ? 'bg-brand-subtle text-brand font-medium'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-surface-3'
+                tab === t ? 'font-medium' : 'hover:bg-[#f3f4f6]'
               }`}
+              style={tab === t ? { background: BRL, color: BR } : { color: T2 }}
             >
               <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={TAB_ICONS[t]} />
@@ -75,8 +85,8 @@ export default function AdminSettings({ currentUser }: Props) {
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-5xl mx-auto p-6">
           <div className="mb-6">
-            <h2 className="text-lg font-bold text-text-primary">{tab}</h2>
-            <p className="text-sm text-text-secondary mt-0.5">
+            <h2 className="text-lg font-bold" style={{ color: T1 }}>{tab}</h2>
+            <p className="text-sm mt-0.5" style={{ color: T2 }}>
               {tab === 'Agents'           ? 'Manage agent accounts, roles, and capacity.' :
                tab === 'Roles'            ? 'Configure role permissions for dashboard access.' :
                tab === 'Tags'             ? 'Manage global ticket tags available to all agents.' :
