@@ -86,6 +86,24 @@ export function storeSessionAgent(agent: StoredAgent) {
 
 let _startPromise: Promise<string> | null = null;
 
+async function _attemptStart(cfg: CSBotConfig, guestName?: string, guestEmail?: string): Promise<string> {
+  const res = await fetch(`${cfg.apiUrl}/chat/start`, {
+    method: 'POST',
+    headers: getHeaders(cfg),
+    body: JSON.stringify({
+      platform: cfg.platform,
+      ...(guestName ? { guest_name: guestName } : {}),
+      ...(guestEmail ? { guest_email: guestEmail } : {}),
+    }),
+  });
+  if (!res.ok) throw new Error(`start failed: ${res.status}`);
+  const data = await res.json();
+  const isGuest: boolean = data.is_guest ?? false;
+  storeSession(data.conversation_id, undefined, undefined, undefined, isGuest);
+  if (data.customer_id && !isGuest) storeCustomerId(data.customer_id);
+  return data.conversation_id as string;
+}
+
 export async function startConversation(
   cfg: CSBotConfig,
   guestName?: string,
@@ -99,23 +117,38 @@ export async function startConversation(
   if (_startPromise) return _startPromise;
 
   _startPromise = (async () => {
-    const res = await fetch(`${cfg.apiUrl}/chat/start`, {
-      method: 'POST',
-      headers: getHeaders(cfg),
-      body: JSON.stringify({
-        platform: cfg.platform,
-        ...(guestName ? { guest_name: guestName } : {}),
-        ...(guestEmail ? { guest_email: guestEmail } : {}),
-      }),
-    });
-    if (!res.ok) throw new Error(`start failed: ${res.status}`);
-    const data = await res.json();
-    const isGuest: boolean = data.is_guest ?? false;
-    storeSession(data.conversation_id, undefined, undefined, undefined, isGuest);
-    if (data.customer_id && !isGuest) storeCustomerId(data.customer_id);
-    return data.conversation_id as string;
+    try {
+      return await _attemptStart(cfg, guestName, guestEmail);
+    } catch {
+      // One retry before giving up
+      return await _attemptStart(cfg, guestName, guestEmail);
+    }
   })().finally(() => { _startPromise = null; });
   return _startPromise;
+}
+
+export interface EmergencyEscalateResult {
+  conversationId: string;
+  ticketId: string;
+}
+
+export async function emergencyEscalate(
+  cfg: CSBotConfig,
+  errorSource: string,
+  userMessage?: string,
+): Promise<EmergencyEscalateResult> {
+  const res = await fetch(`${cfg.apiUrl}/chat/emergency-escalate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      error_source: errorSource,
+      platform: cfg.platform ?? 'web',
+      ...(userMessage ? { user_message: userMessage } : {}),
+    }),
+  });
+  if (!res.ok) throw new Error(`emergency-escalate failed: ${res.status}`);
+  const data = await res.json();
+  return { conversationId: data.conversation_id, ticketId: data.ticket_id };
 }
 
 export interface SendResult {
