@@ -10,7 +10,9 @@ from db.conversation_store import (
     get_customer_id_for_user, get_customer_tickets, get_open_ticket_for_customer,
     get_ticket_by_id, update_ticket_status, get_ticket_id_by_conversation,
     get_info_collection_phase, set_info_collection_phase, count_collection_turns,
+    create_emergency_ticket,
 )
+from engine.assignment_client import trigger_auto_assign
 from workflow_engine.interceptor import workflow_interceptor as chat
 from engine.mock_agents import pick_agent
 from engine.prompt_templates import build_greeting
@@ -175,6 +177,50 @@ def greet(body: GreetRequest, user_id: str | None = Depends(get_optional_user_id
         bot_name=persona["name"],
         agent_avatar=persona["avatar"],
         agent_avatar_url=persona["avatar_url"],
+    )
+
+
+class EmergencyEscalateRequest(BaseModel):
+    error_source: str                   # "start_failed"
+    platform: str = "web"
+    language: str = "en"
+    guest_name: str | None = None
+    guest_email: str | None = None
+    user_message: str | None = None     # any message the customer had typed before failure
+
+
+class EmergencyEscalateResponse(BaseModel):
+    conversation_id: str
+    ticket_id: str
+    escalated: bool = True
+
+
+@router.post("/emergency-escalate", response_model=EmergencyEscalateResponse)
+def emergency_escalate(body: EmergencyEscalateRequest):
+    """
+    Called by the widget when startConversation() fails on both attempts.
+    Creates a guest ticket with status=Escalated immediately and triggers
+    auto-assign so a human agent picks it up.
+    No auth required — the widget cannot authenticate if start failed.
+    """
+    # Import inside the function so monkeypatching in tests can intercept these calls.
+    import db.conversation_store as _cs
+    import engine.assignment_client as _ac
+
+    try:
+        ticket_id = _cs.create_emergency_ticket(
+            platform=body.platform,
+            error_source=body.error_source,
+            guest_name=body.guest_name,
+            guest_email=body.guest_email,
+            user_message=body.user_message,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Failed to create emergency ticket") from exc
+    _ac.trigger_auto_assign(ticket_id, "unclassified", 3, ticket_id)
+    return EmergencyEscalateResponse(
+        conversation_id=ticket_id,
+        ticket_id=ticket_id,
     )
 
 

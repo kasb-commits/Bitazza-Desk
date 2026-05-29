@@ -304,6 +304,46 @@ def create_conversation(
     return ticket_id  # ticket_id IS the conversation_id in the Python layer
 
 
+def create_emergency_ticket(
+    platform: str,
+    error_source: str,
+    guest_name: str | None = None,
+    guest_email: str | None = None,
+    user_message: str | None = None,
+) -> str:
+    """
+    Creates a guest customer row and a ticket with status='Escalated' in one
+    atomic write. Used by POST /chat/emergency-escalate when the normal
+    startConversation flow fails on the frontend.
+
+    Returns the ticket_id (== conversation_id).
+    """
+    with _conn() as conn:
+        cur = conn.cursor()
+
+        customer_id = str(uuid.uuid4())
+        cur.execute(
+            "INSERT INTO customers (id, name, email, tier) VALUES (%s, %s, %s, 'regular')",
+            (customer_id, guest_name or "Guest", guest_email),
+        )
+
+        ticket_id = str(uuid.uuid4())
+        cur.execute("""
+            INSERT INTO tickets
+                (id, customer_id, channel, status, category, priority, team, error_source, sla_deadline)
+            VALUES (%s, %s, %s, 'Escalated', 'unclassified', 3, 'cs', %s, NOW() + 10 * INTERVAL '1 minute')
+        """, (ticket_id, customer_id, platform, error_source))
+
+        if user_message:
+            msg_id = str(uuid.uuid4())
+            cur.execute("""
+                INSERT INTO messages (id, ticket_id, sender_type, content, metadata)
+                VALUES (%s, %s, 'customer', %s, '{}')
+            """, (msg_id, ticket_id, user_message))
+
+    return ticket_id
+
+
 def get_customer_id_for_user(user_id: str) -> str | None:
     """Return the persistent customer UUID for a given widget user_id, or None if not found."""
     with _conn() as conn:

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Message, MessageAttachment, CSBotConfig, IssueCategory } from './types';
 import { ISSUE_CATEGORIES } from './types';
-import { startConversation, sendMessage, uploadAttachment, fetchHistory, setCategoryAgent, getStoredSession, storeSessionLang, storeSessionCategory, storeSessionAgent, clearStoredSession, fetchCustomerTickets, fetchOpenTicket, getStoredCustomerId } from './api';
+import { startConversation, sendMessage, uploadAttachment, fetchHistory, setCategoryAgent, getStoredSession, storeSessionLang, storeSessionCategory, storeSessionAgent, clearStoredSession, fetchCustomerTickets, fetchOpenTicket, getStoredCustomerId, emergencyEscalate } from './api';
 import type { PastTicket } from './api';
 import MessageBubble from './MessageBubble';
 import TypingIndicator from './TypingIndicator';
@@ -60,6 +60,7 @@ const UI_TEXT = {
     escalationBanner: 'Connecting you to a support agent...',
     errorRetry: 'Failed to send. Tap to retry.',
     welcome: 'Hey there! 😊 What can I help you with today?',
+    connectionFallback: "We're having trouble connecting. Please email us at support@bitazza.com or call +66-2-171-2417.",
   },
   th: {
     placeholder: 'พิมพ์ข้อความของคุณ...',
@@ -69,6 +70,7 @@ const UI_TEXT = {
     escalationBanner: 'กำลังเชื่อมต่อกับเจ้าหน้าที่สนับสนุน...',
     errorRetry: 'ส่งไม่สำเร็จ แตะเพื่อลองใหม่',
     welcome: 'สวัสดีค่ะ! 😊 วันนี้มีอะไรให้ช่วยได้บ้างคะ?',
+    connectionFallback: 'ขณะนี้ระบบขัดข้อง กรุณาติดต่อเราที่ support@bitazza.com หรือโทร +66-2-171-2417',
   },
 };
 
@@ -181,7 +183,22 @@ export default function ChatWindow({ cfg, onClose }: Props) {
       if (!cfg.guestMode) {
         startConversation(cfg)
           .then((id) => setConvId(id))
-          .catch(() => setError('Could not connect. Please refresh.'));
+          .catch(async () => {
+            try {
+              const result = await emergencyEscalate(cfg, 'start_failed');
+              setConvId(result.conversationId);
+              setEscalated(true);
+              setLangSelected(true);
+              setSelectedCategory('other' as IssueCategory);
+            } catch {
+              setMessages((prev) => [...prev, {
+                id: 'emergency-fallback',
+                role: 'assistant',
+                content: UI_TEXT[cfg.lang ?? 'en'].connectionFallback,
+                timestamp: Date.now(),
+              }]);
+            }
+          });
       }
     }
   }, []);
@@ -274,7 +291,14 @@ export default function ChatWindow({ cfg, onClose }: Props) {
 
     if (convId) {
       setAwaitingFirstReply(true);
-      setCategoryAgent(cfg, convId, category).then(({ agentName, agentAvatarUrl }) => {
+      const trySetCategory = async () => {
+        try {
+          return await setCategoryAgent(cfg, convId, category);
+        } catch {
+          return await setCategoryAgent(cfg, convId, category);
+        }
+      };
+      trySetCategory().then(({ agentName, agentAvatarUrl }) => {
         const resolvedName = agentName ?? 'Support Agent';
         setBotName(resolvedName);
         setBotAvatarUrl(agentAvatarUrl || null);
@@ -295,7 +319,9 @@ export default function ChatWindow({ cfg, onClose }: Props) {
           sendRef.current?.(openingMsg, category, true);
         }, 1200 + Math.random() * 600);
       }).catch(() => {
-        sendRef.current?.(openingMsg, category, true);
+        // Both setCategoryAgent attempts failed — ticket already exists, just escalate
+        setEscalated(true);
+        setAwaitingFirstReply(false);
       });
     } else {
       sendRef.current?.(openingMsg, category, true);
