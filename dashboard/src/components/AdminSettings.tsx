@@ -1262,31 +1262,25 @@ function Toggle({ on, onToggle, saving }: { on: boolean; onToggle: () => void; s
   );
 }
 
-function RuleCard({ title, subtitle, editable, children }: { title: string; subtitle: string; editable?: boolean; children: React.ReactNode }) {
+function Group({ label, description, locked, children }: { label: string; description?: string; locked?: boolean; children: React.ReactNode }) {
   return (
-    <div style={{
-      background: 'white', borderRadius: 14, overflow: 'hidden',
-      boxShadow: '0 0 0 0.5px rgba(0,0,0,0.1), 0 2px 12px rgba(0,0,0,0.07)',
-    }}>
-      <div style={{ padding: '18px 24px 14px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
-        <div>
-          <p style={{ fontSize: 13, fontWeight: 600, color: T1, letterSpacing: '-0.01em' }}>{title}</p>
-          <p style={{ fontSize: 12, color: TM, marginTop: 2, lineHeight: 1.5 }}>{subtitle}</p>
-        </div>
-        {!editable && (
-          <svg width={13} height={13} fill="none" stroke="currentColor" viewBox="0 0 24 24"
-               style={{ color: '#bfc5cf', flexShrink: 0, marginTop: 2 }}>
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+    <div style={{ marginBottom: 28 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, paddingLeft: 2 }}>
+        <p style={{ fontSize: 11, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</p>
+        {locked && (
+          <svg width={11} height={11} fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: TM }}>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
           </svg>
         )}
       </div>
-      {/* inset hairline below header */}
-      <div style={{ height: '0.5px', background: 'rgba(0,0,0,0.09)', marginLeft: 24 }} />
-      <div>{children}</div>
+      {description && <p style={{ fontSize: 12, color: TM, marginBottom: 8, paddingLeft: 2, lineHeight: 1.5 }}>{description}</p>}
+      <div style={{ background: 'white', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.06)' }}>
+        {children}
+      </div>
     </div>
   );
 }
+
 
 type Rules = {
   category_team_map: Record<string, string>;
@@ -1381,39 +1375,24 @@ function AssignmentRulesTab() {
   const vipDirty   = isDirty('vip_auto_priority1');
   const slaDirty   = isDirty('sla_minutes');
 
-  // Row helpers — inset separator sits BETWEEN rows as a sibling element, not as borderBottom
-  const ROW: React.CSSProperties = {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '0 24px', minHeight: 50,
-  };
-  const SEP  = () => <div style={{ height: '0.5px', background: 'rgba(0,0,0,0.07)', marginLeft: 24 }} />;
-  const ROW_LABEL: React.CSSProperties = { fontSize: 13, fontWeight: 400, color: T1 };
-  const ROW_SUB: React.CSSProperties   = { fontSize: 11, color: TM, marginTop: 2, lineHeight: 1.5 };
-  const SEL: React.CSSProperties = {
-    fontSize: 13, fontWeight: 400, color: T1,
-    background: 'white',
-    border: '1px solid rgba(0,0,0,0.15)',
-    borderRadius: 8,
-    padding: '7px 32px 7px 12px',
-    outline: 'none',
-    cursor: 'pointer',
-    width: 160,
-    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-  };
+  const R: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', minHeight: 44 };
+  const RL: React.CSSProperties = { fontSize: 13, fontWeight: 400, color: T1 };
+  const HR = () => <div style={{ height: '0.5px', background: 'rgba(0,0,0,0.07)', marginLeft: 16 }} />;
 
   return (
-    <div className="space-y-4">
+    <div>
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-5 right-5 z-50 flex items-start gap-3 rounded-2xl shadow-2xl"
-             style={{
-               padding: '14px 18px', maxWidth: 360,
-               background: toast.type === 'error' ? '#1c0505' : 'white',
-               border: `1px solid ${toast.type === 'error' ? 'rgba(239,68,68,0.25)' : 'rgba(0,0,0,0.08)'}`,
-               color: toast.type === 'error' ? '#fca5a5' : T1,
-               fontSize: 13, lineHeight: 1.5,
-             }}>
+        <div style={{
+          position: 'fixed', bottom: 20, right: 20, zIndex: 50,
+          display: 'flex', alignItems: 'flex-start', gap: 10,
+          padding: '12px 16px', borderRadius: 12, maxWidth: 360,
+          background: toast.type === 'error' ? '#1c0505' : 'white',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.08)',
+          color: toast.type === 'error' ? '#fca5a5' : T1,
+          fontSize: 13, lineHeight: 1.5,
+        }}>
           <svg width={16} height={16} fill="none" stroke="currentColor" viewBox="0 0 24 24"
                style={{ color: toast.type === 'error' ? '#f87171' : '#10b981', flexShrink: 0, marginTop: 1 }}>
             {toast.type === 'error'
@@ -1422,9 +1401,8 @@ function AssignmentRulesTab() {
             }
           </svg>
           <span style={{ flex: 1 }}>{toast.msg}</span>
-          <button onClick={() => setToast(null)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.4, padding: 0, flexShrink: 0 }}>
-            <svg width={13} height={13} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button onClick={() => setToast(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.4, padding: 0, flexShrink: 0 }}>
+            <svg width={12} height={12} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -1433,24 +1411,22 @@ function AssignmentRulesTab() {
 
       {/* Confirmation modal */}
       {confirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center"
-             style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(6px)' }}>
-          <div className="w-full max-w-sm mx-4 rounded-2xl bg-white"
-               style={{ border: '1px solid rgba(0,0,0,0.09)', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
-            <div style={{ padding: '24px 24px 0' }}>
-              <p style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: '-0.01em', marginBottom: 8 }}>{confirm.title}</p>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(8px)' }}>
+          <div style={{ width: '100%', maxWidth: 380, margin: '0 16px', borderRadius: 16, background: 'white', boxShadow: '0 24px 64px rgba(0,0,0,0.22)', overflow: 'hidden' }}>
+            <div style={{ padding: '22px 22px 16px' }}>
+              <p style={{ fontSize: 14, fontWeight: 600, color: T1, marginBottom: 6 }}>{confirm.title}</p>
               <p style={{ fontSize: 13, color: T2, lineHeight: 1.6 }}>{confirm.description}</p>
             </div>
-            <div className="flex gap-2 justify-end" style={{ padding: '20px 24px' }}>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', padding: '0 22px 22px' }}>
               <button onClick={() => setConfirm(null)}
-                style={{ fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.10)', background: 'white', color: T2, cursor: 'pointer' }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#f3f4f6')}
+                style={{ fontSize: 13, fontWeight: 500, padding: '7px 16px', borderRadius: 8, border: '0.5px solid rgba(0,0,0,0.15)', background: 'white', color: T2, cursor: 'pointer' }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#f5f5f7')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'white')}>
                 Cancel
               </button>
               <button onClick={confirm.onConfirm}
-                style={{ fontSize: 13, fontWeight: 600, padding: '8px 20px', borderRadius: 10, border: 'none', background: BR, color: 'white', cursor: 'pointer' }}
-                onMouseEnter={e => (e.currentTarget.style.opacity = '0.88')}
+                style={{ fontSize: 13, fontWeight: 600, padding: '7px 16px', borderRadius: 8, border: 'none', background: BR, color: 'white', cursor: 'pointer' }}
+                onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
                 onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
                 Apply Change
               </button>
@@ -1460,54 +1436,44 @@ function AssignmentRulesTab() {
       )}
 
       {/* Category → Team Routing */}
-      <RuleCard editable title="Category → Team Routing" subtitle="Tickets are routed to a team based on their category. Unmatched categories fall back to CS.">
+      <Group label="Category → Team Routing" description="Tickets are routed to a team based on their category. Unmatched categories fall back to CS.">
         {Object.entries(draft.category_team_map).map(([cat, team]) => (
           <React.Fragment key={cat}>
-            <div style={ROW}>
-              <span style={ROW_LABEL}>{CATEGORY_LABELS[cat] ?? cat}</span>
-              <div style={{ position: 'relative', display: 'inline-block' }}>
-                <select
-                  value={team}
-                  disabled={saving === 'category_team_map'}
-                  onChange={e => setDraft(d => d ? { ...d, category_team_map: { ...d.category_team_map, [cat]: e.target.value } } : d)}
-                  style={{ ...SEL, paddingRight: 32 }}
-                >
-                  {KNOWN_TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-                <svg width={10} height={6} viewBox="0 0 10 6" fill="none"
-                     style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: TM }}>
-                  <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
+            <div style={R}>
+              <span style={RL}>{CATEGORY_LABELS[cat] ?? cat}</span>
+              <select
+                value={team}
+                disabled={saving === 'category_team_map'}
+                onChange={e => setDraft(d => d ? { ...d, category_team_map: { ...d.category_team_map, [cat]: e.target.value } } : d)}
+                style={{ fontSize: 12, color: T1, background: '#f5f5f7', border: 'none', borderRadius: 7, padding: '5px 10px', outline: 'none', cursor: 'pointer', fontWeight: 500 }}
+              >
+                {KNOWN_TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
             </div>
-            <SEP />
+            <HR />
           </React.Fragment>
         ))}
-        <div style={{ ...ROW, opacity: 0.38 }}>
-          <span style={{ ...ROW_LABEL, fontStyle: 'italic' }}>All other categories</span>
+        <div style={{ ...R, opacity: 0.35 }}>
+          <span style={{ ...RL, fontStyle: 'italic' }}>All other categories</span>
           <span style={{ fontSize: 12, color: TM }}>cs (fallback)</span>
         </div>
         <SaveBar
           dirty={catDirty}
           saving={saving === 'category_team_map'}
           onDiscard={() => setDraft(d => d ? { ...d, category_team_map: saved!.category_team_map } : d)}
-          onSave={() => requestSave(
-            'category_team_map', draft.category_team_map,
-            'Update Category → Team Routing',
-            'This will immediately affect how all incoming tickets are routed to teams. Changes take effect on the next ticket created.'
-          )}
+          onSave={() => requestSave('category_team_map', draft.category_team_map, 'Update Category → Team Routing', 'This will immediately affect how all incoming tickets are routed to teams. Changes take effect on the next ticket created.')}
         />
-      </RuleCard>
+      </Group>
 
-      {/* Agent Routing Strategy — system locked */}
-      <RuleCard title="Agent Routing Strategy" subtitle="Controls how tickets are distributed to available agents within a team.">
+      {/* Agent Routing Strategy */}
+      <Group label="Agent Routing Strategy" description="How tickets are distributed to available agents within a team." locked>
         {[
-          { label: 'Round-Robin', sub: 'Least recently used — ticket goes to the Available agent with the oldest last-assignment time, who is under capacity.' },
+          { label: 'Round-Robin', sub: 'Least recently used — ticket goes to the Available agent with the oldest last-assignment time who is under capacity.' },
           { label: 'Queue Fallback', sub: 'If no agent is available the ticket is queued. VIP tickets go to the front, others to the back.' },
         ].map((r, i, arr) => (
           <React.Fragment key={r.label}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 20px' }}>
-              <svg width={15} height={15} fill="none" stroke={BR} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" style={{ flexShrink: 0, marginTop: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 16px' }}>
+              <svg width={14} height={14} fill="none" stroke={BR} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" style={{ flexShrink: 0, marginTop: 2 }}>
                 <path d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
               </svg>
               <div>
@@ -1515,24 +1481,24 @@ function AssignmentRulesTab() {
                 <p style={{ fontSize: 12, color: TM, marginTop: 2, lineHeight: 1.5 }}>{r.sub}</p>
               </div>
             </div>
-            {i < arr.length - 1 && <SEP />}
+            {i < arr.length - 1 && <HR />}
           </React.Fragment>
         ))}
-      </RuleCard>
+      </Group>
 
       {/* Sticky Agent */}
-      <RuleCard editable title="Sticky Agent" subtitle="Returning customers are matched to their previous agent if they return within the configured window and the agent is available.">
-        <div style={ROW}>
-          <span style={ROW_LABEL}>Return window</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <Group label="Sticky Agent" description="Returning customers are matched to their previous agent if they return within the configured window.">
+        <div style={R}>
+          <span style={RL}>Return window</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <input
               type="number" min={1} max={72}
               value={draft.sticky_agent_hours}
               disabled={saving === 'sticky_agent_hours'}
               onChange={e => setDraft(d => d ? { ...d, sticky_agent_hours: Number(e.target.value) } : d)}
-              style={{ width: 64, fontSize: 14, fontWeight: 600, textAlign: 'center' as const, background: 'white', border: '1px solid rgba(0,0,0,0.14)', borderRadius: 8, padding: '5px 8px', color: T1, outline: 'none', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}
-              onFocus={e => (e.currentTarget.style.borderColor = BR)}
-              onBlur={e => (e.currentTarget.style.borderColor = 'rgba(0,0,0,0.14)')}
+              style={{ width: 52, fontSize: 13, fontWeight: 500, textAlign: 'center' as const, background: '#f5f5f7', border: 'none', borderRadius: 7, padding: '5px 6px', color: T1, outline: 'none' }}
+              onFocus={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.boxShadow = `0 0 0 2px ${BR}40`; }}
+              onBlur={e => { e.currentTarget.style.background = '#f5f5f7'; e.currentTarget.style.boxShadow = 'none'; }}
             />
             <span style={{ fontSize: 12, color: TM }}>hours</span>
           </div>
@@ -1541,18 +1507,14 @@ function AssignmentRulesTab() {
           dirty={stickyDirty}
           saving={saving === 'sticky_agent_hours'}
           onDiscard={() => setDraft(d => d ? { ...d, sticky_agent_hours: saved!.sticky_agent_hours } : d)}
-          onSave={() => requestSave(
-            'sticky_agent_hours', draft.sticky_agent_hours,
-            'Update Sticky Agent Window',
-            `Returning customers will be matched to their previous agent only if they return within ${draft.sticky_agent_hours} hour${draft.sticky_agent_hours !== 1 ? 's' : ''}. This affects all new tickets.`
-          )}
+          onSave={() => requestSave('sticky_agent_hours', draft.sticky_agent_hours, 'Update Sticky Agent Window', `Returning customers will be matched to their previous agent only if they return within ${draft.sticky_agent_hours} hour${draft.sticky_agent_hours !== 1 ? 's' : ''}. This affects all new tickets.`)}
         />
-      </RuleCard>
+      </Group>
 
       {/* VIP Auto-Priority */}
-      <RuleCard editable title="VIP Auto-Priority" subtitle="Tickets from VIP-tier customers are automatically promoted to Priority 1 on creation.">
-        <div style={ROW}>
-          <span style={ROW_LABEL}>Auto-promote VIP tickets</span>
+      <Group label="VIP Auto-Priority" description="Tickets from VIP-tier customers are automatically promoted to Priority 1 on creation.">
+        <div style={R}>
+          <span style={RL}>Auto-promote VIP tickets to Priority 1</span>
           <Toggle
             on={draft.vip_auto_priority1}
             saving={saving === 'vip_auto_priority1'}
@@ -1563,52 +1525,42 @@ function AssignmentRulesTab() {
           dirty={vipDirty}
           saving={saving === 'vip_auto_priority1'}
           onDiscard={() => setDraft(d => d ? { ...d, vip_auto_priority1: saved!.vip_auto_priority1 } : d)}
-          onSave={() => requestSave(
-            'vip_auto_priority1', draft.vip_auto_priority1,
-            `${draft.vip_auto_priority1 ? 'Enable' : 'Disable'} VIP Auto-Priority`,
-            draft.vip_auto_priority1
-              ? 'VIP customers will automatically receive Priority 1 on every new ticket. This affects SLA deadlines and queue position.'
-              : 'VIP customers will no longer be auto-promoted to Priority 1. Their tickets will follow standard priority rules.'
-          )}
+          onSave={() => requestSave('vip_auto_priority1', draft.vip_auto_priority1, `${draft.vip_auto_priority1 ? 'Enable' : 'Disable'} VIP Auto-Priority`, draft.vip_auto_priority1 ? 'VIP customers will automatically receive Priority 1 on every new ticket. This affects SLA deadlines and queue position.' : 'VIP customers will no longer be auto-promoted to Priority 1. Their tickets will follow standard priority rules.')}
         />
-      </RuleCard>
+      </Group>
 
       {/* SLA Deadlines */}
-      <RuleCard editable title="SLA Deadlines" subtitle="Time-to-first-response targets applied at the moment a ticket is assigned to an agent.">
+      <Group label="SLA Deadlines" description="Time-to-first-response targets applied at the moment a ticket is assigned to an agent.">
         {SLA_META.map(({ priority, label, color }, i, arr) => (
           <React.Fragment key={priority}>
-            <div style={ROW}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />
-                <span style={ROW_LABEL}>{label}</span>
-              </div>
+            <div style={R}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />
+                <span style={RL}>{label}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <input
                   type="number" min={1} max={1440}
                   value={draft.sla_minutes[priority] ?? ''}
                   disabled={saving === 'sla_minutes'}
                   onChange={e => setDraft(d => d ? { ...d, sla_minutes: { ...d.sla_minutes, [priority]: Number(e.target.value) } } : d)}
-                  style={{ width: 64, fontSize: 14, fontWeight: 600, textAlign: 'center' as const, background: 'white', border: '1px solid rgba(0,0,0,0.14)', borderRadius: 8, padding: '5px 8px', color: T1, outline: 'none', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}
-                  onFocus={e => (e.currentTarget.style.borderColor = color)}
-                  onBlur={e => (e.currentTarget.style.borderColor = 'rgba(0,0,0,0.14)')}
+                  style={{ width: 52, fontSize: 13, fontWeight: 500, textAlign: 'center' as const, background: '#f5f5f7', border: 'none', borderRadius: 7, padding: '5px 6px', color: T1, outline: 'none' }}
+                  onFocus={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.boxShadow = `0 0 0 2px ${color}50`; }}
+                  onBlur={e => { e.currentTarget.style.background = '#f5f5f7'; e.currentTarget.style.boxShadow = 'none'; }}
                 />
-                <span style={{ fontSize: 12, color: TM, width: 22 }}>min</span>
+                <span style={{ fontSize: 12, color: TM, width: 20 }}>min</span>
               </div>
             </div>
-            {i < arr.length - 1 && <SEP />}
+            {i < arr.length - 1 && <HR />}
           </React.Fragment>
         ))}
         <SaveBar
           dirty={slaDirty}
           saving={saving === 'sla_minutes'}
           onDiscard={() => setDraft(d => d ? { ...d, sla_minutes: saved!.sla_minutes } : d)}
-          onSave={() => requestSave(
-            'sla_minutes', draft.sla_minutes,
-            'Update SLA Deadlines',
-            'New SLA targets will apply to all tickets assigned from this point forward. Tickets already in progress keep their existing deadlines.'
-          )}
+          onSave={() => requestSave('sla_minutes', draft.sla_minutes, 'Update SLA Deadlines', 'New SLA targets will apply to all tickets assigned from this point forward. Tickets already in progress keep their existing deadlines.')}
         />
-      </RuleCard>
+      </Group>
     </div>
   );
 }
@@ -1616,13 +1568,12 @@ function AssignmentRulesTab() {
 function SaveBar({ dirty, saving, onSave, onDiscard }: { dirty: boolean; saving: boolean; onSave: () => void; onDiscard: () => void }) {
   if (!dirty) return null;
   return (
-    <div className="flex items-center justify-end gap-2"
-         style={{ padding: '14px 24px', borderTop: '1px solid rgba(0,0,0,0.06)', background: 'rgba(249,250,251,0.8)' }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, padding: '10px 16px', borderTop: '0.5px solid rgba(0,0,0,0.07)' }}>
       <button
         onClick={onDiscard}
         disabled={saving}
-        style={{ fontSize: 12, fontWeight: 500, padding: '7px 16px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.10)', background: 'white', color: T2, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.5 : 1 }}
-        onMouseEnter={e => (e.currentTarget.style.background = '#f3f4f6')}
+        style={{ fontSize: 12, fontWeight: 500, padding: '5px 14px', borderRadius: 7, border: '0.5px solid rgba(0,0,0,0.14)', background: 'white', color: T2, cursor: 'pointer' }}
+        onMouseEnter={e => (e.currentTarget.style.background = '#f5f5f7')}
         onMouseLeave={e => (e.currentTarget.style.background = 'white')}
       >
         Discard
@@ -1630,9 +1581,9 @@ function SaveBar({ dirty, saving, onSave, onDiscard }: { dirty: boolean; saving:
       <button
         onClick={onSave}
         disabled={saving}
-        style={{ fontSize: 12, fontWeight: 600, padding: '7px 18px', borderRadius: 10, border: 'none', background: BR, color: 'white', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.65 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
-        onMouseEnter={e => (e.currentTarget.style.opacity = saving ? '0.65' : '0.88')}
-        onMouseLeave={e => (e.currentTarget.style.opacity = saving ? '0.65' : '1')}
+        style={{ fontSize: 12, fontWeight: 600, padding: '5px 14px', borderRadius: 7, border: 'none', background: BR, color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}
+        onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+        onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
       >
         {saving && <Spinner size="sm" />}
         Save Changes

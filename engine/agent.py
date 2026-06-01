@@ -458,11 +458,12 @@ def chat(
     from db.conversation_store import is_human_handling as _is_human_pre
     if _is_human_pre(conversation_id):
         _post_escalation_note = (
-            "\n\nCONTEXT — POST-ESCALATION: This ticket has already been escalated. "
-            "A human specialist has been notified and will reach out to the customer. "
-            "Do NOT say you are connecting them or that a handoff is in progress — it already happened. "
-            "Acknowledge the customer's follow-up question, give whatever factual information you can, "
-            "and reassure them the specialist will be in touch shortly."
+            "\n\nCONTEXT — POST-ESCALATION: This ticket has already been escalated and the customer is waiting. "
+            "A human specialist has already been notified — the handoff is done, not in progress. "
+            "TONE: the customer may be anxious or frustrated. Be calm, direct, and reassuring. "
+            "Do NOT say 'I am connecting you', 'please hold on', or anything implying the transfer is still happening. "
+            "Do NOT ask 'Is there anything else I can help you with?' — they are waiting for a specialist, not more bot help. "
+            "Simply acknowledge their message, answer what you factually can, and confirm the specialist will reach out shortly."
         )
         system_prompt = system_prompt + _post_escalation_note
 
@@ -740,6 +741,11 @@ def chat(
         from db.conversation_store import is_human_handling as _is_human
         if _is_human(conversation_id):
             reason = "already_escalated"
+        elif account_data:
+            # A tool was called and returned data this turn — the bot has real account
+            # context and produced a substantive answer. Don't intercept with collection
+            # questions; the model already has everything it needs. Escalate directly.
+            pass
         elif reason in _intercept_reasons:
             _phase = get_info_collection_phase(conversation_id)
             if _phase is None:
