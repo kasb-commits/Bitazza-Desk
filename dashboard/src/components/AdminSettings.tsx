@@ -9,16 +9,12 @@ import { useToast } from './ui/Toast';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const BR   = '#6366f1';
-const BRL  = 'rgba(99,102,241,0.10)';
 const T1   = '#1a1d2e';
 const T2   = '#4b5563';
 const TM   = '#9ca3af';
 const SEP  = 'rgba(0,0,0,0.06)';
-const SIDE_S: React.CSSProperties  = { background: 'rgba(255,255,255,0.72)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderRight: `1px solid ${SEP}` };
-const CARD_S: React.CSSProperties  = { background: '#ffffff', border: `1px solid ${SEP}`, borderRadius: 14 };
-const HEADER_S: React.CSSProperties = { background: 'linear-gradient(135deg,rgba(99,102,241,0.07) 0%,rgba(255,255,255,0) 60%)', borderBottom: `1px solid ${SEP}` };
 
-const TABS = ['Agents', 'Roles', 'Tags', 'Ticket Properties', 'Canned Responses', 'Assignment Rules', 'SLA Targets', 'Bot Config', 'Report Settings'] as const;
+const TABS = ['Agents', 'Roles', 'Tags', 'Ticket Properties', 'Canned Responses', 'Assignment Rules', 'SLA Targets', 'Bot Config', 'Announcements', 'Report Settings'] as const;
 type Tab = typeof TABS[number];
 
 const TAB_SLUG: Record<Tab, string> = {
@@ -30,6 +26,7 @@ const TAB_SLUG: Record<Tab, string> = {
   'Assignment Rules':  'assignment-rules',
   'SLA Targets':       'sla-targets',
   'Bot Config':        'bot-config',
+  'Announcements':     'announcements',
   'Report Settings':   'report-settings',
 };
 const SLUG_TAB: Record<string, Tab> = Object.fromEntries(
@@ -45,70 +42,203 @@ const TAB_ICONS: Record<Tab, string> = {
   'Assignment Rules':  'M4 6h16M4 10h16M4 14h16M4 18h16',
   'SLA Targets':       'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
   'Bot Config':        'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H4a2 2 0 01-2-2V5a2 2 0 012-2h16a2 2 0 012 2v10a2 2 0 01-2 2h-1',
+  'Announcements':     'M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z',
   'Report Settings':   'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9',
 };
 
 interface Props { currentUser: AuthUser; }
 
+const TAB_DESCRIPTIONS: Record<Tab, string> = {
+  'Agents':            'Manage agent accounts, roles, and capacity.',
+  'Roles':             'Configure role permissions for dashboard access.',
+  'Tags':              'Manage global ticket tags available to all agents.',
+  'Ticket Properties': 'Define dynamic properties for ticket classification and routing.',
+  'Canned Responses':  'Pre-written replies for common customer scenarios.',
+  'Assignment Rules':  'Configure routing logic per channel and category.',
+  'SLA Targets':       'Set response and resolution time targets per priority tier.',
+  'Bot Config':        'Configure bot persona, greeting, and fallback behavior.',
+  'Announcements':     'Publish banners shown to widget users before they pick a category.',
+  'Report Settings':   'Configure daily and weekly report delivery channels.',
+};
+
+const ADMIN_GROUPS: { label: string; desc: string; color: string; icon: string; items: Tab[] }[] = [
+  {
+    label: 'Team',
+    desc:  'Manage the people and permissions that power your support operation.',
+    color: '#6366f1',
+    icon:  'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z',
+    items: ['Agents', 'Roles', 'Tags'],
+  },
+  {
+    label: 'Automation',
+    desc:  'Define how tickets are routed, prioritized, and escalated across your team.',
+    color: '#0ea5e9',
+    icon:  'M13 10V3L4 14h7v7l9-11h-7z',
+    items: ['Assignment Rules', 'SLA Targets'],
+  },
+  {
+    label: 'Content',
+    desc:  'Build and maintain the templates and data structures your agents rely on.',
+    color: '#10b981',
+    icon:  'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+    items: ['Canned Responses', 'Ticket Properties'],
+  },
+  {
+    label: 'Platform',
+    desc:  'Configure the AI bot behaviour and report delivery channels.',
+    color: '#f59e0b',
+    icon:  'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H4a2 2 0 01-2-2V5a2 2 0 012-2h16a2 2 0 012 2v10a2 2 0 01-2 2h-1',
+    items: ['Bot Config', 'Announcements', 'Report Settings'],
+  },
+];
+
 export default function AdminSettings({ currentUser }: Props) {
   const { tab: tabSlug } = useParams<{ tab?: string }>();
   const navigate = useNavigate();
-  const tab: Tab = (tabSlug && SLUG_TAB[tabSlug]) ? SLUG_TAB[tabSlug] : 'Agents';
-  const setTab = (t: Tab) => navigate(`/admin/${TAB_SLUG[t]}`, { replace: true });
+  const tab: Tab | null = (tabSlug && SLUG_TAB[tabSlug]) ? SLUG_TAB[tabSlug] : null;
+
+  // ── Overview (no tab selected) ───────────────────────────────────────────────
+  if (!tab) {
+    return (
+      <div className="flex-1 overflow-y-auto" style={{ background: '#f4f5f9' }}>
+
+        {/* Hero banner */}
+        <div className="relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 60%, #a5b4fc 100%)' }}>
+          {/* Decorative circles */}
+          <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full opacity-20" style={{ background: 'white' }} />
+          <div className="absolute -bottom-10 right-48 w-40 h-40 rounded-full opacity-10" style={{ background: 'white' }} />
+          <div className="px-8 py-8 flex items-center justify-between relative z-10">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                Bitazza CS · Workspace
+              </p>
+              <h1 className="text-xl font-bold text-white mb-1">Admin Settings</h1>
+              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.65)' }}>
+                Configure your team, automation, content, and platform.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="text-right">
+                <p className="text-sm font-semibold text-white">{currentUser.name ?? currentUser.email}</p>
+                <p className="text-xs capitalize" style={{ color: 'rgba(255,255,255,0.6)' }}>{currentUser.role}</p>
+              </div>
+              <Avatar name={currentUser.name ?? currentUser.email} size="md" />
+            </div>
+          </div>
+        </div>
+
+        {/* Setting groups — two-column: context left, rows right */}
+        <div className="px-8 py-7 space-y-4">
+          {ADMIN_GROUPS.map(group => (
+            <div key={group.label} className="grid gap-4" style={{ gridTemplateColumns: '260px 1fr' }}>
+
+              {/* Left: group context panel */}
+              <div className="rounded-2xl p-6 flex flex-col justify-between"
+                   style={{ background: `linear-gradient(145deg, ${group.color}14 0%, ${group.color}06 100%)`, border: `1px solid ${group.color}22` }}>
+                <div>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4"
+                       style={{ background: group.color }}>
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d={group.icon} />
+                    </svg>
+                  </div>
+                  <p className="text-sm font-bold mb-1.5" style={{ color: T1 }}>{group.label}</p>
+                  <p className="text-xs leading-relaxed" style={{ color: T2 }}>{group.desc}</p>
+                </div>
+                <p className="text-[10px] font-semibold uppercase tracking-widest mt-5"
+                   style={{ color: `${group.color}99` }}>
+                  {group.items.length} {group.items.length === 1 ? 'section' : 'sections'}
+                </p>
+              </div>
+
+              {/* Right: setting rows */}
+              <div className="rounded-2xl overflow-hidden bg-white flex flex-col"
+                   style={{ border: `1px solid ${SEP}`, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+                {group.items.map((t, i) => (
+                  <button
+                    key={t}
+                    onClick={() => navigate(`/admin/${TAB_SLUG[t]}`)}
+                    className="group flex-1 flex items-center gap-4 px-6 py-4 text-left transition-colors hover:bg-[#f9fafb]"
+                    style={i > 0 ? { borderTop: `1px solid ${SEP}` } : {}}
+                  >
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                         style={{ background: `${group.color}12` }}>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                           style={{ color: group.color }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d={TAB_ICONS[t]} />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold" style={{ color: T1 }}>{t}</p>
+                      <p className="text-xs mt-0.5" style={{ color: TM }}>{TAB_DESCRIPTIONS[t]}</p>
+                    </div>
+                    <svg className="w-4 h-4 shrink-0 transition-transform group-hover:translate-x-0.5"
+                         fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: TM }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                ))}
+              </div>
+
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Section view ─────────────────────────────────────────────────────────────
+  const groupColor = ADMIN_GROUPS.find(g => g.items.includes(tab))?.color ?? BR;
 
   return (
-    <div className="flex flex-1 overflow-hidden" style={{ background: '#eef2f7' }}>
+    <div className="flex-1 overflow-y-auto" style={{ background: '#f4f5f9' }}>
 
-      {/* Vertical tab sidebar */}
-      <div className="w-[200px] shrink-0 py-3" style={SIDE_S}>
-        <p className="text-[10px] uppercase tracking-wider px-4 mb-3 font-semibold" style={{ color: TM }}>Settings</p>
-        <nav className="space-y-0.5 px-2">
-          {TABS.map(t => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`w-full flex items-center gap-2.5 text-xs px-3 py-2 rounded-md text-left transition-colors ${
-                tab === t ? 'font-medium' : 'hover:bg-[#f3f4f6]'
-              }`}
-              style={tab === t ? { background: BRL, color: BR } : { color: T2 }}
-            >
-              <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={TAB_ICONS[t]} />
-              </svg>
-              {t}
-            </button>
-          ))}
-        </nav>
+      {/* Breadcrumb bar */}
+      <div className="sticky top-0 z-10 px-8 py-3 flex items-center gap-2"
+           style={{ background: 'rgba(244,245,249,0.9)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderBottom: `1px solid ${SEP}` }}>
+        <button
+          onClick={() => navigate('/admin')}
+          className="flex items-center gap-1.5 text-xs transition-opacity hover:opacity-70"
+          style={{ color: T2 }}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Admin
+        </button>
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: TM }}>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+        <span className="text-xs font-medium" style={{ color: T1 }}>{tab}</span>
       </div>
 
-      {/* Main content */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-5xl mx-auto p-6">
-          <div className="mb-6">
-            <h2 className="text-lg font-bold" style={{ color: T1 }}>{tab}</h2>
-            <p className="text-sm mt-0.5" style={{ color: T2 }}>
-              {tab === 'Agents'           ? 'Manage agent accounts, roles, and capacity.' :
-               tab === 'Roles'            ? 'Configure role permissions for dashboard access.' :
-               tab === 'Tags'             ? 'Manage global ticket tags available to all agents.' :
-               tab === 'Ticket Properties' ? 'Define dynamic properties for ticket classification, sub-categories, and group routing.' :
-               tab === 'Canned Responses' ? 'Pre-written replies for common customer scenarios.' :
-               tab === 'Assignment Rules' ? 'Configure routing logic per channel and category.' :
-               tab === 'SLA Targets'      ? 'Set SLA response and resolution time targets per tier.' :
-               tab === 'Report Settings'  ? 'Configure daily and weekly ticket report delivery channels.' :
-               'Configure bot persona, greeting, and fallback behavior.'}
-            </p>
-          </div>
-
-          {tab === 'Agents'           && <AgentsTab currentUser={currentUser} />}
-          {tab === 'Roles'            && <RolesTab currentUser={currentUser} />}
-          {tab === 'Tags'             && <TagsTab />}
-          {tab === 'Ticket Properties' && <TicketPropertiesTab />}
-          {tab === 'Canned Responses' && <CannedResponsesTab />}
-          {tab === 'Assignment Rules' && <AssignmentRulesTab />}
-          {tab === 'SLA Targets'      && <StubTab label="SLA Targets" description="Set SLA response and resolution time targets per tier: VIP 1 min · EA 3 min · Standard 10 min." />}
-          {tab === 'Bot Config'       && <StubTab label="Bot Config" description="Configure bot persona, greeting, fallback message, and business hours. Use Workflow Studio for flow editing." />}
-          {tab === 'Report Settings'  && <NotificationsTab />}
+      {/* Section header */}
+      <div className="px-8 pt-7 pb-5 flex items-center gap-4">
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
+             style={{ background: `${groupColor}18` }}>
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+               style={{ color: groupColor }}>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d={TAB_ICONS[tab]} />
+          </svg>
         </div>
+        <div>
+          <h1 className="text-xl font-bold" style={{ color: T1 }}>{tab}</h1>
+          <p className="text-sm mt-0.5" style={{ color: TM }}>{TAB_DESCRIPTIONS[tab]}</p>
+        </div>
+      </div>
+
+      {/* Tab content — full width */}
+      <div className="px-8 pb-8">
+        {tab === 'Agents'            && <AgentsTab currentUser={currentUser} />}
+        {tab === 'Roles'             && <RolesTab currentUser={currentUser} />}
+        {tab === 'Tags'              && <TagsTab />}
+        {tab === 'Ticket Properties' && <TicketPropertiesTab />}
+        {tab === 'Canned Responses'  && <CannedResponsesTab />}
+        {tab === 'Assignment Rules'  && <AssignmentRulesTab />}
+        {tab === 'SLA Targets'       && <StubTab label="SLA Targets" description="Set SLA response and resolution time targets per tier: VIP 1 min · EA 3 min · Standard 10 min." />}
+        {tab === 'Bot Config'        && <StubTab label="Bot Config" description="Configure bot persona, greeting, fallback message, and business hours. Use Workflow Studio for flow editing." />}
+        {tab === 'Announcements'     && <AnnouncementsTab />}
+        {tab === 'Report Settings'   && <NotificationsTab />}
       </div>
     </div>
   );
@@ -164,30 +294,61 @@ function AgentsTab({ currentUser }: { currentUser: AuthUser }) {
   };
 
   if (loading) return (
-    <div className="flex items-center gap-2 text-sm text-text-muted">
+    <div className="flex items-center gap-2" style={{ fontSize: 13, color: TM }}>
       <Spinner size="sm" /> Loading agents…
     </div>
   );
 
+  // ── Derived stats ────────────────────────────────────────────────────────────
+  const onlineCount = agents.filter(a => a.active !== false && (a.state ?? a.status) === 'Available').length;
+  const busyCount   = agents.filter(a => a.active !== false && (a.state ?? a.status) === 'Busy').length;
+  const uniqueRoles = [...new Set(agents.filter(a => a.active !== false).map(a => a.role).filter(Boolean))].length;
+
+  const ROLE_COLORS: Record<string, string> = {
+    super_admin: '#8b5cf6', admin: BR, supervisor: '#0ea5e9', agent: '#10b981',
+  };
+  const getRoleColor = (role: string) => ROLE_COLORS[role] ?? BR;
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
-      <div className="flex items-center justify-between">
-        <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer select-none">
-          <div
-            onClick={toggleInactive}
-            className={`w-8 h-4.5 rounded-full transition-colors cursor-pointer relative ${showInactive ? 'bg-brand' : 'bg-surface-4'}`}
-            style={{ height: 18 }}
-          >
-            <div className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white shadow transition-transform ${showInactive ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+      {/* Stats strip */}
+      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+        {([
+          { label: 'Total Agents', value: agents.length,  icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z', color: BR },
+          { label: 'Available',    value: onlineCount,     icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',  color: '#10b981' },
+          { label: 'Busy',         value: busyCount,       icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',   color: '#f59e0b' },
+          { label: 'Roles',        value: uniqueRoles,     icon: 'M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z', color: '#0ea5e9' },
+        ] as { label: string; value: number; icon: string; color: string }[]).map(s => (
+          <div key={s.label} className="rounded-2xl bg-white flex items-center gap-4 px-5 py-4"
+               style={{ border: `1px solid ${SEP}`, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${s.color}14` }}>
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: s.color, width: 18, height: 18 }}>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d={s.icon} />
+              </svg>
+            </div>
+            <div>
+              <p style={{ fontSize: 22, fontWeight: 700, color: T1, lineHeight: 1 }}>{s.value}</p>
+              <p style={{ fontSize: 11, color: TM, marginTop: 3 }}>{s.label}</p>
+            </div>
           </div>
-          Show inactive agents
+        ))}
+      </div>
+
+      {/* Toolbar */}
+      <div className="flex items-center justify-between">
+        <label className="flex items-center gap-2.5 cursor-pointer select-none">
+          <div onClick={toggleInactive} className="relative cursor-pointer shrink-0"
+               style={{ width: 32, height: 18, borderRadius: 9, background: showInactive ? BR : '#d1d5db', transition: 'background 0.2s' }}>
+            <div style={{ position: 'absolute', top: 2, left: showInactive ? 14 : 2, width: 14, height: 14, borderRadius: '50%', background: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'left 0.15s' }} />
+          </div>
+          <span style={{ fontSize: 12, color: T2 }}>Show inactive agents</span>
         </label>
-        <button
-          onClick={() => setShowAdd(true)}
-          className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-brand hover:bg-brand-dim text-white rounded-md transition-colors"
-        >
+        <button onClick={() => setShowAdd(true)} className="flex items-center gap-1.5"
+          style={{ fontSize: 12, fontWeight: 600, padding: '7px 16px', background: BR, color: 'white', borderRadius: 10, border: 'none', cursor: 'pointer' }}
+          onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+          onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
           </svg>
@@ -195,78 +356,114 @@ function AgentsTab({ currentUser }: { currentUser: AuthUser }) {
         </button>
       </div>
 
-      <div className="bg-surface-2 ring-1 ring-surface-5 rounded-lg overflow-hidden">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="border-b border-surface-5">
-              {['', 'Name', 'Email', 'Role', 'State', 'Chats', 'Skills', 'Actions'].map(h => (
-                <th key={h} className="text-left text-[10px] font-semibold text-text-muted uppercase tracking-wide px-3 py-2.5">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-surface-5">
-            {agents.length === 0 && (
-              <tr>
-                <td colSpan={8} className="px-4 py-6 text-center text-sm text-text-muted">No agents found</td>
-              </tr>
-            )}
-            {agents.map(a => {
-              const state    = a.state ?? a.status ?? 'Offline';
-              const active   = a.active_chats ?? a.active_conversation_count ?? 0;
-              const max      = a.max_chats ?? a.max_capacity ?? 3;
-              const isInactive = a.active === false;
-              const stateColor = state === 'Available' ? 'bg-accent-green' : state === 'Offline' ? 'bg-text-muted' : 'bg-accent-amber';
-              return (
-                <tr key={a.id} className={`transition-colors ${isInactive ? 'opacity-50' : 'hover:bg-surface-3'}`}>
-                  <td className="px-3 py-2.5">
-                    <button onClick={() => setAvatarAgent(a)} className="relative group" title="Change avatar">
-                      <Avatar name={a.name} size="sm" src={a.avatar_url ?? undefined} />
-                      <span className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                        <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                      </span>
-                    </button>
-                  </td>
-                  <td className="px-3 py-2.5">
+      {/* Agent card grid */}
+      {agents.length === 0 ? (
+        <div className="rounded-2xl bg-white flex flex-col items-center justify-center py-16"
+             style={{ border: `1px solid ${SEP}` }}>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: 40, height: 40, color: TM, opacity: 0.3, marginBottom: 12 }}>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          <p style={{ fontSize: 13, color: TM }}>No agents found</p>
+        </div>
+      ) : (
+        <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
+          {agents.map(a => {
+            const state      = a.state ?? a.status ?? 'Offline';
+            const active     = a.active_chats ?? a.active_conversation_count ?? 0;
+            const max        = a.max_chats ?? a.max_capacity ?? 3;
+            const isInactive = a.active === false;
+            const stateColor = state === 'Available' ? '#10b981' : state === 'Offline' ? '#9ca3af' : '#f59e0b';
+            const rc         = getRoleColor(a.role ?? '');
+            const utilPct    = Math.min(100, Math.round((active / Math.max(1, max)) * 100));
+
+            return (
+              <div key={a.id} className="rounded-2xl bg-white flex flex-col overflow-hidden"
+                   style={{ border: `1px solid ${SEP}`, boxShadow: '0 1px 6px rgba(0,0,0,0.05)', opacity: isInactive ? 0.55 : 1 }}>
+
+                {/* Top — gradient band with avatar */}
+                <div className="relative flex flex-col items-center pb-4 pt-5"
+                     style={{ background: `linear-gradient(145deg, ${rc}18 0%, ${rc}08 100%)`, borderBottom: `1px solid ${rc}18` }}>
+                  {isInactive && (
+                    <span className="absolute top-3 right-3"
+                          style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.05em', background: `${BR}15`, color: BR, padding: '2px 7px', borderRadius: 20 }}>
+                      INACTIVE
+                    </span>
+                  )}
+                  <button onClick={() => setAvatarAgent(a)} className="relative group mb-3" title="Change avatar"
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                    <Avatar name={a.name} size="lg" src={a.avatar_url ?? undefined} />
+                    <span className="absolute inset-0 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          style={{ background: 'rgba(0,0,0,0.45)' }}>
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: 16, height: 16, color: 'white' }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    </span>
+                  </button>
+                  <p style={{ fontSize: 14, fontWeight: 700, color: T1, textAlign: 'center' }}>{a.name}</p>
+                  <span className="mt-1.5"
+                        style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'capitalize', background: `${rc}18`, color: rc, padding: '3px 10px', borderRadius: 20 }}>
+                    {a.role ?? 'agent'}
+                  </span>
+                </div>
+
+                {/* Body */}
+                <div className="flex flex-col gap-3 px-4 py-4 flex-1">
+                  {/* Status + email */}
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
-                      <span className="font-medium text-text-primary">{a.name}</span>
-                      {isInactive && <span className="text-[9px] bg-brand/10 text-brand px-1.5 py-0.5 rounded-full">Inactive</span>}
+                      <div style={{ width: 7, height: 7, borderRadius: '50%', background: stateColor, flexShrink: 0 }} />
+                      <span style={{ fontSize: 12, color: T2 }}>{state}</span>
                     </div>
-                  </td>
-                  <td className="px-3 py-2.5 text-text-secondary">{a.email ?? '—'}</td>
-                  <td className="px-3 py-2.5 text-text-secondary capitalize">{a.role ?? '—'}</td>
-                  <td className="px-3 py-2.5">
-                    <div className="flex items-center gap-1.5">
-                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${stateColor}`} />
-                      <span className="text-text-secondary">{state}</span>
+                    <span style={{ fontSize: 11, color: TM, maxWidth: 90, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {a.email?.split('@')[0] ?? '—'}
+                    </span>
+                  </div>
+
+                  {/* Capacity bar */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span style={{ fontSize: 10, color: TM }}>Chat capacity</span>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: T2 }}>{active} / {max}</span>
                     </div>
-                  </td>
-                  <td className="px-3 py-2.5 font-mono text-text-secondary tabular-nums">{active}/{max}</td>
-                  <td className="px-3 py-2.5">
-                    <div className="flex gap-1 flex-wrap">
+                    <div style={{ height: 4, borderRadius: 4, background: '#f0f0f0', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${utilPct}%`, borderRadius: 4, background: utilPct > 80 ? '#ef4444' : utilPct > 50 ? '#f59e0b' : '#10b981', transition: 'width 0.4s' }} />
+                    </div>
+                  </div>
+
+                  {/* Skills */}
+                  {(a.skills ?? []).length > 0 && (
+                    <div className="flex flex-wrap gap-1">
                       {(a.skills ?? []).map(s => (
-                        <span key={s} className="text-[9px] bg-surface-4 text-text-muted px-1.5 py-0.5 rounded">{s}</span>
+                        <span key={s} style={{ fontSize: 10, background: '#f3f4f6', color: TM, padding: '2px 7px', borderRadius: 5 }}>{s}</span>
                       ))}
                     </div>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => setEditAgent(a)} className="text-[10px] text-brand hover:text-brand-dim transition-colors">Edit</button>
-                      <button onClick={() => setResetAgent(a)} className="text-[10px] text-text-muted hover:text-text-secondary transition-colors">Reset PW</button>
-                      {isInactive
-                        ? <button onClick={() => handleReactivate(a)} className="text-[10px] text-accent-green hover:opacity-70 transition-opacity">Reactivate</button>
-                        : <button onClick={() => handleDeactivate(a)} className="text-[10px] text-brand hover:opacity-70 transition-opacity">Deactivate</button>
-                      }
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                  )}
+                </div>
+
+                {/* Action footer */}
+                <div className="flex" style={{ borderTop: `1px solid ${SEP}` }}>
+                  {([
+                    { label: 'Edit',      color: BR,        fn: () => setEditAgent(a) },
+                    { label: 'Reset PW',  color: TM,        fn: () => setResetAgent(a) },
+                    isInactive
+                      ? { label: 'Reactivate', color: '#10b981', fn: () => handleReactivate(a) }
+                      : { label: 'Deactivate', color: '#ef4444', fn: () => handleDeactivate(a) },
+                  ] as { label: string; color: string; fn: () => void }[]).map((action, i, arr) => (
+                    <button key={action.label} onClick={action.fn}
+                      className="flex-1 py-2.5"
+                      style={{ fontSize: 11, fontWeight: 600, color: action.color, background: 'none', border: 'none', cursor: 'pointer', borderRight: i < arr.length - 1 ? `1px solid ${SEP}` : 'none', transition: 'background 0.12s' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#f9fafb')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                      {action.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {showAdd    && <AgentModal roles={getAllowedRoles(currentUser.role, roles)} onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); load(); }} />}
       {editAgent  && <AgentModal agent={editAgent} roles={getAllowedRoles(currentUser.role, roles)} onClose={() => setEditAgent(null)} onSaved={() => { setEditAgent(null); load(); }} />}
@@ -494,17 +691,19 @@ function PermChecklist({ available, selected, onChange }: { available: string[];
         return (
           <div key={g.label}>
             <div className="mb-2">
-              <p className="text-[10px] font-semibold text-text-secondary uppercase tracking-wider">{g.label}</p>
-              <p className="text-[10px] text-text-muted mt-0.5">{g.description}</p>
+              <p style={{ fontSize: 10, fontWeight: 700, color: T2, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{g.label}</p>
+              <p style={{ fontSize: 10, color: TM, marginTop: 2 }}>{g.description}</p>
             </div>
             <div className="space-y-0.5">
               {visible.map(p => {
                 const checked = selected.includes(p);
                 return (
-                  <label key={p} className={`flex items-center gap-3 px-3 py-2 cursor-pointer rounded-md transition-colors ${checked ? 'bg-brand-subtle' : 'hover:bg-surface-3'}`}>
-                    <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 transition-colors ring-1 ${
-                      checked ? 'bg-brand ring-brand' : 'bg-surface-2 ring-surface-5'
-                    }`}>
+                  <label key={p} className="flex items-center gap-3 px-3 py-2 cursor-pointer rounded-lg"
+                         style={{ background: checked ? `${BR}0d` : 'transparent', transition: 'background 0.12s' }}
+                         onMouseEnter={e => { if (!checked) (e.currentTarget as HTMLLabelElement).style.background = '#f9fafb'; }}
+                         onMouseLeave={e => { (e.currentTarget as HTMLLabelElement).style.background = checked ? `${BR}0d` : 'transparent'; }}>
+                    <div className="w-4 h-4 rounded flex items-center justify-center shrink-0"
+                         style={{ background: checked ? BR : 'white', border: `1.5px solid ${checked ? BR : '#d1d5db'}`, transition: 'all 0.12s' }}>
                       {checked && (
                         <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 8" fill="none">
                           <path d="M1 4l3 3 5-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -512,7 +711,7 @@ function PermChecklist({ available, selected, onChange }: { available: string[];
                       )}
                     </div>
                     <input type="checkbox" checked={checked} onChange={() => toggle(p)} className="sr-only" />
-                    <span className={`text-xs leading-none ${checked ? 'text-text-primary' : 'text-text-secondary'}`}>{PERM_LABELS[p] ?? p}</span>
+                    <span style={{ fontSize: 12, color: checked ? T1 : T2 }}>{PERM_LABELS[p] ?? p}</span>
                   </label>
                 );
               })}
@@ -594,15 +793,48 @@ function RolesTab({ currentUser: _ }: { currentUser: AuthUser }) {
     catch (e) { setError(e instanceof Error ? e.message : 'Failed to delete'); }
   };
 
-  if (loading) return <div className="flex items-center gap-2 text-sm text-text-muted"><Spinner size="sm" /> Loading roles…</div>;
+  if (loading) return (
+    <div className="flex items-center gap-2" style={{ fontSize: 13, color: TM }}>
+      <Spinner size="sm" /> Loading roles…
+    </div>
+  );
+
+  const getRoleAccent = (_name: string) => BR;
+
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
+      {/* Stats strip */}
+      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+        {([
+          { label: 'Total Roles',           value: roles.length,                            icon: 'M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z', color: BR },
+          { label: 'Preset',                value: roles.filter(r => r.is_preset).length,  icon: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z', color: '#0ea5e9' },
+          { label: 'Custom',                value: roles.filter(r => !r.is_preset).length, icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z', color: '#f59e0b' },
+          { label: 'Permissions Available', value: allPerms.length,                        icon: 'M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z', color: '#10b981' },
+        ] as { label: string; value: number; icon: string; color: string }[]).map(s => (
+          <div key={s.label} className="rounded-2xl bg-white flex items-center gap-4 px-5 py-4"
+               style={{ border: `1px solid ${SEP}`, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${s.color}14` }}>
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: s.color, width: 18, height: 18 }}>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d={s.icon} />
+              </svg>
+            </div>
+            <div>
+              <p style={{ fontSize: 22, fontWeight: 700, color: T1, lineHeight: 1 }}>{s.value}</p>
+              <p style={{ fontSize: 11, color: TM, marginTop: 3 }}>{s.label}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Toolbar */}
       <div className="flex justify-end">
-        <button onClick={() => setShowCreate(true)}
-          className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-brand hover:bg-brand-dim text-white rounded-md transition-colors">
+        <button onClick={() => setShowCreate(true)} className="flex items-center gap-1.5"
+          style={{ fontSize: 12, fontWeight: 600, padding: '7px 16px', background: BR, color: 'white', borderRadius: 10, border: 'none', cursor: 'pointer' }}
+          onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+          onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
           </svg>
@@ -610,75 +842,117 @@ function RolesTab({ currentUser: _ }: { currentUser: AuthUser }) {
         </button>
       </div>
 
-      <div className="bg-surface-2 ring-1 ring-surface-5 rounded-lg overflow-hidden">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="border-b border-surface-5">
-              {['Role', 'Display Name', 'Type', 'Permissions', ''].map(h => (
-                <th key={h} className="text-left text-[10px] font-semibold text-text-muted uppercase tracking-wide px-4 py-2.5">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-surface-5">
-            {roles.map(r => (
-              <>
-                <tr key={r.name} className="hover:bg-surface-3 transition-colors">
-                  <td className="px-4 py-2.5 font-mono font-medium text-text-primary">{r.name}</td>
-                  <td className="px-4 py-2.5 text-text-secondary">{r.display_name ?? '—'}</td>
-                  <td className="px-4 py-2.5">
-                    <span className={`text-[9px] px-2 py-0.5 rounded-full font-medium ${
-                      r.is_preset ? 'bg-brand/10 text-brand' : 'bg-surface-4 text-text-muted'
-                    }`}>
-                      {r.is_preset ? 'Preset' : 'Custom'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <button
-                      onClick={() => setExpanded(expanded === r.name ? null : r.name)}
-                      className="text-[10px] text-brand hover:text-brand-dim transition-colors"
-                    >
-                      {r.permissions?.length ?? 0} {(r.permissions?.length ?? 0) === 1 ? 'permission' : 'permissions'}
-                    </button>
-                  </td>
-                  <td className="px-4 py-2.5 text-right">
-                    <div className="flex items-center justify-end gap-3">
-                      {!r.is_preset && <button onClick={() => setEditing(r)} className="text-[10px] text-brand hover:text-brand-dim transition-colors">Edit</button>}
-                      {!r.is_preset && <button onClick={() => remove(r.name)} className="text-[10px] text-text-muted hover:text-brand transition-colors">Delete</button>}
-                    </div>
-                  </td>
-                </tr>
-                {expanded === r.name && (
-                  <tr key={`${r.name}-exp`}>
-                    <td colSpan={5} className="px-6 py-4 bg-surface-3">
-                      {(r.permissions?.length ?? 0) === 0 ? (
-                        <span className="text-xs text-text-muted italic">No permissions assigned</span>
-                      ) : (
-                        <div className="space-y-3">
-                          {PERM_GROUPS.map(g => {
-                            const active = g.perms.filter(p => r.permissions!.includes(p));
-                            if (!active.length) return null;
-                            return (
-                              <div key={g.label}>
-                                <p className="text-[9px] font-semibold text-text-muted uppercase tracking-wider mb-1.5">{g.label}</p>
-                                <div className="flex flex-wrap gap-1">
-                                  {active.map(p => (
-                                    <span key={p} className="text-[10px] px-2 py-0.5 bg-surface-2 ring-1 ring-surface-5 rounded text-text-secondary">
-                                      {PERM_LABELS[p] ?? p}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            );
-                          })}
+      {/* Role list */}
+      <div className="rounded-2xl bg-white overflow-hidden" style={{ border: `1px solid ${SEP}`, boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
+        {roles.map((r, idx) => {
+          const rc     = getRoleAccent(r.name);
+          const perms  = r.permissions ?? [];
+          const isOpen = expanded === r.name;
+          const groupCounts = PERM_GROUPS
+            .map(g => ({ label: g.label, count: g.perms.filter(p => perms.includes(p)).length }))
+            .filter(g => g.count > 0);
+
+          return (
+            <div key={r.name} style={{ borderTop: idx > 0 ? `1px solid ${SEP}` : 'none' }}>
+
+              {/* Row */}
+              <div className="flex items-center gap-4"
+                   style={{ paddingLeft: 0, paddingRight: 20, paddingTop: 14, paddingBottom: 14, transition: 'background 0.12s' }}
+                   onMouseEnter={e => { if (!isOpen) (e.currentTarget as HTMLDivElement).style.background = '#fafafa'; }}
+                   onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}>
+
+                {/* Color rail */}
+                <div style={{ width: 3, alignSelf: 'stretch', borderRadius: '0 3px 3px 0', background: rc, flexShrink: 0, marginRight: 4 }} />
+
+                {/* Identity */}
+                <div style={{ minWidth: 160 }}>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: T1 }}>{r.name}</p>
+                  {r.display_name
+                    ? <p style={{ fontSize: 11, color: TM, marginTop: 1 }}>{r.display_name}</p>
+                    : <p style={{ fontSize: 11, color: 'transparent', marginTop: 1 }}>—</p>
+                  }
+                </div>
+
+                {/* Permission group chips */}
+                <div className="flex flex-wrap gap-1.5 flex-1">
+                  {groupCounts.length === 0
+                    ? <span style={{ fontSize: 11, color: TM, fontStyle: 'italic' }}>No permissions</span>
+                    : groupCounts.map(g => (
+                        <span key={g.label} style={{ fontSize: 10, fontWeight: 500, background: '#f3f4f6', color: T2, padding: '3px 9px', borderRadius: 20 }}>
+                          {g.label}
+                          <span style={{ fontWeight: 700, color: TM, marginLeft: 4 }}>{g.count}</span>
+                        </span>
+                      ))
+                  }
+                </div>
+
+                {/* Type badge */}
+                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', flexShrink: 0,
+                  background: r.is_preset ? `${BR}12` : '#fef3c7',
+                  color: r.is_preset ? BR : '#b45309',
+                  padding: '3px 9px', borderRadius: 20 }}>
+                  {r.is_preset ? 'Preset' : 'Custom'}
+                </span>
+
+                {/* Actions */}
+                <div className="flex items-center gap-1 shrink-0">
+                  {!r.is_preset && (
+                    <>
+                      <button onClick={() => setEditing(r)}
+                        style={{ fontSize: 11, fontWeight: 600, color: BR, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: 6, transition: 'background 0.12s' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = `${BR}10`)}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'none')}>Edit</button>
+                      <button onClick={() => remove(r.name)}
+                        style={{ fontSize: 11, fontWeight: 600, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: 6, transition: 'background 0.12s' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#fef2f2')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'none')}>Delete</button>
+                    </>
+                  )}
+                  {r.is_preset && (
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: 14, height: 14, color: TM, marginRight: 4 }} title="Protected — cannot be edited">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                    </svg>
+                  )}
+                  <button onClick={() => setExpanded(isOpen ? null : r.name)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px', borderRadius: 6, color: TM, transition: 'background 0.12s, color 0.12s' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#f3f4f6'; e.currentTarget.style.color = T1; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = TM; }}>
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: 14, height: 14, transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Expanded permission matrix */}
+              {isOpen && (
+                <div style={{ borderTop: `1px solid ${SEP}`, background: '#fafafa', padding: '16px 20px 16px 27px' }}>
+                  <div className="grid gap-x-6 gap-y-4" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                    {PERM_GROUPS.map(g => {
+                      const active = g.perms.filter(p => perms.includes(p));
+                      if (!active.length) return null;
+                      return (
+                        <div key={g.label}>
+                          <p style={{ fontSize: 10, fontWeight: 700, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 7 }}>
+                            {g.label}
+                            <span style={{ fontWeight: 500, marginLeft: 5, color: TM, opacity: 0.6 }}>{active.length}/{g.perms.length}</span>
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            {active.map(p => (
+                              <span key={p} style={{ fontSize: 10, background: `${rc}12`, color: rc, padding: '2px 8px', borderRadius: 5, fontWeight: 500 }}>
+                                {PERM_LABELS[p] ?? p}
+                              </span>
+                            ))}
+                          </div>
                         </div>
-                      )}
-                    </td>
-                  </tr>
-                )}
-              </>
-            ))}
-          </tbody>
-        </table>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {showCreate && <RoleModal allPermissions={allPerms} onSave={handleCreate} onClose={() => setShowCreate(false)} />}
@@ -690,8 +964,9 @@ function RolesTab({ currentUser: _ }: { currentUser: AuthUser }) {
 // ── Tags tab ──────────────────────────────────────────────────────────────────
 
 function TagsTab() {
-  const [tags, setTags]     = useState<string[]>([]);
-  const [newTag, setNewTag] = useState('');
+  const [tags, setTags]         = useState<string[]>([]);
+  const [newTag, setNewTag]     = useState('');
+  const [hoveredTag, setHoveredTag] = useState<string | null>(null);
 
   useEffect(() => { api.getTags().then(setTags).catch(() => {}); }, []);
 
@@ -707,39 +982,93 @@ function TagsTab() {
     if (updated) setTags(updated);
   };
 
+  const compound = tags.filter(t => t.includes('_')).length;
+  const simple   = tags.filter(t => !t.includes('_')).length;
+
   return (
-    <div className="space-y-4">
-      <div className="bg-surface-2 ring-1 ring-surface-5 rounded-lg p-4 space-y-4">
-        <div className="flex gap-2">
+    <div className="space-y-5">
+
+      {/* Stats strip */}
+      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+        {([
+          { label: 'Total Tags',     value: tags.length, icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z', color: BR },
+          { label: 'Compound Tags',  value: compound,    icon: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1', color: '#0ea5e9' },
+          { label: 'Simple Tags',    value: simple,      icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', color: '#10b981' },
+        ] as { label: string; value: number; icon: string; color: string }[]).map(s => (
+          <div key={s.label} className="rounded-2xl bg-white flex items-center gap-4 px-5 py-4"
+               style={{ border: `1px solid ${SEP}`, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${s.color}14` }}>
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: s.color, width: 18, height: 18 }}>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d={s.icon} />
+              </svg>
+            </div>
+            <div>
+              <p style={{ fontSize: 22, fontWeight: 700, color: T1, lineHeight: 1 }}>{s.value}</p>
+              <p style={{ fontSize: 11, color: TM, marginTop: 3 }}>{s.label}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Add tag input */}
+      <div className="rounded-2xl bg-white px-5 py-4 flex gap-3 items-center"
+           style={{ border: `1px solid ${SEP}`, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+        <div style={{ position: 'relative', flex: 1 }}>
+          <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: TM, fontSize: 13, pointerEvents: 'none' }}>#</span>
           <input
             value={newTag}
             onChange={e => setNewTag(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && add()}
-            placeholder="New tag (e.g. billing, urgent)…"
-            className={ADMIN_INPUT}
+            placeholder="new-tag or compound_tag…"
+            style={{ ...ADMIN_INPUT_STYLE, paddingLeft: 24 }}
+            onFocus={e => (e.currentTarget.style.borderColor = BR)}
+            onBlur={e => (e.currentTarget.style.borderColor = 'rgba(0,0,0,0.10)')}
           />
-          <button onClick={add} className="text-xs px-4 py-1.5 bg-brand hover:bg-brand-dim text-white rounded-md transition-colors whitespace-nowrap">
-            Add Tag
-          </button>
         </div>
+        <button onClick={add}
+          style={{ fontSize: 12, fontWeight: 600, padding: '7px 18px', background: BR, color: 'white', borderRadius: 10, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+          onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+          onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
+          Add Tag
+        </button>
+      </div>
 
-        {tags.length === 0
-          ? <p className="text-sm text-text-muted">No tags yet. Add your first tag above.</p>
-          : (
-            <div className="flex flex-wrap gap-2">
-              {tags.map(t => (
-                <span key={t} className="flex items-center gap-1.5 text-xs bg-surface-3 ring-1 ring-surface-5 text-text-secondary px-2.5 py-1 rounded-full">
-                  {t}
-                  <button onClick={() => remove(t)} className="text-text-muted hover:text-brand transition-colors leading-none">
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                  </button>
-                </span>
-              ))}
-            </div>
-          )
-        }
+      {/* Tag list */}
+      <div className="rounded-2xl bg-white px-5 py-5"
+           style={{ border: `1px solid ${SEP}`, boxShadow: '0 1px 4px rgba(0,0,0,0.04)', minHeight: 80 }}>
+        {tags.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 gap-2">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: 32, height: 32, color: TM, opacity: 0.5 }}>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
+            </svg>
+            <p style={{ fontSize: 13, color: TM }}>No tags yet — add your first one above.</p>
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {tags.map(t => (
+              <div key={t}
+                   className="flex items-center gap-1.5"
+                   onMouseEnter={() => setHoveredTag(t)}
+                   onMouseLeave={() => setHoveredTag(null)}
+                   style={{
+                     fontSize: 12, fontWeight: 500, color: T2,
+                     background: hoveredTag === t ? `${BR}08` : '#f4f5f7',
+                     border: `1px solid ${hoveredTag === t ? `${BR}30` : 'transparent'}`,
+                     padding: '5px 10px 5px 9px', borderRadius: 20,
+                     transition: 'all 0.15s', cursor: 'default',
+                   }}>
+                <span style={{ color: hoveredTag === t ? BR : TM, fontSize: 11, fontWeight: 600 }}>#</span>
+                <span>{t}</span>
+                <button onClick={() => remove(t)}
+                  style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: hoveredTag === t ? '#ef4444' : TM, transition: 'color 0.15s', marginLeft: 2 }}>
+                  <svg width={12} height={12} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -899,9 +1228,9 @@ const CATEGORY_LABELS: Record<string, string> = {
 const KNOWN_TEAMS = ['cs', 'kyc', 'withdrawals', 'fraud'];
 
 const SLA_META = [
-  { priority: '1', label: 'VIP (Priority 1)',      badge: 'bg-accent-red/10 text-accent-red' },
-  { priority: '2', label: 'Elevated (Priority 2)', badge: 'bg-accent-amber/10 text-accent-amber' },
-  { priority: '3', label: 'Standard (Priority 3)', badge: 'bg-surface-4 text-text-muted' },
+  { priority: '1', label: 'VIP (Priority 1)',      color: '#ef4444' },
+  { priority: '2', label: 'Elevated (Priority 2)', color: '#f59e0b' },
+  { priority: '3', label: 'Standard (Priority 3)', color: '#9ca3af' },
 ];
 
 function Toggle({ on, onToggle, saving }: { on: boolean; onToggle: () => void; saving?: boolean }) {
@@ -909,27 +1238,49 @@ function Toggle({ on, onToggle, saving }: { on: boolean; onToggle: () => void; s
     <button
       onClick={onToggle}
       disabled={saving}
-      className={`w-8 rounded-full relative shrink-0 transition-colors focus:outline-none ${on ? 'bg-brand' : 'bg-surface-4'} ${saving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-      style={{ height: 18 }}
+      style={{
+        width: 44, height: 26, borderRadius: 13,
+        background: on ? BR : '#d1d5db',
+        border: 'none', padding: 0,
+        cursor: saving ? 'not-allowed' : 'pointer',
+        position: 'relative', flexShrink: 0,
+        transition: 'background 0.22s',
+        opacity: saving ? 0.5 : 1,
+        display: 'inline-block',
+        boxShadow: on ? `0 0 0 3px ${BR}22` : 'none',
+      }}
     >
-      <div className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white shadow transition-transform ${on ? 'right-0.5' : 'left-0.5'}`} />
+      <div style={{
+        position: 'absolute', top: 3,
+        left: on ? 21 : 3,
+        width: 20, height: 20, borderRadius: '50%',
+        background: 'white',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.22)',
+        transition: 'left 0.18s',
+      }} />
     </button>
   );
 }
 
 function RuleCard({ title, subtitle, editable, children }: { title: string; subtitle: string; editable?: boolean; children: React.ReactNode }) {
   return (
-    <div className="bg-surface-2 ring-1 ring-surface-5 rounded-lg overflow-hidden">
-      <div className="px-4 py-3 border-b border-surface-5 flex items-start justify-between gap-4">
+    <div className="rounded-2xl bg-white overflow-hidden"
+         style={{ border: '1px solid rgba(0,0,0,0.07)', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+      <div className="flex items-start justify-between gap-4"
+           style={{ padding: '20px 24px 18px', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
         <div>
-          <p className="text-xs font-semibold text-text-primary">{title}</p>
-          <p className="text-[11px] text-text-muted mt-0.5">{subtitle}</p>
+          <p style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: '-0.01em' }}>{title}</p>
+          <p style={{ fontSize: 12, color: TM, marginTop: 4, lineHeight: 1.55 }}>{subtitle}</p>
         </div>
-        <span className={`text-[9px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wide shrink-0 mt-0.5 ${editable ? 'bg-brand/10 text-brand' : 'bg-surface-3 text-text-muted'}`}>
-          {editable ? 'Editable' : 'System'}
-        </span>
+        {!editable && (
+          <svg width={15} height={15} fill="none" stroke="currentColor" viewBox="0 0 24 24"
+               style={{ color: TM, flexShrink: 0, marginTop: 3 }}>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+          </svg>
+        )}
       </div>
-      <div className="p-4">{children}</div>
+      <div>{children}</div>
     </div>
   );
 }
@@ -1028,25 +1379,28 @@ function AssignmentRulesTab() {
   const slaDirty   = isDirty('sla_minutes');
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+
+      {/* Toast */}
       {toast && (
-        <div className={`fixed bottom-4 right-4 z-50 flex items-start gap-2.5 px-4 py-3 rounded-lg shadow-lg max-w-sm ring-1 text-xs leading-relaxed ${
-          toast.type === 'error'
-            ? 'bg-red-950/90 ring-red-800/60 text-red-200'
-            : 'bg-surface-1 ring-surface-5 text-text-primary'
-        }`}>
+        <div className="fixed bottom-4 right-4 z-50 flex items-start gap-2.5 px-4 py-3 rounded-2xl shadow-xl max-w-sm text-xs leading-relaxed"
+             style={{
+               background: toast.type === 'error' ? '#450a0a' : 'white',
+               border: `1px solid ${toast.type === 'error' ? 'rgba(239,68,68,0.3)' : SEP}`,
+               color: toast.type === 'error' ? '#fca5a5' : T1,
+             }}>
           {toast.type === 'error' ? (
-            <svg className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg width={14} height={14} fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#f87171', flexShrink: 0, marginTop: 1 }}>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3.75m9.303 3.376c.866 1.5-.217 3.374-1.948 3.374H4.645c-1.73 0-2.813-1.874-1.948-3.374L10.052 3.378c.866-1.5 3.032-1.5 3.898 0L21.303 16.126zM12 15.75h.007v.008H12v-.008z" />
             </svg>
           ) : (
-            <svg className="w-3.5 h-3.5 text-accent-green shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg width={14} height={14} fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#10b981', flexShrink: 0, marginTop: 1 }}>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           )}
-          <span>{toast.msg}</span>
-          <button onClick={() => setToast(null)} className="ml-auto shrink-0 opacity-50 hover:opacity-100 transition-opacity">
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <span style={{ flex: 1 }}>{toast.msg}</span>
+          <button onClick={() => setToast(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.5, flexShrink: 0, padding: 0 }}>
+            <svg width={12} height={12} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -1055,21 +1409,19 @@ function AssignmentRulesTab() {
 
       {/* Confirmation modal */}
       {confirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-surface-1 ring-1 ring-surface-5 rounded-xl shadow-modal w-full max-w-sm mx-4 p-6">
-            <h3 className="text-sm font-semibold text-text-primary mb-1">{confirm.title}</h3>
-            <p className="text-xs text-text-secondary leading-relaxed mb-5">{confirm.description}</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}>
+          <div className="w-full max-w-sm mx-4 rounded-2xl bg-white p-6" style={{ border: `1px solid ${SEP}`, boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
+            <p style={{ fontSize: 14, fontWeight: 700, color: T1, marginBottom: 6 }}>{confirm.title}</p>
+            <p style={{ fontSize: 12, color: T2, lineHeight: 1.6, marginBottom: 20 }}>{confirm.description}</p>
             <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => setConfirm(null)}
-                className="text-xs px-3 py-1.5 rounded-md bg-surface-3 hover:bg-surface-4 text-text-secondary transition-colors"
-              >
+              <button onClick={() => setConfirm(null)}
+                style={{ fontSize: 12, fontWeight: 500, padding: '6px 14px', borderRadius: 10, border: `1px solid ${SEP}`, background: '#f3f4f6', color: T2, cursor: 'pointer' }}>
                 Cancel
               </button>
-              <button
-                onClick={confirm.onConfirm}
-                className="text-xs px-3 py-1.5 rounded-md bg-brand hover:bg-brand-dim text-white transition-colors"
-              >
+              <button onClick={confirm.onConfirm}
+                style={{ fontSize: 12, fontWeight: 600, padding: '6px 16px', borderRadius: 10, border: 'none', background: BR, color: 'white', cursor: 'pointer' }}
+                onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+                onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
                 Apply Change
               </button>
             </div>
@@ -1077,35 +1429,60 @@ function AssignmentRulesTab() {
         </div>
       )}
 
+      {/* Stats strip */}
+      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+        {([
+          { label: 'Categories Routed', value: Object.keys(draft.category_team_map).length, icon: 'M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7', color: '#0ea5e9' },
+          { label: 'Sticky Window',     value: `${draft.sticky_agent_hours}h`,              icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', color: '#f59e0b' },
+          { label: 'VIP Priority',      value: draft.vip_auto_priority1 ? 'On' : 'Off',    icon: 'M5 3l14 9-14 9V3z', color: draft.vip_auto_priority1 ? '#10b981' : TM },
+          { label: 'SLA Tiers',         value: Object.keys(draft.sla_minutes).length,      icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', color: BR },
+        ] as { label: string; value: string | number; icon: string; color: string }[]).map(s => (
+          <div key={s.label} className="rounded-2xl bg-white flex items-center gap-4 px-5 py-4"
+               style={{ border: `1px solid ${SEP}`, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${s.color}14` }}>
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: s.color, width: 18, height: 18 }}>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d={s.icon} />
+              </svg>
+            </div>
+            <div>
+              <p style={{ fontSize: 22, fontWeight: 700, color: T1, lineHeight: 1 }}>{s.value}</p>
+              <p style={{ fontSize: 11, color: TM, marginTop: 3 }}>{s.label}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* Category → Team routing */}
       <RuleCard editable title="Category → Team Routing" subtitle="Tickets are routed to a team based on their category. Unmatched categories fall back to CS.">
-        <table className="w-full text-xs mb-4">
+        <table className="w-full mb-4" style={{ fontSize: 12, borderCollapse: 'collapse' }}>
           <thead>
-            <tr className="border-b border-surface-5">
+            <tr style={{ borderBottom: `1px solid ${SEP}` }}>
               {['Category', 'Routed To'].map(h => (
-                <th key={h} className="text-left text-[10px] font-semibold text-text-muted uppercase tracking-wide pb-2 pr-4">{h}</th>
+                <th key={h} style={{ textAlign: 'left', fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.05em', paddingBottom: 8, paddingRight: 16 }}>{h}</th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-surface-5">
-            {Object.entries(draft.category_team_map).map(([cat, team]) => (
-              <tr key={cat} className="hover:bg-surface-3 transition-colors">
-                <td className="py-2 pr-4 text-text-primary font-medium">{CATEGORY_LABELS[cat] ?? cat}</td>
-                <td className="py-2">
+          <tbody>
+            {Object.entries(draft.category_team_map).map(([cat, team], i, arr) => (
+              <tr key={cat} style={{ borderBottom: i < arr.length - 1 ? `1px solid ${SEP}` : 'none' }}>
+                <td style={{ padding: '9px 16px 9px 0', color: T1, fontWeight: 500 }}>{CATEGORY_LABELS[cat] ?? cat}</td>
+                <td style={{ padding: '9px 0' }}>
                   <select
                     value={team}
                     disabled={saving === 'category_team_map'}
                     onChange={e => setDraft(d => d ? { ...d, category_team_map: { ...d.category_team_map, [cat]: e.target.value } } : d)}
-                    className="text-xs bg-surface-3 border border-surface-5 text-text-primary rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-brand"
+                    style={{ fontSize: 12, background: '#f4f5f7', border: `1px solid ${SEP}`, color: T1, borderRadius: 8, padding: '4px 10px', outline: 'none' }}
                   >
                     {KNOWN_TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </td>
               </tr>
             ))}
-            <tr className="opacity-50">
-              <td className="py-2 pr-4 text-text-secondary italic">All other categories</td>
-              <td className="py-2"><span className="px-2 py-0.5 rounded-full bg-surface-4 text-text-muted text-[11px]">cs (fallback)</span></td>
+            <tr style={{ opacity: 0.45 }}>
+              <td style={{ padding: '9px 16px 0 0', color: T2, fontStyle: 'italic' }}>All other categories</td>
+              <td style={{ padding: '9px 0 0 0' }}>
+                <span style={{ fontSize: 11, background: '#f3f4f6', color: TM, padding: '3px 10px', borderRadius: 20 }}>cs (fallback)</span>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -1123,21 +1500,20 @@ function AssignmentRulesTab() {
 
       {/* Agent Routing Strategy — system locked */}
       <RuleCard title="Agent Routing Strategy" subtitle="Controls how tickets are distributed to available agents within a team.">
-        <div className="space-y-0">
+        <div>
           {[
             { label: 'Round-Robin (FR-02)', badge: 'Least recently used', desc: 'Ticket goes to the Available agent with the oldest last-assignment time who is under capacity.' },
             { label: 'Queue Fallback',      badge: 'Priority-aware',      desc: 'If no agent is available the ticket is queued. VIP tickets go to the front, others to the back.' },
-          ].map(r => (
-            <div key={r.label} className="flex gap-3 py-2.5 border-b border-surface-5 last:border-0">
-              <div className="w-8 shrink-0 rounded-full bg-brand relative mt-0.5" style={{ height: 18 }}>
-                <div className="absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-white shadow" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-xs font-medium text-text-primary">{r.label}</span>
-                  <span className="text-[9px] bg-surface-3 text-text-muted px-1.5 py-0.5 rounded">{r.badge}</span>
+          ].map((r, i, arr) => (
+            <div key={r.label} className="flex gap-3"
+                 style={{ padding: '10px 0', borderBottom: i < arr.length - 1 ? `1px solid ${SEP}` : 'none' }}>
+              <Toggle on saving={false} onToggle={() => {}} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="flex items-center gap-2" style={{ marginBottom: 3 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: T1 }}>{r.label}</span>
+                  <span style={{ fontSize: 9, fontWeight: 500, background: '#f3f4f6', color: TM, padding: '2px 7px', borderRadius: 20 }}>{r.badge}</span>
                 </div>
-                <p className="text-[11px] text-text-muted leading-relaxed">{r.desc}</p>
+                <p style={{ fontSize: 11, color: TM, lineHeight: 1.55 }}>{r.desc}</p>
               </div>
             </div>
           ))}
@@ -1147,11 +1523,9 @@ function AssignmentRulesTab() {
       {/* Sticky Agent */}
       <RuleCard editable title="Sticky Agent (FR-04)" subtitle="Re-assigns returning customers to the same agent if they return within the configured window and the agent is available.">
         <div className="flex items-center gap-4 mb-4">
-          <div className="w-8 shrink-0 rounded-full bg-brand relative" style={{ height: 18 }}>
-            <div className="absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-white shadow" />
-          </div>
+          <Toggle on saving={false} onToggle={() => {}} />
           <div className="flex items-center gap-2">
-            <span className="text-xs text-text-secondary">Return window:</span>
+            <span style={{ fontSize: 12, color: T2 }}>Return window:</span>
             <input
               type="number"
               min={1}
@@ -1159,9 +1533,11 @@ function AssignmentRulesTab() {
               value={draft.sticky_agent_hours}
               disabled={saving === 'sticky_agent_hours'}
               onChange={e => setDraft(d => d ? { ...d, sticky_agent_hours: Number(e.target.value) } : d)}
-              className="w-16 text-xs bg-surface-3 border border-surface-5 text-text-primary rounded px-2 py-1 text-center focus:outline-none focus:ring-1 focus:ring-brand"
+              style={{ ...ADMIN_INPUT_STYLE, width: 64, textAlign: 'center' as const }}
+              onFocus={e => (e.currentTarget.style.borderColor = BR)}
+              onBlur={e => (e.currentTarget.style.borderColor = 'rgba(0,0,0,0.10)')}
             />
-            <span className="text-xs text-text-muted">hours</span>
+            <span style={{ fontSize: 12, color: TM }}>hours</span>
           </div>
         </div>
         <SaveBar
@@ -1184,7 +1560,7 @@ function AssignmentRulesTab() {
             saving={saving === 'vip_auto_priority1'}
             onToggle={() => setDraft(d => d ? { ...d, vip_auto_priority1: !d.vip_auto_priority1 } : d)}
           />
-          <p className="text-xs text-text-secondary">
+          <p style={{ fontSize: 12, color: T2 }}>
             {draft.vip_auto_priority1
               ? 'Enabled — VIP customers will be auto-promoted to Priority 1 on ticket creation.'
               : 'Disabled — VIP customers use the same priority as any other customer.'}
@@ -1206,10 +1582,14 @@ function AssignmentRulesTab() {
 
       {/* SLA Deadlines */}
       <RuleCard editable title="SLA Deadlines" subtitle="Time-to-first-response targets applied at the moment a ticket is assigned to an agent.">
-        <div className="space-y-0 mb-4">
-          {SLA_META.map(({ priority, label, badge }) => (
-            <div key={priority} className="flex items-center justify-between py-2.5 border-b border-surface-5 last:border-0">
-              <span className="text-xs text-text-primary">{label}</span>
+        <div style={{ marginBottom: 16 }}>
+          {SLA_META.map(({ priority, label, color }, i, arr) => (
+            <div key={priority} className="flex items-center justify-between"
+                 style={{ padding: '10px 0', borderBottom: i < arr.length - 1 ? `1px solid ${SEP}` : 'none' }}>
+              <div className="flex items-center gap-2">
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />
+                <span style={{ fontSize: 12, color: T1 }}>{label}</span>
+              </div>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
@@ -1218,9 +1598,11 @@ function AssignmentRulesTab() {
                   value={draft.sla_minutes[priority] ?? ''}
                   disabled={saving === 'sla_minutes'}
                   onChange={e => setDraft(d => d ? { ...d, sla_minutes: { ...d.sla_minutes, [priority]: Number(e.target.value) } } : d)}
-                  className="w-16 text-xs bg-surface-3 border border-surface-5 text-text-primary rounded px-2 py-1 text-center focus:outline-none focus:ring-1 focus:ring-brand"
+                  style={{ ...ADMIN_INPUT_STYLE, width: 64, textAlign: 'center' as const }}
+                  onFocus={e => (e.currentTarget.style.borderColor = color)}
+                  onBlur={e => (e.currentTarget.style.borderColor = 'rgba(0,0,0,0.10)')}
                 />
-                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${badge}`}>min</span>
+                <span style={{ fontSize: 11, fontWeight: 600, background: `${color}14`, color, padding: '3px 9px', borderRadius: 20 }}>min</span>
               </div>
             </div>
           ))}
@@ -1241,23 +1623,334 @@ function AssignmentRulesTab() {
 }
 
 function SaveBar({ dirty, saving, onSave, onDiscard }: { dirty: boolean; saving: boolean; onSave: () => void; onDiscard: () => void }) {
+  if (!dirty) return null;
   return (
-    <div className={`flex items-center justify-end gap-2 pt-3 border-t border-surface-5 transition-opacity ${dirty ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+    <div className="flex items-center justify-end gap-2"
+         style={{ padding: '14px 24px', borderTop: '1px solid rgba(0,0,0,0.06)', background: 'rgba(249,250,251,0.8)' }}>
       <button
         onClick={onDiscard}
         disabled={saving}
-        className="text-xs px-3 py-1.5 rounded-md bg-surface-3 hover:bg-surface-4 text-text-secondary transition-colors disabled:opacity-50"
+        style={{ fontSize: 12, fontWeight: 500, padding: '7px 16px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.10)', background: 'white', color: T2, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.5 : 1 }}
+        onMouseEnter={e => (e.currentTarget.style.background = '#f3f4f6')}
+        onMouseLeave={e => (e.currentTarget.style.background = 'white')}
       >
         Discard
       </button>
       <button
         onClick={onSave}
-        disabled={!dirty || saving}
-        className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-brand hover:bg-brand-dim text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled={saving}
+        style={{ fontSize: 12, fontWeight: 600, padding: '7px 18px', borderRadius: 10, border: 'none', background: BR, color: 'white', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.65 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
+        onMouseEnter={e => (e.currentTarget.style.opacity = saving ? '0.65' : '0.88')}
+        onMouseLeave={e => (e.currentTarget.style.opacity = saving ? '0.65' : '1')}
       >
         {saving && <Spinner size="sm" />}
         Save Changes
       </button>
+    </div>
+  );
+}
+
+// ── Announcements tab ─────────────────────────────────────────────────────────
+
+interface Announcement {
+  id: string;
+  title_en: string;
+  body_en: string;
+  title_th: string;
+  body_th: string;
+  color: string | null;
+  active: boolean;
+  starts_at: string | null;
+  ends_at: string | null;
+  created_at: string;
+}
+
+const PRESET_COLORS = ['#6366f1','#0ea5e9','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6'];
+
+function toLocalDatetimeInput(utcStr: string | null): string {
+  if (!utcStr) return '';
+  const d = new Date(utcStr);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function localDatetimeInputToISO(s: string): string | null {
+  if (!s) return null;
+  return new Date(s).toISOString();
+}
+
+const EMPTY_ANN_FORM = { title_en: '', body_en: '', title_th: '', body_th: '', color: '', starts_at: '', ends_at: '' };
+
+function AnnouncementsTab() {
+  const [items, setItems]     = useState<Announcement[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState('');
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing]   = useState<Announcement | null>(null);
+  const [form, setForm]         = useState({ ...EMPTY_ANN_FORM });
+  const [saving, setSaving]     = useState(false);
+  const { toast }               = useToast();
+
+  const load = async () => {
+    try {
+      setItems(await api.getAnnouncements());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const openCreate = () => { setEditing(null); setForm({ ...EMPTY_ANN_FORM }); setShowForm(true); };
+  const openEdit   = (a: Announcement) => {
+    setEditing(a);
+    setForm({
+      title_en: a.title_en, body_en: a.body_en,
+      title_th: a.title_th, body_th: a.body_th,
+      color:    a.color ?? '',
+      starts_at: toLocalDatetimeInput(a.starts_at),
+      ends_at:   toLocalDatetimeInput(a.ends_at),
+    });
+    setShowForm(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.title_en.trim() || !form.body_en.trim() || !form.title_th.trim() || !form.body_th.trim()) {
+      setError('All four title/body fields are required.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      const payload = {
+        title_en: form.title_en.trim(), body_en: form.body_en.trim(),
+        title_th: form.title_th.trim(), body_th: form.body_th.trim(),
+        color:     form.color || null,
+        starts_at: localDatetimeInputToISO(form.starts_at),
+        ends_at:   localDatetimeInputToISO(form.ends_at),
+      };
+      if (editing) {
+        await api.updateAnnouncement(editing.id, payload);
+      } else {
+        await api.createAnnouncement(payload);
+      }
+      toast(editing ? 'Announcement updated' : 'Announcement created', 'success');
+      setShowForm(false);
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggle = async (a: Announcement) => {
+    try {
+      await api.toggleAnnouncement(a.id);
+      load();
+    } catch {
+      toast('Toggle failed', 'error');
+    }
+  };
+
+  const handleDelete = async (a: Announcement) => {
+    if (!confirm(`Delete "${a.title_en}"?`)) return;
+    try {
+      await api.deleteAnnouncement(a.id);
+      toast('Announcement deleted', 'success');
+      load();
+    } catch {
+      toast('Delete failed', 'error');
+    }
+  };
+
+  const fmtDate = (s: string | null) => s ? new Date(s).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+
+  if (loading) return <div className="flex items-center gap-2" style={{ fontSize: 13, color: TM }}><Spinner size="sm" /> Loading…</div>;
+
+  return (
+    <div className="space-y-5">
+      {error && <ErrorBanner>{error}</ErrorBanner>}
+
+      <div className="flex items-center justify-between">
+        <p style={{ fontSize: 12, color: T2 }}>
+          Active announcements are shown as dismissible cards in the widget before the category picker.
+        </p>
+        <button
+          onClick={openCreate}
+          className="flex items-center gap-1.5 shrink-0"
+          style={{ fontSize: 12, fontWeight: 600, padding: '7px 16px', background: BR, color: 'white', borderRadius: 10, border: 'none', cursor: 'pointer' }}
+          onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+          onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
+          </svg>
+          New Announcement
+        </button>
+      </div>
+
+      <div className="rounded-2xl overflow-hidden bg-white" style={{ border: `1px solid ${SEP}`, boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
+        <table className="w-full">
+          <thead>
+            <tr style={{ borderBottom: `1px solid ${SEP}`, background: '#fafbfc' }}>
+              {['Title (EN)', 'Title (TH)', 'Color', 'Active', 'Starts', 'Ends', 'Actions'].map(h => (
+                <th key={h} style={{ textAlign: 'left', fontSize: 10, fontWeight: 700, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em', padding: '10px 14px' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {items.length === 0 && (
+              <tr>
+                <td colSpan={7} style={{ padding: '40px 16px', textAlign: 'center', fontSize: 13, color: TM }}>No announcements yet</td>
+              </tr>
+            )}
+            {items.map((a, idx) => (
+              <tr
+                key={a.id}
+                style={{ borderTop: idx > 0 ? `1px solid ${SEP}` : 'none', background: 'transparent', transition: 'background 0.12s' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLTableRowElement).style.background = '#f9fafb'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'; }}
+              >
+                <td style={{ padding: '10px 14px', fontSize: 12, color: T1, fontWeight: 600, maxWidth: 200 }}>
+                  <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.title_en}</div>
+                  <div style={{ fontSize: 11, color: T2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>{a.body_en}</div>
+                </td>
+                <td style={{ padding: '10px 14px', fontSize: 12, color: T1, maxWidth: 200 }}>
+                  <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.title_th}</div>
+                </td>
+                <td style={{ padding: '10px 14px' }}>
+                  {a.color
+                    ? <div style={{ width: 18, height: 18, borderRadius: 5, background: a.color, border: '1.5px solid rgba(0,0,0,0.10)' }} title={a.color} />
+                    : <span style={{ fontSize: 11, color: TM }}>default</span>}
+                </td>
+                <td style={{ padding: '10px 14px' }}>
+                  <button
+                    onClick={() => handleToggle(a)}
+                    title={a.active ? 'Deactivate' : 'Activate'}
+                    style={{
+                      width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', padding: 0,
+                      background: a.active ? '#10b981' : '#d1d5db', transition: 'background 0.2s', position: 'relative',
+                    }}
+                  >
+                    <div style={{
+                      position: 'absolute', top: 3, left: a.active ? 18 : 3,
+                      width: 14, height: 14, borderRadius: '50%', background: 'white',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'left 0.15s',
+                    }} />
+                  </button>
+                </td>
+                <td style={{ padding: '10px 14px', fontSize: 12, color: T2 }}>{fmtDate(a.starts_at)}</td>
+                <td style={{ padding: '10px 14px', fontSize: 12, color: T2 }}>{fmtDate(a.ends_at)}</td>
+                <td style={{ padding: '10px 14px' }}>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => openEdit(a)}
+                      style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', background: '#f3f4f6', color: T2, borderRadius: 7, border: 'none', cursor: 'pointer' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#e5e7eb')}
+                      onMouseLeave={e => (e.currentTarget.style.background = '#f3f4f6')}
+                    >Edit</button>
+                    <button
+                      onClick={() => handleDelete(a)}
+                      style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', background: '#fef2f2', color: '#ef4444', borderRadius: 7, border: 'none', cursor: 'pointer' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#fee2e2')}
+                      onMouseLeave={e => (e.currentTarget.style.background = '#fef2f2')}
+                    >Delete</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {showForm && (
+        <ModalShell title={editing ? 'Edit Announcement' : 'New Announcement'} onClose={() => setShowForm(false)} width="w-[560px]">
+          {error && <ErrorBanner>{error}</ErrorBanner>}
+          <Field label="Title (English)">
+            <AdminInput value={form.title_en} onChange={v => setForm(f => ({ ...f, title_en: v }))} placeholder="e.g. Scheduled Maintenance Tonight" />
+          </Field>
+          <Field label="Body (English)">
+            <textarea
+              value={form.body_en}
+              onChange={e => setForm(f => ({ ...f, body_en: e.target.value }))}
+              placeholder="Brief message shown to customers…"
+              rows={3}
+              style={{ ...ADMIN_INPUT_STYLE, resize: 'vertical' }}
+              onFocus={e => (e.currentTarget.style.borderColor = BR)}
+              onBlur={e => (e.currentTarget.style.borderColor = 'rgba(0,0,0,0.10)')}
+            />
+          </Field>
+          <Field label="Title (Thai)">
+            <AdminInput value={form.title_th} onChange={v => setForm(f => ({ ...f, title_th: v }))} placeholder="e.g. กำหนดการบำรุงรักษาคืนนี้" />
+          </Field>
+          <Field label="Body (Thai)">
+            <textarea
+              value={form.body_th}
+              onChange={e => setForm(f => ({ ...f, body_th: e.target.value }))}
+              placeholder="ข้อความสั้นๆ ที่แสดงต่อลูกค้า…"
+              rows={3}
+              style={{ ...ADMIN_INPUT_STYLE, resize: 'vertical' }}
+              onFocus={e => (e.currentTarget.style.borderColor = BR)}
+              onBlur={e => (e.currentTarget.style.borderColor = 'rgba(0,0,0,0.10)')}
+            />
+          </Field>
+          <Field label="Card color (optional — defaults to widget brand color)">
+            <div className="flex items-center gap-2 flex-wrap">
+              {PRESET_COLORS.map(c => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, color: f.color === c ? '' : c }))}
+                  style={{
+                    width: 26, height: 26, borderRadius: 7, background: c, border: 'none', cursor: 'pointer', flexShrink: 0,
+                    outline: form.color === c ? `3px solid ${c}` : '2px solid transparent',
+                    outlineOffset: 2,
+                    transition: 'outline 0.1s',
+                  }}
+                  title={c}
+                />
+              ))}
+              {/* Custom hex input */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 4 }}>
+                <input
+                  type="color"
+                  value={form.color || '#6366f1'}
+                  onChange={e => setForm(f => ({ ...f, color: e.target.value }))}
+                  style={{ width: 26, height: 26, padding: 1, border: '1px solid rgba(0,0,0,0.12)', borderRadius: 7, cursor: 'pointer', background: 'none' }}
+                  title="Custom color"
+                />
+                <input
+                  type="text"
+                  value={form.color}
+                  onChange={e => setForm(f => ({ ...f, color: e.target.value }))}
+                  placeholder="#hex or empty for default"
+                  style={{ ...ADMIN_INPUT_STYLE, width: 160 }}
+                />
+                {form.color && (
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, color: '' }))}
+                    style={{ fontSize: 11, color: TM, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}
+                  >clear</button>
+                )}
+              </div>
+            </div>
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Starts at (optional)">
+              <input type="datetime-local" value={form.starts_at} onChange={e => setForm(f => ({ ...f, starts_at: e.target.value }))} style={ADMIN_INPUT_STYLE} />
+            </Field>
+            <Field label="Ends at (optional)">
+              <input type="datetime-local" value={form.ends_at} onChange={e => setForm(f => ({ ...f, ends_at: e.target.value }))} style={ADMIN_INPUT_STYLE} />
+            </Field>
+          </div>
+          <ModalFooter onClose={() => setShowForm(false)} onSave={handleSave} saving={saving} saveLabel={editing ? 'Save Changes' : 'Create'} />
+        </ModalShell>
+      )}
     </div>
   );
 }
@@ -1281,7 +1974,10 @@ function StubTab({ label, description }: { label: string; description: string })
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
-const ADMIN_INPUT = 'w-full text-xs bg-surface-3 ring-1 ring-surface-5 rounded px-2.5 py-1.5 text-text-primary placeholder:text-text-muted outline-none focus:ring-brand transition-all';
+const ADMIN_INPUT_STYLE: React.CSSProperties = {
+  width: '100%', fontSize: 12, background: '#f9fafb', border: '1px solid rgba(0,0,0,0.10)',
+  borderRadius: 8, padding: '7px 10px', color: T1, outline: 'none', transition: 'border-color 0.15s',
+};
 
 function AdminInput({ value, onChange, placeholder, type = 'text', autoFocus, className = '' }: {
   value: string; onChange: (v: string) => void; placeholder?: string; type?: string; autoFocus?: boolean; className?: string;
@@ -1293,14 +1989,17 @@ function AdminInput({ value, onChange, placeholder, type = 'text', autoFocus, cl
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
       autoFocus={autoFocus}
-      className={`${ADMIN_INPUT} ${className}`}
+      className={className}
+      style={ADMIN_INPUT_STYLE}
+      onFocus={e => (e.currentTarget.style.borderColor = BR)}
+      onBlur={e => (e.currentTarget.style.borderColor = 'rgba(0,0,0,0.10)')}
     />
   );
 }
 
 function AdminSelect({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: { value: string; label: string }[] }) {
   return (
-    <select value={value} onChange={e => onChange(e.target.value)} className={ADMIN_INPUT}>
+    <select value={value} onChange={e => onChange(e.target.value)} style={ADMIN_INPUT_STYLE}>
       {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>
   );
@@ -1309,7 +2008,7 @@ function AdminSelect({ value, onChange, options }: { value: string; onChange: (v
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <label className="text-[10px] text-text-muted uppercase tracking-wide font-medium">{label}</label>
+      <label style={{ fontSize: 10, fontWeight: 700, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</label>
       {children}
     </div>
   );
@@ -1317,7 +2016,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function ErrorBanner({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-2 bg-brand/10 ring-1 ring-brand/20 text-brand text-xs px-3 py-2.5 rounded-lg">
+    <div className="flex items-center gap-2" style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#ef4444', fontSize: 12, padding: '10px 12px', borderRadius: 10 }}>
       <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
       </svg>
@@ -1328,17 +2027,19 @@ function ErrorBanner({ children }: { children: React.ReactNode }) {
 
 function ModalShell({ title, onClose, children, width = 'w-[480px]' }: { title: string; onClose: () => void; children: React.ReactNode; width?: string }) {
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className={`bg-surface-2 ring-1 ring-surface-5 rounded-xl ${width} max-h-[90vh] flex flex-col shadow-modal animate-scale-in`}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-surface-5 shrink-0">
-          <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
-          <button onClick={onClose} className="text-text-muted hover:text-text-primary transition-colors p-1 hover:bg-surface-3 rounded">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}>
+      <div className={`bg-white rounded-2xl ${width} max-h-[90vh] flex flex-col animate-scale-in`} style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.18)', border: '1px solid rgba(0,0,0,0.07)' }}>
+        <div className="flex items-center justify-between px-6 py-4 shrink-0" style={{ borderBottom: `1px solid ${SEP}` }}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: T1 }}>{title}</h3>
+          <button onClick={onClose} className="flex items-center justify-center" style={{ width: 28, height: 28, borderRadius: 8, background: '#f3f4f6', border: 'none', cursor: 'pointer', color: TM, transition: 'background 0.15s' }}
+            onMouseEnter={e => (e.currentTarget.style.background = '#e5e7eb')}
+            onMouseLeave={e => (e.currentTarget.style.background = '#f3f4f6')}>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
             </svg>
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
           {children}
         </div>
       </div>
@@ -1348,14 +2049,20 @@ function ModalShell({ title, onClose, children, width = 'w-[480px]' }: { title: 
 
 function ModalFooter({ onClose, onSave, saving, saveLabel, disabled = false }: { onClose: () => void; onSave: () => void; saving: boolean; saveLabel: string; disabled?: boolean }) {
   return (
-    <div className="flex justify-end gap-2 pt-2 border-t border-surface-5 mt-2">
-      <button onClick={onClose} className="text-xs px-4 py-1.5 bg-surface-3 ring-1 ring-surface-5 rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-4 transition-colors">
+    <div className="flex justify-end gap-2 pt-4 mt-2" style={{ borderTop: `1px solid ${SEP}` }}>
+      <button onClick={onClose}
+        style={{ fontSize: 12, fontWeight: 600, padding: '7px 16px', background: '#f3f4f6', color: T2, borderRadius: 9, border: 'none', cursor: 'pointer', transition: 'background 0.15s' }}
+        onMouseEnter={e => (e.currentTarget.style.background = '#e5e7eb')}
+        onMouseLeave={e => (e.currentTarget.style.background = '#f3f4f6')}>
         Cancel
       </button>
       <button
         onClick={onSave}
         disabled={saving || disabled}
-        className="text-xs px-4 py-1.5 bg-brand hover:bg-brand-dim text-white rounded-md transition-colors disabled:opacity-40 flex items-center gap-1.5"
+        className="flex items-center gap-1.5"
+        style={{ fontSize: 12, fontWeight: 600, padding: '7px 16px', background: disabled || saving ? '#a5b4fc' : BR, color: 'white', borderRadius: 9, border: 'none', cursor: disabled ? 'not-allowed' : 'pointer', transition: 'opacity 0.15s' }}
+        onMouseEnter={e => { if (!disabled && !saving) e.currentTarget.style.opacity = '0.85'; }}
+        onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
       >
         {saving ? <><Spinner size="xs" /> Saving…</> : saveLabel}
       </button>

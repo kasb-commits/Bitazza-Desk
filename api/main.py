@@ -16,6 +16,7 @@ from api.routes.knowledge import router as knowledge_router
 from api.routes.studio import router as studio_router
 from api.routes.notifications import router as notifications_router
 from api.routes.uploads import router as uploads_router
+from api.routes.announcements import router as announcements_router
 from db.conversation_store import init_db
 from engine.auto_transitions import start_auto_transition_loop
 from engine.report_sender import start_report_scheduler_loop
@@ -116,6 +117,7 @@ app.include_router(knowledge_router)
 app.include_router(studio_router)
 app.include_router(notifications_router)
 app.include_router(uploads_router, prefix="/api/uploads", tags=["uploads"])
+app.include_router(announcements_router)
 
 # Mount mock User/KYC API and token issuer only in development
 if settings.USE_MOCK_USER_API:

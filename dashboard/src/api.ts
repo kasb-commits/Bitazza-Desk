@@ -362,6 +362,22 @@ export const api = {
       { method: 'PATCH', body: JSON.stringify({ property_id: propertyId, value }) }
     ),
 
+  // Announcements
+  getAnnouncements: () =>
+    req<{ id: string; title_en: string; body_en: string; title_th: string; body_th: string; color: string | null; active: boolean; starts_at: string | null; ends_at: string | null; created_at: string }[]>('/api/announcements'),
+
+  createAnnouncement: (data: { title_en: string; body_en: string; title_th: string; body_th: string; color?: string | null; starts_at?: string | null; ends_at?: string | null }) =>
+    req<{ id: string }>('/api/announcements', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateAnnouncement: (id: string, data: { title_en?: string; body_en?: string; title_th?: string; body_th?: string; color?: string | null; starts_at?: string | null; ends_at?: string | null }) =>
+    req('/api/announcements/' + id, { method: 'PUT', body: JSON.stringify(data) }),
+
+  toggleAnnouncement: (id: string) =>
+    req('/api/announcements/' + id + '/toggle', { method: 'PATCH' }),
+
+  deleteAnnouncement: (id: string) =>
+    req('/api/announcements/' + id, { method: 'DELETE' }),
+
   // FR-09: Core API — live customer profile from Bitazza backend (5s timeout)
   getCoreProfile: async (bitazzaUid: string) => {
     const controller = new AbortController();
