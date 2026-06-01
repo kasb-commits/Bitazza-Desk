@@ -1264,18 +1264,20 @@ function Toggle({ on, onToggle, saving }: { on: boolean; onToggle: () => void; s
 
 function RuleCard({ title, subtitle, editable, children }: { title: string; subtitle: string; editable?: boolean; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl bg-white overflow-hidden"
-         style={{ border: '1px solid rgba(0,0,0,0.07)', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-      <div className="flex items-start justify-between gap-4"
-           style={{ padding: '20px 24px 18px', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+    <div style={{
+      background: 'white', borderRadius: 16, overflow: 'hidden',
+      border: '1px solid rgba(0,0,0,0.09)',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
+    }}>
+      <div style={{ padding: '18px 24px 16px', borderBottom: '1px solid rgba(0,0,0,0.07)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
         <div>
-          <p style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: '-0.01em' }}>{title}</p>
-          <p style={{ fontSize: 12, color: TM, marginTop: 4, lineHeight: 1.55 }}>{subtitle}</p>
+          <p style={{ fontSize: 14, fontWeight: 700, color: T1, letterSpacing: '-0.015em', lineHeight: 1.3 }}>{title}</p>
+          <p style={{ fontSize: 12, color: TM, marginTop: 3, lineHeight: 1.5, maxWidth: 480 }}>{subtitle}</p>
         </div>
         {!editable && (
-          <svg width={15} height={15} fill="none" stroke="currentColor" viewBox="0 0 24 24"
-               style={{ color: TM, flexShrink: 0, marginTop: 3 }}>
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+          <svg width={14} height={14} fill="none" stroke="currentColor" viewBox="0 0 24 24"
+               style={{ color: '#c4c9d4', flexShrink: 0, marginTop: 2 }}>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                   d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
           </svg>
         )}
@@ -1378,29 +1380,48 @@ function AssignmentRulesTab() {
   const vipDirty   = isDirty('vip_auto_priority1');
   const slaDirty   = isDirty('sla_minutes');
 
+  const ROW: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '0 24px', minHeight: 52, borderBottom: '1px solid rgba(0,0,0,0.06)',
+  };
+  const ROW_LAST: React.CSSProperties = { ...ROW, borderBottom: 'none' };
+  const ROW_LABEL: React.CSSProperties = { fontSize: 13, fontWeight: 500, color: T1 };
+  const ROW_SUB: React.CSSProperties   = { fontSize: 11, color: TM, marginTop: 2, lineHeight: 1.5 };
+  const SEL: React.CSSProperties = {
+    fontSize: 12, fontWeight: 500, color: T1,
+    background: 'white', border: '1px solid rgba(0,0,0,0.12)',
+    borderRadius: 8, padding: '6px 28px 6px 10px',
+    outline: 'none', cursor: 'pointer', width: 148,
+    appearance: 'none' as const,
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239ca3af' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E")`,
+    backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+  };
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-4" style={{ maxWidth: 680 }}>
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-4 right-4 z-50 flex items-start gap-2.5 px-4 py-3 rounded-2xl shadow-xl max-w-sm text-xs leading-relaxed"
+        <div className="fixed bottom-5 right-5 z-50 flex items-start gap-3 rounded-2xl shadow-2xl"
              style={{
-               background: toast.type === 'error' ? '#450a0a' : 'white',
-               border: `1px solid ${toast.type === 'error' ? 'rgba(239,68,68,0.3)' : SEP}`,
+               padding: '14px 18px', maxWidth: 360,
+               background: toast.type === 'error' ? '#1c0505' : 'white',
+               border: `1px solid ${toast.type === 'error' ? 'rgba(239,68,68,0.25)' : 'rgba(0,0,0,0.08)'}`,
                color: toast.type === 'error' ? '#fca5a5' : T1,
+               fontSize: 13, lineHeight: 1.5,
              }}>
-          {toast.type === 'error' ? (
-            <svg width={14} height={14} fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#f87171', flexShrink: 0, marginTop: 1 }}>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3.75m9.303 3.376c.866 1.5-.217 3.374-1.948 3.374H4.645c-1.73 0-2.813-1.874-1.948-3.374L10.052 3.378c.866-1.5 3.032-1.5 3.898 0L21.303 16.126zM12 15.75h.007v.008H12v-.008z" />
-            </svg>
-          ) : (
-            <svg width={14} height={14} fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#10b981', flexShrink: 0, marginTop: 1 }}>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          )}
+          <svg width={16} height={16} fill="none" stroke="currentColor" viewBox="0 0 24 24"
+               style={{ color: toast.type === 'error' ? '#f87171' : '#10b981', flexShrink: 0, marginTop: 1 }}>
+            {toast.type === 'error'
+              ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3.75m9.303 3.376c.866 1.5-.217 3.374-1.948 3.374H4.645c-1.73 0-2.813-1.874-1.948-3.374L10.052 3.378c.866-1.5 3.032-1.5 3.898 0L21.303 16.126zM12 15.75h.007v.008H12v-.008z" />
+              : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            }
+          </svg>
           <span style={{ flex: 1 }}>{toast.msg}</span>
-          <button onClick={() => setToast(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.5, flexShrink: 0, padding: 0 }}>
-            <svg width={12} height={12} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button onClick={() => setToast(null)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.4, padding: 0, flexShrink: 0 }}>
+            <svg width={13} height={13} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -1409,18 +1430,24 @@ function AssignmentRulesTab() {
 
       {/* Confirmation modal */}
       {confirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}>
-          <div className="w-full max-w-sm mx-4 rounded-2xl bg-white p-6" style={{ border: `1px solid ${SEP}`, boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
-            <p style={{ fontSize: 14, fontWeight: 700, color: T1, marginBottom: 6 }}>{confirm.title}</p>
-            <p style={{ fontSize: 12, color: T2, lineHeight: 1.6, marginBottom: 20 }}>{confirm.description}</p>
-            <div className="flex gap-2 justify-end">
+        <div className="fixed inset-0 z-50 flex items-center justify-center"
+             style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(6px)' }}>
+          <div className="w-full max-w-sm mx-4 rounded-2xl bg-white"
+               style={{ border: '1px solid rgba(0,0,0,0.09)', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+            <div style={{ padding: '24px 24px 0' }}>
+              <p style={{ fontSize: 15, fontWeight: 700, color: T1, letterSpacing: '-0.01em', marginBottom: 8 }}>{confirm.title}</p>
+              <p style={{ fontSize: 13, color: T2, lineHeight: 1.6 }}>{confirm.description}</p>
+            </div>
+            <div className="flex gap-2 justify-end" style={{ padding: '20px 24px' }}>
               <button onClick={() => setConfirm(null)}
-                style={{ fontSize: 12, fontWeight: 500, padding: '6px 14px', borderRadius: 10, border: `1px solid ${SEP}`, background: '#f3f4f6', color: T2, cursor: 'pointer' }}>
+                style={{ fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.10)', background: 'white', color: T2, cursor: 'pointer' }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#f3f4f6')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'white')}>
                 Cancel
               </button>
               <button onClick={confirm.onConfirm}
-                style={{ fontSize: 12, fontWeight: 600, padding: '6px 16px', borderRadius: 10, border: 'none', background: BR, color: 'white', cursor: 'pointer' }}
-                onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+                style={{ fontSize: 13, fontWeight: 600, padding: '8px 20px', borderRadius: 10, border: 'none', background: BR, color: 'white', cursor: 'pointer' }}
+                onMouseEnter={e => (e.currentTarget.style.opacity = '0.88')}
                 onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
                 Apply Change
               </button>
@@ -1429,63 +1456,25 @@ function AssignmentRulesTab() {
         </div>
       )}
 
-      {/* Stats strip */}
-      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-        {([
-          { label: 'Categories Routed', value: Object.keys(draft.category_team_map).length, icon: 'M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7', color: '#0ea5e9' },
-          { label: 'Sticky Window',     value: `${draft.sticky_agent_hours}h`,              icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', color: '#f59e0b' },
-          { label: 'VIP Priority',      value: draft.vip_auto_priority1 ? 'On' : 'Off',    icon: 'M5 3l14 9-14 9V3z', color: draft.vip_auto_priority1 ? '#10b981' : TM },
-          { label: 'SLA Tiers',         value: Object.keys(draft.sla_minutes).length,      icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', color: BR },
-        ] as { label: string; value: string | number; icon: string; color: string }[]).map(s => (
-          <div key={s.label} className="rounded-2xl bg-white flex items-center gap-4 px-5 py-4"
-               style={{ border: `1px solid ${SEP}`, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${s.color}14` }}>
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: s.color, width: 18, height: 18 }}>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d={s.icon} />
-              </svg>
-            </div>
-            <div>
-              <p style={{ fontSize: 22, fontWeight: 700, color: T1, lineHeight: 1 }}>{s.value}</p>
-              <p style={{ fontSize: 11, color: TM, marginTop: 3 }}>{s.label}</p>
-            </div>
+      {/* Category → Team Routing */}
+      <RuleCard editable title="Category → Team Routing" subtitle="Tickets are routed to a team based on their category. Unmatched categories fall back to CS.">
+        {Object.entries(draft.category_team_map).map(([cat, team], i, arr) => (
+          <div key={cat} style={i < arr.length - 1 ? ROW : ROW_LAST}>
+            <span style={ROW_LABEL}>{CATEGORY_LABELS[cat] ?? cat}</span>
+            <select
+              value={team}
+              disabled={saving === 'category_team_map'}
+              onChange={e => setDraft(d => d ? { ...d, category_team_map: { ...d.category_team_map, [cat]: e.target.value } } : d)}
+              style={SEL}
+            >
+              {KNOWN_TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
           </div>
         ))}
-      </div>
-
-      {/* Category → Team routing */}
-      <RuleCard editable title="Category → Team Routing" subtitle="Tickets are routed to a team based on their category. Unmatched categories fall back to CS.">
-        <table className="w-full mb-4" style={{ fontSize: 12, borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ borderBottom: `1px solid ${SEP}` }}>
-              {['Category', 'Routed To'].map(h => (
-                <th key={h} style={{ textAlign: 'left', fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.05em', paddingBottom: 8, paddingRight: 16 }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {Object.entries(draft.category_team_map).map(([cat, team], i, arr) => (
-              <tr key={cat} style={{ borderBottom: i < arr.length - 1 ? `1px solid ${SEP}` : 'none' }}>
-                <td style={{ padding: '9px 16px 9px 0', color: T1, fontWeight: 500 }}>{CATEGORY_LABELS[cat] ?? cat}</td>
-                <td style={{ padding: '9px 0' }}>
-                  <select
-                    value={team}
-                    disabled={saving === 'category_team_map'}
-                    onChange={e => setDraft(d => d ? { ...d, category_team_map: { ...d.category_team_map, [cat]: e.target.value } } : d)}
-                    style={{ fontSize: 12, background: '#f4f5f7', border: `1px solid ${SEP}`, color: T1, borderRadius: 8, padding: '4px 10px', outline: 'none' }}
-                  >
-                    {KNOWN_TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </td>
-              </tr>
-            ))}
-            <tr style={{ opacity: 0.45 }}>
-              <td style={{ padding: '9px 16px 0 0', color: T2, fontStyle: 'italic' }}>All other categories</td>
-              <td style={{ padding: '9px 0 0 0' }}>
-                <span style={{ fontSize: 11, background: '#f3f4f6', color: TM, padding: '3px 10px', borderRadius: 20 }}>cs (fallback)</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div style={{ ...ROW, borderBottom: '1px solid rgba(0,0,0,0.06)', opacity: 0.4 }}>
+          <span style={{ ...ROW_LABEL, fontStyle: 'italic' }}>All other categories</span>
+          <span style={{ fontSize: 12, color: TM }}>cs (fallback)</span>
+        </div>
         <SaveBar
           dirty={catDirty}
           saving={saving === 'category_team_map'}
@@ -1500,44 +1489,40 @@ function AssignmentRulesTab() {
 
       {/* Agent Routing Strategy — system locked */}
       <RuleCard title="Agent Routing Strategy" subtitle="Controls how tickets are distributed to available agents within a team.">
-        <div>
-          {[
-            { label: 'Round-Robin (FR-02)', badge: 'Least recently used', desc: 'Ticket goes to the Available agent with the oldest last-assignment time who is under capacity.' },
-            { label: 'Queue Fallback',      badge: 'Priority-aware',      desc: 'If no agent is available the ticket is queued. VIP tickets go to the front, others to the back.' },
-          ].map((r, i, arr) => (
-            <div key={r.label} className="flex gap-3"
-                 style={{ padding: '10px 0', borderBottom: i < arr.length - 1 ? `1px solid ${SEP}` : 'none' }}>
-              <Toggle on saving={false} onToggle={() => {}} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="flex items-center gap-2" style={{ marginBottom: 3 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: T1 }}>{r.label}</span>
-                  <span style={{ fontSize: 9, fontWeight: 500, background: '#f3f4f6', color: TM, padding: '2px 7px', borderRadius: 20 }}>{r.badge}</span>
-                </div>
-                <p style={{ fontSize: 11, color: TM, lineHeight: 1.55 }}>{r.desc}</p>
-              </div>
+        {[
+          { label: 'Round-Robin', sub: 'Least recently used — ticket goes to the Available agent with the oldest last-assignment time who is under capacity.' },
+          { label: 'Queue Fallback', sub: 'If no agent is available the ticket is queued. VIP tickets go to the front, others to the back.' },
+        ].map((r, i, arr) => (
+          <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 24px', borderBottom: i < arr.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none' }}>
+            <svg width={16} height={16} fill="none" stroke={BR} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" style={{ flexShrink: 0, marginTop: 2 }}>
+              <path d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <div>
+              <p style={ROW_LABEL}>{r.label}</p>
+              <p style={ROW_SUB}>{r.sub}</p>
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
       </RuleCard>
 
       {/* Sticky Agent */}
-      <RuleCard editable title="Sticky Agent (FR-04)" subtitle="Re-assigns returning customers to the same agent if they return within the configured window and the agent is available.">
-        <div className="flex items-center gap-4 mb-4">
-          <Toggle on saving={false} onToggle={() => {}} />
+      <RuleCard editable title="Sticky Agent" subtitle="Returning customers are matched to their previous agent if they return within the configured window and the agent is available.">
+        <div style={ROW}>
+          <div>
+            <p style={ROW_LABEL}>Return window</p>
+            <p style={ROW_SUB}>How long after a conversation ends the customer is re-matched</p>
+          </div>
           <div className="flex items-center gap-2">
-            <span style={{ fontSize: 12, color: T2 }}>Return window:</span>
             <input
-              type="number"
-              min={1}
-              max={72}
+              type="number" min={1} max={72}
               value={draft.sticky_agent_hours}
               disabled={saving === 'sticky_agent_hours'}
               onChange={e => setDraft(d => d ? { ...d, sticky_agent_hours: Number(e.target.value) } : d)}
-              style={{ ...ADMIN_INPUT_STYLE, width: 64, textAlign: 'center' as const }}
+              style={{ width: 72, fontSize: 15, fontWeight: 700, textAlign: 'center' as const, background: 'white', border: '1px solid rgba(0,0,0,0.12)', borderRadius: 10, padding: '7px 8px', color: T1, outline: 'none', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
               onFocus={e => (e.currentTarget.style.borderColor = BR)}
-              onBlur={e => (e.currentTarget.style.borderColor = 'rgba(0,0,0,0.10)')}
+              onBlur={e => (e.currentTarget.style.borderColor = 'rgba(0,0,0,0.12)')}
             />
-            <span style={{ fontSize: 12, color: TM }}>hours</span>
+            <span style={{ fontSize: 13, color: TM, fontWeight: 400 }}>hours</span>
           </div>
         </div>
         <SaveBar
@@ -1552,19 +1537,22 @@ function AssignmentRulesTab() {
         />
       </RuleCard>
 
-      {/* VIP Override */}
-      <RuleCard editable title="VIP Auto-Priority (FR-05)" subtitle="When enabled, tickets from VIP-tier customers are automatically promoted to Priority 1 on creation.">
-        <div className="flex items-center gap-3 mb-4">
+      {/* VIP Auto-Priority */}
+      <RuleCard editable title="VIP Auto-Priority" subtitle="Tickets from VIP-tier customers are automatically promoted to Priority 1 on creation.">
+        <div style={ROW_LAST}>
+          <div>
+            <p style={ROW_LABEL}>Auto-promote VIP tickets</p>
+            <p style={ROW_SUB}>
+              {draft.vip_auto_priority1
+                ? 'Enabled — VIP customers will receive Priority 1 on every new ticket.'
+                : 'Disabled — VIP tickets use standard priority rules.'}
+            </p>
+          </div>
           <Toggle
             on={draft.vip_auto_priority1}
             saving={saving === 'vip_auto_priority1'}
             onToggle={() => setDraft(d => d ? { ...d, vip_auto_priority1: !d.vip_auto_priority1 } : d)}
           />
-          <p style={{ fontSize: 12, color: T2 }}>
-            {draft.vip_auto_priority1
-              ? 'Enabled — VIP customers will be auto-promoted to Priority 1 on ticket creation.'
-              : 'Disabled — VIP customers use the same priority as any other customer.'}
-          </p>
         </div>
         <SaveBar
           dirty={vipDirty}
@@ -1582,31 +1570,26 @@ function AssignmentRulesTab() {
 
       {/* SLA Deadlines */}
       <RuleCard editable title="SLA Deadlines" subtitle="Time-to-first-response targets applied at the moment a ticket is assigned to an agent.">
-        <div style={{ marginBottom: 16 }}>
-          {SLA_META.map(({ priority, label, color }, i, arr) => (
-            <div key={priority} className="flex items-center justify-between"
-                 style={{ padding: '10px 0', borderBottom: i < arr.length - 1 ? `1px solid ${SEP}` : 'none' }}>
-              <div className="flex items-center gap-2">
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />
-                <span style={{ fontSize: 12, color: T1 }}>{label}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min={1}
-                  max={1440}
-                  value={draft.sla_minutes[priority] ?? ''}
-                  disabled={saving === 'sla_minutes'}
-                  onChange={e => setDraft(d => d ? { ...d, sla_minutes: { ...d.sla_minutes, [priority]: Number(e.target.value) } } : d)}
-                  style={{ ...ADMIN_INPUT_STYLE, width: 64, textAlign: 'center' as const }}
-                  onFocus={e => (e.currentTarget.style.borderColor = color)}
-                  onBlur={e => (e.currentTarget.style.borderColor = 'rgba(0,0,0,0.10)')}
-                />
-                <span style={{ fontSize: 11, fontWeight: 600, background: `${color}14`, color, padding: '3px 9px', borderRadius: 20 }}>min</span>
-              </div>
+        {SLA_META.map(({ priority, label, color }, i, arr) => (
+          <div key={priority} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', minHeight: 52, borderBottom: i < arr.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none' }}>
+            <div className="flex items-center gap-3">
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0, boxShadow: `0 0 0 2px ${color}22` }} />
+              <span style={ROW_LABEL}>{label}</span>
             </div>
-          ))}
-        </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number" min={1} max={1440}
+                value={draft.sla_minutes[priority] ?? ''}
+                disabled={saving === 'sla_minutes'}
+                onChange={e => setDraft(d => d ? { ...d, sla_minutes: { ...d.sla_minutes, [priority]: Number(e.target.value) } } : d)}
+                style={{ width: 72, fontSize: 15, fontWeight: 700, textAlign: 'center' as const, background: 'white', border: '1px solid rgba(0,0,0,0.12)', borderRadius: 10, padding: '7px 8px', color: T1, outline: 'none', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
+                onFocus={e => (e.currentTarget.style.borderColor = color)}
+                onBlur={e => (e.currentTarget.style.borderColor = 'rgba(0,0,0,0.12)')}
+              />
+              <span style={{ fontSize: 11, fontWeight: 500, color: TM, width: 24 }}>min</span>
+            </div>
+          </div>
+        ))}
         <SaveBar
           dirty={slaDirty}
           saving={saving === 'sla_minutes'}

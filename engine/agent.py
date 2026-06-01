@@ -157,7 +157,8 @@ class AgentResponse:
                  specialist_intro: str | None = None, confidence: float = 1.0,
                  upgraded_category: str | None = None,
                  transition_message: str | None = None,
-                 info_collection: bool = False):
+                 info_collection: bool = False,
+                 profile_fetched: bool = False):
         self.text = text
         self.language = language
         self.escalated = escalated
@@ -172,6 +173,7 @@ class AgentResponse:
         self.upgraded_category = upgraded_category  # set when mid-convo category switch occurs
         self.transition_message: str | None = transition_message  # outgoing-agent farewell shown before specialist reply
         self.info_collection = info_collection  # True when this reply is a collection-phase question
+        self.profile_fetched = profile_fetched  # True when get_user_profile tool was called this turn
 
 
 _UPGRADE_TRANSITION_MESSAGES: dict[str, dict[str, str]] = {
@@ -450,6 +452,20 @@ def chat(
         system_prompt = get_guest_system_prompt(language, agent_name=_agent_name)
     else:
         system_prompt = get_system_prompt(language, category, platform=platform, agent_name=_agent_name)
+
+    # If the ticket is already escalated, append a context note so Gemini knows
+    # the handoff is already done and stops saying "I'm connecting you now."
+    from db.conversation_store import is_human_handling as _is_human_pre
+    if _is_human_pre(conversation_id):
+        _post_escalation_note = (
+            "\n\nCONTEXT — POST-ESCALATION: This ticket has already been escalated. "
+            "A human specialist has been notified and will reach out to the customer. "
+            "Do NOT say you are connecting them or that a handoff is in progress — it already happened. "
+            "Acknowledge the customer's follow-up question, give whatever factual information you can, "
+            "and reassure them the specialist will be in touch shortly."
+        )
+        system_prompt = system_prompt + _post_escalation_note
+
     augmented_message = build_user_message(user_message, rag_chunks, {})
 
     # Convert history to Gemini format.
@@ -771,7 +787,10 @@ def chat(
             escalation_reason=reason, ticket_id=ticket_id,
         )
 
-    return AgentResponse(text=response_text, language=language, resolved=resolved, confidence=confidence)
+    return AgentResponse(
+        text=response_text, language=language, resolved=resolved, confidence=confidence,
+        profile_fetched="get_user_profile" in account_data,
+    )
 
 
 _EN_FAREWELL_PHRASES = {

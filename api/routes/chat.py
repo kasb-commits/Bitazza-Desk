@@ -421,6 +421,8 @@ async def send_message(request: Request, body: MessageRequest, user_id: str | No
     }
     if getattr(result, "info_collection", False):
         _reply_meta["info_collection"] = True
+    if getattr(result, "profile_fetched", False):
+        _reply_meta["profile_fetched"] = True
     add_message(body.conversation_id, "assistant", result.text, _reply_meta)
 
     # After the AI replies, move status to Pending_Customer (ball is in customer's court).

@@ -687,8 +687,11 @@ def get_history(conversation_id: str, limit: int = 10) -> list[dict]:
 
 def has_successful_bot_reply(conversation_id: str) -> bool:
     """
-    Returns True if at least one bot message in this conversation was NOT an escalation.
-    Used to decide whether to force a tool call again on retry turns.
+    Returns True if at least one bot message in this conversation was NOT an escalation
+    AND the get_user_profile tool was already called (data is in conversation history).
+    Used to decide whether to suppress the forced get_user_profile call on follow-up turns.
+    Both conditions must be true — a non-escalated reply from a pure KB/informational turn
+    does not mean profile data is available for account-specific follow-up questions.
     """
     with _conn() as conn:
         cur = conn.cursor()
@@ -698,12 +701,16 @@ def has_successful_bot_reply(conversation_id: str) -> bool:
             ORDER BY created_at ASC
         """, (conversation_id,))
         rows = cur.fetchall()
+    has_non_escalated = False
+    has_profile_data = False
     for r in rows:
         raw = r["metadata"]
         meta = json.loads(raw) if isinstance(raw, str) and raw else (raw or {})
         if not meta.get("escalated", False):
-            return True
-    return False
+            has_non_escalated = True
+        if meta.get("profile_fetched", False):
+            has_profile_data = True
+    return has_non_escalated and has_profile_data
 
 
 def count_consecutive_low_confidence(conversation_id: str) -> int:
