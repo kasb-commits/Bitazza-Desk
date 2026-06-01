@@ -1265,23 +1265,24 @@ function Toggle({ on, onToggle, saving }: { on: boolean; onToggle: () => void; s
 function RuleCard({ title, subtitle, editable, children }: { title: string; subtitle: string; editable?: boolean; children: React.ReactNode }) {
   return (
     <div style={{
-      background: 'white', borderRadius: 16, overflow: 'hidden',
-      border: '1px solid rgba(0,0,0,0.09)',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
+      background: 'white', borderRadius: 14, overflow: 'hidden',
+      boxShadow: '0 0 0 0.5px rgba(0,0,0,0.1), 0 2px 12px rgba(0,0,0,0.07)',
     }}>
-      <div style={{ padding: '18px 24px 16px', borderBottom: '1px solid rgba(0,0,0,0.07)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+      <div style={{ padding: '16px 20px 14px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
         <div>
-          <p style={{ fontSize: 14, fontWeight: 700, color: T1, letterSpacing: '-0.015em', lineHeight: 1.3 }}>{title}</p>
-          <p style={{ fontSize: 12, color: TM, marginTop: 3, lineHeight: 1.5, maxWidth: 480 }}>{subtitle}</p>
+          <p style={{ fontSize: 13, fontWeight: 600, color: T1, letterSpacing: '-0.01em' }}>{title}</p>
+          <p style={{ fontSize: 12, color: TM, marginTop: 2, lineHeight: 1.5 }}>{subtitle}</p>
         </div>
         {!editable && (
-          <svg width={14} height={14} fill="none" stroke="currentColor" viewBox="0 0 24 24"
-               style={{ color: '#c4c9d4', flexShrink: 0, marginTop: 2 }}>
+          <svg width={13} height={13} fill="none" stroke="currentColor" viewBox="0 0 24 24"
+               style={{ color: '#bfc5cf', flexShrink: 0, marginTop: 2 }}>
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                   d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
           </svg>
         )}
       </div>
+      {/* inset hairline below header */}
+      <div style={{ height: '0.5px', background: 'rgba(0,0,0,0.09)', marginLeft: 20 }} />
       <div>{children}</div>
     </div>
   );
@@ -1380,22 +1381,23 @@ function AssignmentRulesTab() {
   const vipDirty   = isDirty('vip_auto_priority1');
   const slaDirty   = isDirty('sla_minutes');
 
+  // Row helpers — inset separator sits BETWEEN rows as a sibling element, not as borderBottom
   const ROW: React.CSSProperties = {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '0 24px', minHeight: 52, borderBottom: '1px solid rgba(0,0,0,0.06)',
+    padding: '0 20px', minHeight: 44,
   };
-  const ROW_LAST: React.CSSProperties = { ...ROW, borderBottom: 'none' };
-  const ROW_LABEL: React.CSSProperties = { fontSize: 13, fontWeight: 500, color: T1 };
+  const SEP  = () => <div style={{ height: '0.5px', background: 'rgba(0,0,0,0.08)', marginLeft: 20 }} />;
+  const ROW_LABEL: React.CSSProperties = { fontSize: 13, fontWeight: 400, color: T1 };
   const ROW_SUB: React.CSSProperties   = { fontSize: 11, color: TM, marginTop: 2, lineHeight: 1.5 };
   const SEL: React.CSSProperties = {
     fontSize: 12, fontWeight: 500, color: T1,
-    background: 'white', border: '1px solid rgba(0,0,0,0.12)',
-    borderRadius: 8, padding: '6px 28px 6px 10px',
+    background: 'white', border: '1px solid rgba(0,0,0,0.14)',
+    borderRadius: 8, padding: '5px 26px 5px 10px',
     outline: 'none', cursor: 'pointer', width: 148,
     appearance: 'none' as const,
     backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239ca3af' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E")`,
-    backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center',
-    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+    backgroundRepeat: 'no-repeat', backgroundPosition: 'right 9px center',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
   };
 
   return (
@@ -1458,20 +1460,23 @@ function AssignmentRulesTab() {
 
       {/* Category → Team Routing */}
       <RuleCard editable title="Category → Team Routing" subtitle="Tickets are routed to a team based on their category. Unmatched categories fall back to CS.">
-        {Object.entries(draft.category_team_map).map(([cat, team], i, arr) => (
-          <div key={cat} style={i < arr.length - 1 ? ROW : ROW_LAST}>
-            <span style={ROW_LABEL}>{CATEGORY_LABELS[cat] ?? cat}</span>
-            <select
-              value={team}
-              disabled={saving === 'category_team_map'}
-              onChange={e => setDraft(d => d ? { ...d, category_team_map: { ...d.category_team_map, [cat]: e.target.value } } : d)}
-              style={SEL}
-            >
-              {KNOWN_TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
+        {Object.entries(draft.category_team_map).map(([cat, team]) => (
+          <React.Fragment key={cat}>
+            <div style={ROW}>
+              <span style={ROW_LABEL}>{CATEGORY_LABELS[cat] ?? cat}</span>
+              <select
+                value={team}
+                disabled={saving === 'category_team_map'}
+                onChange={e => setDraft(d => d ? { ...d, category_team_map: { ...d.category_team_map, [cat]: e.target.value } } : d)}
+                style={SEL}
+              >
+                {KNOWN_TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <SEP />
+          </React.Fragment>
         ))}
-        <div style={{ ...ROW, borderBottom: '1px solid rgba(0,0,0,0.06)', opacity: 0.4 }}>
+        <div style={{ ...ROW, opacity: 0.38 }}>
           <span style={{ ...ROW_LABEL, fontStyle: 'italic' }}>All other categories</span>
           <span style={{ fontSize: 12, color: TM }}>cs (fallback)</span>
         </div>
@@ -1490,39 +1495,39 @@ function AssignmentRulesTab() {
       {/* Agent Routing Strategy — system locked */}
       <RuleCard title="Agent Routing Strategy" subtitle="Controls how tickets are distributed to available agents within a team.">
         {[
-          { label: 'Round-Robin', sub: 'Least recently used — ticket goes to the Available agent with the oldest last-assignment time who is under capacity.' },
+          { label: 'Round-Robin', sub: 'Least recently used — ticket goes to the Available agent with the oldest last-assignment time, who is under capacity.' },
           { label: 'Queue Fallback', sub: 'If no agent is available the ticket is queued. VIP tickets go to the front, others to the back.' },
         ].map((r, i, arr) => (
-          <div key={r.label} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 24px', borderBottom: i < arr.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none' }}>
-            <svg width={16} height={16} fill="none" stroke={BR} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" style={{ flexShrink: 0, marginTop: 2 }}>
-              <path d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-            <div>
-              <p style={ROW_LABEL}>{r.label}</p>
-              <p style={ROW_SUB}>{r.sub}</p>
+          <React.Fragment key={r.label}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 20px' }}>
+              <svg width={15} height={15} fill="none" stroke={BR} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" style={{ flexShrink: 0, marginTop: 1 }}>
+                <path d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              <div>
+                <p style={{ fontSize: 13, fontWeight: 500, color: T1 }}>{r.label}</p>
+                <p style={{ fontSize: 12, color: TM, marginTop: 2, lineHeight: 1.5 }}>{r.sub}</p>
+              </div>
             </div>
-          </div>
+            {i < arr.length - 1 && <SEP />}
+          </React.Fragment>
         ))}
       </RuleCard>
 
       {/* Sticky Agent */}
       <RuleCard editable title="Sticky Agent" subtitle="Returning customers are matched to their previous agent if they return within the configured window and the agent is available.">
         <div style={ROW}>
-          <div>
-            <p style={ROW_LABEL}>Return window</p>
-            <p style={ROW_SUB}>How long after a conversation ends the customer is re-matched</p>
-          </div>
-          <div className="flex items-center gap-2">
+          <span style={ROW_LABEL}>Return window</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <input
               type="number" min={1} max={72}
               value={draft.sticky_agent_hours}
               disabled={saving === 'sticky_agent_hours'}
               onChange={e => setDraft(d => d ? { ...d, sticky_agent_hours: Number(e.target.value) } : d)}
-              style={{ width: 72, fontSize: 15, fontWeight: 700, textAlign: 'center' as const, background: 'white', border: '1px solid rgba(0,0,0,0.12)', borderRadius: 10, padding: '7px 8px', color: T1, outline: 'none', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
+              style={{ width: 64, fontSize: 14, fontWeight: 600, textAlign: 'center' as const, background: 'white', border: '1px solid rgba(0,0,0,0.14)', borderRadius: 8, padding: '5px 8px', color: T1, outline: 'none', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}
               onFocus={e => (e.currentTarget.style.borderColor = BR)}
-              onBlur={e => (e.currentTarget.style.borderColor = 'rgba(0,0,0,0.12)')}
+              onBlur={e => (e.currentTarget.style.borderColor = 'rgba(0,0,0,0.14)')}
             />
-            <span style={{ fontSize: 13, color: TM, fontWeight: 400 }}>hours</span>
+            <span style={{ fontSize: 12, color: TM }}>hours</span>
           </div>
         </div>
         <SaveBar
@@ -1539,15 +1544,8 @@ function AssignmentRulesTab() {
 
       {/* VIP Auto-Priority */}
       <RuleCard editable title="VIP Auto-Priority" subtitle="Tickets from VIP-tier customers are automatically promoted to Priority 1 on creation.">
-        <div style={ROW_LAST}>
-          <div>
-            <p style={ROW_LABEL}>Auto-promote VIP tickets</p>
-            <p style={ROW_SUB}>
-              {draft.vip_auto_priority1
-                ? 'Enabled — VIP customers will receive Priority 1 on every new ticket.'
-                : 'Disabled — VIP tickets use standard priority rules.'}
-            </p>
-          </div>
+        <div style={ROW}>
+          <span style={ROW_LABEL}>Auto-promote VIP tickets</span>
           <Toggle
             on={draft.vip_auto_priority1}
             saving={saving === 'vip_auto_priority1'}
@@ -1571,24 +1569,27 @@ function AssignmentRulesTab() {
       {/* SLA Deadlines */}
       <RuleCard editable title="SLA Deadlines" subtitle="Time-to-first-response targets applied at the moment a ticket is assigned to an agent.">
         {SLA_META.map(({ priority, label, color }, i, arr) => (
-          <div key={priority} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', minHeight: 52, borderBottom: i < arr.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none' }}>
-            <div className="flex items-center gap-3">
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0, boxShadow: `0 0 0 2px ${color}22` }} />
-              <span style={ROW_LABEL}>{label}</span>
+          <React.Fragment key={priority}>
+            <div style={ROW}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />
+                <span style={ROW_LABEL}>{label}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="number" min={1} max={1440}
+                  value={draft.sla_minutes[priority] ?? ''}
+                  disabled={saving === 'sla_minutes'}
+                  onChange={e => setDraft(d => d ? { ...d, sla_minutes: { ...d.sla_minutes, [priority]: Number(e.target.value) } } : d)}
+                  style={{ width: 64, fontSize: 14, fontWeight: 600, textAlign: 'center' as const, background: 'white', border: '1px solid rgba(0,0,0,0.14)', borderRadius: 8, padding: '5px 8px', color: T1, outline: 'none', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}
+                  onFocus={e => (e.currentTarget.style.borderColor = color)}
+                  onBlur={e => (e.currentTarget.style.borderColor = 'rgba(0,0,0,0.14)')}
+                />
+                <span style={{ fontSize: 12, color: TM, width: 22 }}>min</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="number" min={1} max={1440}
-                value={draft.sla_minutes[priority] ?? ''}
-                disabled={saving === 'sla_minutes'}
-                onChange={e => setDraft(d => d ? { ...d, sla_minutes: { ...d.sla_minutes, [priority]: Number(e.target.value) } } : d)}
-                style={{ width: 72, fontSize: 15, fontWeight: 700, textAlign: 'center' as const, background: 'white', border: '1px solid rgba(0,0,0,0.12)', borderRadius: 10, padding: '7px 8px', color: T1, outline: 'none', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
-                onFocus={e => (e.currentTarget.style.borderColor = color)}
-                onBlur={e => (e.currentTarget.style.borderColor = 'rgba(0,0,0,0.12)')}
-              />
-              <span style={{ fontSize: 11, fontWeight: 500, color: TM, width: 24 }}>min</span>
-            </div>
-          </div>
+            {i < arr.length - 1 && <SEP />}
+          </React.Fragment>
         ))}
         <SaveBar
           dirty={slaDirty}
