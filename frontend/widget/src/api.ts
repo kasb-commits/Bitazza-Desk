@@ -274,6 +274,26 @@ export async function fetchPaginatedHistory(
   }
 }
 
+export interface Announcement {
+  id: string;
+  title_en: string;
+  body_en: string;
+  title_th: string;
+  body_th: string;
+  color: string | null;
+}
+
+export async function fetchAnnouncements(cfg: CSBotConfig): Promise<Announcement[]> {
+  try {
+    const res = await fetch(`${cfg.apiUrl}/chat/announcement`, { headers: getHeaders(cfg) });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.announcements ?? [];
+  } catch {
+    return [];
+  }
+}
+
 export async function uploadAttachment(
   cfg: CSBotConfig,
   file: File,

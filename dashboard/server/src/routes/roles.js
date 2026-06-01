@@ -51,6 +51,7 @@ const ALL_PERMISSIONS = [
   'admin.assignment_rules',
   'admin.sla_targets',
   'admin.bot_config',
+  'admin.announcements',
   'admin.report_settings',
   'admin.ticket_properties',
   // Knowledge base
@@ -67,7 +68,7 @@ const ADMIN_PERMISSIONS = new Set([
   'supervisor.whisper', 'supervisor.reassign',
   'studio.create', 'studio.edit', 'studio.delete', 'studio.test', 'studio.publish',
   'admin.agents', 'admin.roles', 'admin.tags', 'admin.canned_responses', 'admin.assignment_rules',
-  'admin.sla_targets', 'admin.bot_config', 'admin.report_settings', 'admin.ticket_properties',
+  'admin.sla_targets', 'admin.bot_config', 'admin.announcements', 'admin.report_settings', 'admin.ticket_properties',
   'knowledge.read', 'knowledge.write',
   'user360.identity', 'user360.kyc', 'user360.restrictions', 'user360.financials', 'user360.tickets',
 ]);

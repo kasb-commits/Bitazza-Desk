@@ -157,7 +157,8 @@ class AgentResponse:
                  specialist_intro: str | None = None, confidence: float = 1.0,
                  upgraded_category: str | None = None,
                  transition_message: str | None = None,
-                 info_collection: bool = False):
+                 info_collection: bool = False,
+                 profile_fetched: bool = False):
         self.text = text
         self.language = language
         self.escalated = escalated
@@ -172,6 +173,7 @@ class AgentResponse:
         self.upgraded_category = upgraded_category  # set when mid-convo category switch occurs
         self.transition_message: str | None = transition_message  # outgoing-agent farewell shown before specialist reply
         self.info_collection = info_collection  # True when this reply is a collection-phase question
+        self.profile_fetched = profile_fetched  # True when get_user_profile tool was called this turn
 
 
 _UPGRADE_TRANSITION_MESSAGES: dict[str, dict[str, str]] = {
@@ -342,8 +344,9 @@ def chat(
     # guardrails, the safe action is to hand off rather than let free-form AI handle it.
     # suppress_handoff=True means we're called from inside a workflow node — skip this guard.
     # Guests (user_id=None) skip this block — they get KB-based guidance instead.
+    from db.conversation_store import is_human_handling as _is_human_check
     _ACCOUNT_CATEGORIES = {"kyc_verification", "account_restriction", "withdrawal_issue", "deposit_issue", "trade_issue", "fraud_security"}
-    if category in _ACCOUNT_CATEGORIES and not suppress_handoff and user_id is not None:
+    if category in _ACCOUNT_CATEGORIES and not suppress_handoff and user_id is not None and not _is_human_check(conversation_id):
         # Check if a published workflow exists for this category — if so, let it run instead.
         try:
             from workflow_engine.store import get_published_workflows_by_trigger
@@ -449,6 +452,21 @@ def chat(
         system_prompt = get_guest_system_prompt(language, agent_name=_agent_name)
     else:
         system_prompt = get_system_prompt(language, category, platform=platform, agent_name=_agent_name)
+
+    # If the ticket is already escalated, append a context note so Gemini knows
+    # the handoff is already done and stops saying "I'm connecting you now."
+    from db.conversation_store import is_human_handling as _is_human_pre
+    if _is_human_pre(conversation_id):
+        _post_escalation_note = (
+            "\n\nCONTEXT — POST-ESCALATION: This ticket has already been escalated and the customer is waiting. "
+            "A human specialist has already been notified — the handoff is done, not in progress. "
+            "TONE: the customer may be anxious or frustrated. Be calm, direct, and reassuring. "
+            "Do NOT say 'I am connecting you', 'please hold on', or anything implying the transfer is still happening. "
+            "Do NOT ask 'Is there anything else I can help you with?' — they are waiting for a specialist, not more bot help. "
+            "Simply acknowledge their message, answer what you factually can, and confirm the specialist will reach out shortly."
+        )
+        system_prompt = system_prompt + _post_escalation_note
+
     augmented_message = build_user_message(user_message, rag_chunks, {})
 
     # Convert history to Gemini format.
@@ -673,6 +691,13 @@ def chat(
     response_text = _clean_response(response_text)
 
     # 11. Escalation: Gemini's own needs_human flag OR keyword triggers
+    # If the ticket is already escalated, skip re-escalation entirely — the ticket
+    # is already in the queue. Just return Gemini's answer as a plain reply so the
+    # customer gets a relevant response while they wait for the human agent.
+    from db.conversation_store import is_human_handling as _is_human_handling
+    if _is_human_handling(conversation_id):
+        return AgentResponse(text=response_text, language=language, escalated=False, confidence=confidence)
+
     keyword_escalate, reason = should_escalate(user_message, confidence, consecutive_low_confidence)
     escalate = needs_human or keyword_escalate
     if not reason:
@@ -710,7 +735,18 @@ def chat(
         # agent context regardless of category or auth state.
         # User-requested, sensitive keywords, and service errors skip this.
         _intercept_reasons = ("model_requested", "low_confidence")
-        if reason in _intercept_reasons:
+        # If the ticket is already escalated (customer following up after a prior
+        # escalation), skip the collection phase — asking for a screenshot again
+        # is confusing and wrong. Fall straight through to the escalation write.
+        from db.conversation_store import is_human_handling as _is_human
+        if _is_human(conversation_id):
+            reason = "already_escalated"
+        elif account_data:
+            # A tool was called and returned data this turn — the bot has real account
+            # context and produced a substantive answer. Don't intercept with collection
+            # questions; the model already has everything it needs. Escalate directly.
+            pass
+        elif reason in _intercept_reasons:
             _phase = get_info_collection_phase(conversation_id)
             if _phase is None:
                 # First time we've tried to escalate — enter collection phase
@@ -757,7 +793,10 @@ def chat(
             escalation_reason=reason, ticket_id=ticket_id,
         )
 
-    return AgentResponse(text=response_text, language=language, resolved=resolved, confidence=confidence)
+    return AgentResponse(
+        text=response_text, language=language, resolved=resolved, confidence=confidence,
+        profile_fetched="get_user_profile" in account_data,
+    )
 
 
 _EN_FAREWELL_PHRASES = {

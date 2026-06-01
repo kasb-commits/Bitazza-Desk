@@ -54,7 +54,18 @@ class WorkflowRouter:
                 category_upgrade=upgrade,
             )
 
-        # 2. Match a published workflow by trigger
+        # 2. Match a published workflow by trigger.
+        # If the ticket is already escalated, don't restart the workflow from scratch —
+        # fall through so the legacy agent path (and its is_human_handling guard) handles it.
+        from db.conversation_store import is_human_handling
+        if is_human_handling(message.conversation_id):
+            return RouterResult(
+                matched_workflow=None,
+                active_execution=None,
+                fallthrough=True,
+                category_upgrade=None,
+            )
+
         workflows = get_published_workflows()
         for wf in workflows:
             if _trigger_matches(wf, message.channel, message.category):

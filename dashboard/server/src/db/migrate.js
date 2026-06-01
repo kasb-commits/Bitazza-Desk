@@ -660,6 +660,33 @@ INSERT INTO ticket_property_definitions (name, field_key, field_type, options, a
     {"value": "sanctioned", "label": "Sanctioned"}
   ]', NULL, 15)
 ON CONFLICT (field_key) DO NOTHING;
+
+-- Migration 012: Announcements table + permissions
+CREATE TABLE IF NOT EXISTS announcements (
+  id          TEXT PRIMARY KEY,
+  title_en    TEXT NOT NULL,
+  body_en     TEXT NOT NULL,
+  title_th    TEXT NOT NULL,
+  body_th     TEXT NOT NULL,
+  color       TEXT,
+  active      BOOLEAN DEFAULT false,
+  starts_at   TIMESTAMPTZ,
+  ends_at     TIMESTAMPTZ,
+  created_by  TEXT,
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Migration 012b: add color column if table already existed without it
+DO $$ BEGIN
+  ALTER TABLE announcements ADD COLUMN IF NOT EXISTS color TEXT;
+EXCEPTION WHEN others THEN NULL;
+END $$;
+
+INSERT INTO role_permissions (role_name, permission) VALUES
+  ('super_admin', 'admin.announcements'),
+  ('admin',       'admin.announcements')
+ON CONFLICT DO NOTHING;
 `;
 
 (async () => {

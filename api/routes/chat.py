@@ -299,7 +299,9 @@ async def send_message(request: Request, body: MessageRequest, user_id: str | No
     # Before that first reply, even escalated tickets can still get AI answers —
     # the customer may ask follow-up questions while waiting for the agent.
     # reply=None tells the widget to suppress the bot bubble entirely.
-    if is_human_handling(body.conversation_id) and has_human_agent_replied(body.conversation_id):
+    # Cache this once — used again below to prevent status downgrades.
+    _already_escalated = is_human_handling(body.conversation_id)
+    if _already_escalated and has_human_agent_replied(body.conversation_id):
         # Notify the assigned agent that the customer sent a new message
         ticket = get_ticket_by_id(body.conversation_id)
         assigned_to = str(ticket["assigned_to"]) if ticket and ticket.get("assigned_to") else None
@@ -323,7 +325,7 @@ async def send_message(request: Request, body: MessageRequest, user_id: str | No
         )
 
     # If escalated but no human reply yet — still notify the agent but let the AI continue.
-    if is_human_handling(body.conversation_id):
+    if _already_escalated:
         ticket = get_ticket_by_id(body.conversation_id)
         assigned_to = str(ticket["assigned_to"]) if ticket and ticket.get("assigned_to") else None
         if assigned_to:
@@ -345,8 +347,9 @@ async def send_message(request: Request, body: MessageRequest, user_id: str | No
 
     # Mark ticket In_Progress while the AI is actively processing this turn.
     # This distinguishes "AI is working" from "waiting on customer" in the queue.
+    # Skip if already escalated — never downgrade Escalated → In_Progress.
     _ticket_id = get_ticket_id_by_conversation(body.conversation_id)
-    if _ticket_id:
+    if _ticket_id and not _already_escalated:
         update_ticket_status(_ticket_id, "in_progress")
 
     # ── Attachment escalation ──────────────────────────────────────────────────
@@ -418,11 +421,14 @@ async def send_message(request: Request, body: MessageRequest, user_id: str | No
     }
     if getattr(result, "info_collection", False):
         _reply_meta["info_collection"] = True
+    if getattr(result, "profile_fetched", False):
+        _reply_meta["profile_fetched"] = True
     add_message(body.conversation_id, "assistant", result.text, _reply_meta)
 
     # After the AI replies, move status to Pending_Customer (ball is in customer's court).
     # Skip if the AI escalated — agent.py already wrote the correct Escalated status.
-    if not result.escalated and _ticket_id:
+    # Also skip if the ticket was already escalated before this turn — never downgrade.
+    if not result.escalated and _ticket_id and not _already_escalated:
         update_ticket_status(_ticket_id, "pending_customer")
 
     # Merge intent-resolver agent update with any mid-conversation upgrade from the agent.

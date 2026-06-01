@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Message, MessageAttachment, CSBotConfig, IssueCategory } from './types';
 import { ISSUE_CATEGORIES } from './types';
-import { startConversation, sendMessage, uploadAttachment, fetchHistory, setCategoryAgent, getStoredSession, storeSessionLang, storeSessionCategory, storeSessionAgent, clearStoredSession, fetchCustomerTickets, fetchOpenTicket, getStoredCustomerId, emergencyEscalate } from './api';
-import type { PastTicket } from './api';
+import { startConversation, sendMessage, uploadAttachment, fetchHistory, setCategoryAgent, getStoredSession, storeSessionLang, storeSessionCategory, storeSessionAgent, clearStoredSession, fetchCustomerTickets, fetchOpenTicket, getStoredCustomerId, emergencyEscalate, fetchAnnouncements } from './api';
+import type { PastTicket, Announcement } from './api';
 import MessageBubble from './MessageBubble';
 import TypingIndicator from './TypingIndicator';
 import CategoryPicker from './CategoryPicker';
@@ -107,6 +107,8 @@ export default function ChatWindow({ cfg, onClose }: Props) {
   const [isGuest, setIsGuest] = useState<boolean>(cfg.guestMode ?? false);
   const [showGuestForm, setShowGuestForm] = useState<boolean>(false);
   const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [dismissedAnnIds, setDismissedAnnIds] = useState<Set<string>>(new Set());
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -337,6 +339,8 @@ export default function ChatWindow({ cfg, onClose }: Props) {
     setLang(selected);
     setLangSelected(true);
     storeSessionLang(selected);
+    // Fetch active announcements (non-blocking — shown above category picker)
+    fetchAnnouncements(cfg).then(setAnnouncements).catch(() => {});
     // For guest mode: show the identity form instead of proceeding to category picker
     if (cfg.guestMode) {
       setShowGuestForm(true);
@@ -888,6 +892,70 @@ export default function ChatWindow({ cfg, onClose }: Props) {
             </button>
           </div>
         )}
+        {!showGuestForm && langSelected && announcements
+          .filter(a => !dismissedAnnIds.has(a.id))
+          .map(a => {
+            const c = a.color || primaryColor;
+            return (
+            <div
+              key={a.id}
+              className="csbot-msg-in"
+              style={{
+                margin: '4px 0 2px',
+                borderRadius: 16,
+                background: `linear-gradient(135deg, ${c}14 0%, ${c}08 100%)`,
+                border: `1px solid ${c}28`,
+                overflow: 'hidden',
+              }}
+            >
+              {/* Accent bar */}
+              <div style={{ height: 3, background: `linear-gradient(90deg, ${c} 0%, ${c}88 100%)` }} />
+              <div style={{ padding: '10px 12px 11px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
+                  {/* Icon */}
+                  <div style={{
+                    flexShrink: 0, width: 28, height: 28, borderRadius: 8,
+                    background: `${c}18`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 1,
+                  }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 8.01c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h1v4l4-4h10c1.1 0 2-.9 2-2V8.01z"/>
+                    </svg>
+                  </div>
+                  {/* Text */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 12, fontWeight: 700, color: c, marginBottom: 3, lineHeight: 1.3 }}>
+                      {lang === 'th' ? a.title_th : a.title_en}
+                    </p>
+                    <p style={{ fontSize: 12, color: '#374151', lineHeight: 1.55, margin: 0 }}>
+                      {lang === 'th' ? a.body_th : a.body_en}
+                    </p>
+                  </div>
+                  {/* Dismiss */}
+                  <button
+                    onClick={() => setDismissedAnnIds(prev => new Set([...prev, a.id]))}
+                    style={{
+                      flexShrink: 0, marginTop: 1,
+                      width: 20, height: 20, borderRadius: 6,
+                      background: `${c}12`,
+                      border: 'none', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: c, transition: 'background 0.15s',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = `${c}25`)}
+                    onMouseLeave={e => (e.currentTarget.style.background = `${c}12`)}
+                    aria-label="Dismiss"
+                  >
+                    <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                      <path d="M1 1l10 10M11 1L1 11"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+            );
+          })
+        }
         {!showGuestForm && !isGuest && langSelected && !selectedCategory && !escalated && !showOpenTicketBanner && (
           <CategoryPicker
             lang={lang}
