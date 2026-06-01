@@ -509,9 +509,13 @@ def chat(
     if not is_guest_session:
         from db.conversation_store import has_successful_bot_reply
         prior_successful_reply = has_successful_bot_reply(conversation_id) if history else False
+        # When called from inside a workflow (suppress_handoff=True), the workflow's
+        # account_lookup node already fetched the profile. Don't force a redundant
+        # get_user_profile — let Gemini decide based on the conversation context.
+        # Transaction-specific tool forcing (TX IDs, order IDs) still applies below.
         force_tool_name = (
             _FORCE_TOOL_NAMES.get(category)
-            if category in _FORCE_TOOL_CATEGORIES and not prior_successful_reply
+            if category in _FORCE_TOOL_CATEGORIES and not prior_successful_reply and not suppress_handoff
             else None
         )
 
@@ -741,10 +745,9 @@ def chat(
         from db.conversation_store import is_human_handling as _is_human
         if _is_human(conversation_id):
             reason = "already_escalated"
-        elif account_data:
-            # A tool was called and returned data this turn — the bot has real account
-            # context and produced a substantive answer. Don't intercept with collection
-            # questions; the model already has everything it needs. Escalate directly.
+        elif suppress_handoff:
+            # Inside a workflow — the workflow owns escalation routing via its
+            # own escalate node. Don't intercept with collection questions.
             pass
         elif reason in _intercept_reasons:
             _phase = get_info_collection_phase(conversation_id)

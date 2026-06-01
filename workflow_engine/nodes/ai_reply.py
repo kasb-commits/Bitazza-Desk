@@ -84,6 +84,7 @@ class AiReplyNode:
             "escalated": response.escalated,
             "resolved":  response.resolved,
             "confidence": response.confidence,
+            "profile_fetched": getattr(response, "profile_fetched", False),
         }
 
         if response.upgraded_category:
