@@ -1268,7 +1268,7 @@ function RuleCard({ title, subtitle, editable, children }: { title: string; subt
       background: 'white', borderRadius: 14, overflow: 'hidden',
       boxShadow: '0 0 0 0.5px rgba(0,0,0,0.1), 0 2px 12px rgba(0,0,0,0.07)',
     }}>
-      <div style={{ padding: '16px 20px 14px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+      <div style={{ padding: '18px 24px 14px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
         <div>
           <p style={{ fontSize: 13, fontWeight: 600, color: T1, letterSpacing: '-0.01em' }}>{title}</p>
           <p style={{ fontSize: 12, color: TM, marginTop: 2, lineHeight: 1.5 }}>{subtitle}</p>
@@ -1282,7 +1282,7 @@ function RuleCard({ title, subtitle, editable, children }: { title: string; subt
         )}
       </div>
       {/* inset hairline below header */}
-      <div style={{ height: '0.5px', background: 'rgba(0,0,0,0.09)', marginLeft: 20 }} />
+      <div style={{ height: '0.5px', background: 'rgba(0,0,0,0.09)', marginLeft: 24 }} />
       <div>{children}</div>
     </div>
   );
@@ -1384,24 +1384,25 @@ function AssignmentRulesTab() {
   // Row helpers — inset separator sits BETWEEN rows as a sibling element, not as borderBottom
   const ROW: React.CSSProperties = {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '0 20px', minHeight: 44,
+    padding: '0 24px', minHeight: 50,
   };
-  const SEP  = () => <div style={{ height: '0.5px', background: 'rgba(0,0,0,0.08)', marginLeft: 20 }} />;
+  const SEP  = () => <div style={{ height: '0.5px', background: 'rgba(0,0,0,0.07)', marginLeft: 24 }} />;
   const ROW_LABEL: React.CSSProperties = { fontSize: 13, fontWeight: 400, color: T1 };
   const ROW_SUB: React.CSSProperties   = { fontSize: 11, color: TM, marginTop: 2, lineHeight: 1.5 };
   const SEL: React.CSSProperties = {
-    fontSize: 12, fontWeight: 500, color: T1,
-    background: 'white', border: '1px solid rgba(0,0,0,0.14)',
-    borderRadius: 8, padding: '5px 26px 5px 10px',
-    outline: 'none', cursor: 'pointer', width: 148,
-    appearance: 'none' as const,
-    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239ca3af' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E")`,
-    backgroundRepeat: 'no-repeat', backgroundPosition: 'right 9px center',
-    boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+    fontSize: 13, fontWeight: 400, color: T1,
+    background: 'white',
+    border: '1px solid rgba(0,0,0,0.15)',
+    borderRadius: 8,
+    padding: '7px 32px 7px 12px',
+    outline: 'none',
+    cursor: 'pointer',
+    width: 160,
+    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
   };
 
   return (
-    <div className="space-y-4" style={{ maxWidth: 680 }}>
+    <div className="space-y-4">
 
       {/* Toast */}
       {toast && (
@@ -1464,14 +1465,20 @@ function AssignmentRulesTab() {
           <React.Fragment key={cat}>
             <div style={ROW}>
               <span style={ROW_LABEL}>{CATEGORY_LABELS[cat] ?? cat}</span>
-              <select
-                value={team}
-                disabled={saving === 'category_team_map'}
-                onChange={e => setDraft(d => d ? { ...d, category_team_map: { ...d.category_team_map, [cat]: e.target.value } } : d)}
-                style={SEL}
-              >
-                {KNOWN_TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
+              <div style={{ position: 'relative', display: 'inline-block' }}>
+                <select
+                  value={team}
+                  disabled={saving === 'category_team_map'}
+                  onChange={e => setDraft(d => d ? { ...d, category_team_map: { ...d.category_team_map, [cat]: e.target.value } } : d)}
+                  style={{ ...SEL, paddingRight: 32 }}
+                >
+                  {KNOWN_TEAMS.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <svg width={10} height={6} viewBox="0 0 10 6" fill="none"
+                     style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: TM }}>
+                  <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
             </div>
             <SEP />
           </React.Fragment>
