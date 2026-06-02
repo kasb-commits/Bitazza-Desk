@@ -580,6 +580,14 @@ def create_email_ticket(
     return ticket_id
 
 
+def get_ticket_category(conversation_id: str) -> str | None:
+    with _conn() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT category FROM tickets WHERE id = %s", (conversation_id,))
+        row = cur.fetchone()
+        return row["category"] if row else None
+
+
 def update_ticket_category(conversation_id: str, category: str) -> None:
     team = _CATEGORY_TEAM.get(category, "cs")
     with _conn() as conn:
