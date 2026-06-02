@@ -437,7 +437,7 @@ def get_paginated_history(conversation_id: str, page: int = 1, limit: int = 10) 
             SELECT sender_type, content, created_at, metadata
             FROM messages
             WHERE ticket_id = %s
-              AND sender_type != 'internal_note'
+              AND sender_type NOT IN ('internal_note', 'system')
             ORDER BY created_at DESC
             LIMIT %s OFFSET %s
         """, (conversation_id, limit, offset))
@@ -665,7 +665,7 @@ def get_history(conversation_id: str, limit: int = 10) -> list[dict]:
             SELECT sender_type, content, created_at, metadata
             FROM messages
             WHERE ticket_id = %s
-              AND sender_type != 'internal_note'
+              AND sender_type NOT IN ('internal_note', 'system')
             ORDER BY created_at DESC
             LIMIT %s
         """, (conversation_id, limit))
