@@ -291,13 +291,18 @@ function MessageBubble({ msg, showTs }: BubbleProps) {
   const type = getSenderType(msg);
   const ts = formatTime(msg.created_at);
 
-  // System — centered pill
+  // System — inline event divider
   if (type === 'system') {
+    const displayContent = msg.content === '__resolve_request__'
+      ? `Resolution Request Sent By ${msg.agent_name || 'Agent'}`
+      : msg.content;
     return (
-      <div className="flex justify-center my-1">
-        <span className="text-[10px] text-text-muted bg-surface-3 ring-1 ring-surface-5 px-3 py-1 rounded-full">
-          {msg.content}
+      <div className="flex items-center gap-2 my-2 px-1">
+        <div className="flex-1 h-px bg-gray-200" />
+        <span className="text-[11px] text-gray-400 font-medium shrink-0 select-none">
+          {displayContent}
         </span>
+        <div className="flex-1 h-px bg-gray-200" />
       </div>
     );
   }

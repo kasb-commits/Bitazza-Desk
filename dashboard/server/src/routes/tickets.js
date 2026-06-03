@@ -607,9 +607,9 @@ router.post('/:id/claim', requirePermission('inbox.claim'), async (req, res) => 
 router.post('/:id/resolve-request', requirePermission('inbox.reply'), async (req, res) => {
   try {
     await pool.query(
-      `INSERT INTO messages (ticket_id, sender_type, sender_id, content)
-       VALUES ($1, 'system', $2, '__resolve_request__')`,
-      [req.params.id, req.user.id]
+      `INSERT INTO messages (ticket_id, sender_type, sender_id, content, metadata)
+       VALUES ($1, 'system', $2, '__resolve_request__', $3)`,
+      [req.params.id, req.user.id, JSON.stringify({ agent_name: req.user.name })]
     );
     await pool.query(
       `UPDATE tickets SET status='Pending_Customer', updated_at=NOW() WHERE id=$1 AND status NOT IN ('Closed_Resolved','Closed_Unresponsive')`,
