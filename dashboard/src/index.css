@@ -376,6 +376,6 @@ html {
 
 /* ── DS: Message bubble backgrounds ─────────────────────────────────────── */
 /*  Semantic colors that stay legible on any chat background.                 */
-.ds-bubble-customer { background: #ffffff;  color: #1B1A18; border: 1px solid #EDEDF8; }
-.ds-bubble-bot      { background: #ffffff;  color: #1B1A18; border: 1px solid #EDEDF8; }
-.ds-bubble-agent    { background: #F0FEF8;  color: #1B1A18; border: 1px solid #00CE80; }
+.ds-bubble-customer { background: #ffffff;  color: #111827; border: 1px solid rgba(180,195,220,0.35); }
+.ds-bubble-bot      { background: #dbeafe;  color: #1e3a8a; }
+.ds-bubble-agent    { background: #d1fae5;  color: #064e3b; }
