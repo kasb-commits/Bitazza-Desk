@@ -447,6 +447,13 @@ export default function MessageThread({ ticketId, ws, onStatusChange, pendingDra
     }
   }, [pendingDraft]);
 
+  // Join/leave the ticket's socket room so we receive ticket-scoped events
+  useEffect(() => {
+    if (!ws || !ticketId) return;
+    ws.send(JSON.stringify({ type: 'join_ticket', ticket_id: ticketId }));
+    return () => { ws.send(JSON.stringify({ type: 'leave_ticket', ticket_id: ticketId })); };
+  }, [ws, ticketId]);
+
   useEffect(() => {
     if (!ws) return;
     const handler = (e: MessageEvent) => {

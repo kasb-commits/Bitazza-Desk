@@ -416,6 +416,9 @@ export function createSocket(): Socket {
 export function createWS(onEvent: (e: unknown) => void): WebSocket {
   const socket = createSocket();
 
+  // Storage for addEventListener('message', ...) listeners (used by MessageThread)
+  const msgListeners = new Set<(e: { data: string }) => void>();
+
   // Forward all server→client events as fake MessageEvents
   const EVENTS = [
     'new_message', 'status_change', 'ticket:updated', 'ticket:assigned',
@@ -425,7 +428,13 @@ export function createWS(onEvent: (e: unknown) => void): WebSocket {
 
   EVENTS.forEach(ev => {
     socket.on(ev, (payload: unknown) => {
-      onEvent({ type: ev, ...((payload as object) ?? {}) });
+      const eventData = { type: ev, ...((payload as object) ?? {}) };
+      onEvent(eventData);
+      // Also dispatch to addEventListener('message') listeners (e.g. MessageThread)
+      if (msgListeners.size > 0) {
+        const fakeMsg = { data: JSON.stringify(eventData) };
+        msgListeners.forEach(fn => fn(fakeMsg));
+      }
     });
   });
 
@@ -441,8 +450,12 @@ export function createWS(onEvent: (e: unknown) => void): WebSocket {
     },
     close: () => socket.disconnect(),
     onclose: null as ((e: CloseEvent) => void) | null,
-    addEventListener: (_: string, __: unknown) => {},
-    removeEventListener: (_: string, __: unknown) => {},
+    addEventListener: (type: string, fn: unknown) => {
+      if (type === 'message') msgListeners.add(fn as (e: { data: string }) => void);
+    },
+    removeEventListener: (type: string, fn: unknown) => {
+      if (type === 'message') msgListeners.delete(fn as (e: { data: string }) => void);
+    },
   };
 
   socket.on('connect',    () => { fake.readyState = WebSocket.OPEN; });

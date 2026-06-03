@@ -2,6 +2,7 @@
 const router = require('express').Router();
 const pool   = require('../db/pg');
 const { authenticate, requirePermission } = require('../middleware/auth');
+const { emitToTicket } = require('../lib/sockets');
 
 // ── GET /definitions ─────────────────────────────────────────────────────────
 // Returns all property definitions. ?include_inactive=true for admin view.
@@ -178,16 +179,16 @@ router.patch('/tickets/:ticketId/values', authenticate, async (req, res) => {
   if (!property_id) return res.status(400).json({ error: 'property_id is required' });
 
   try {
-    // Look up the definition to determine the correct column
+    // Look up the definition to determine the correct column and display name
     const { rows: defRows } = await pool.query(
-      'SELECT field_type FROM ticket_property_definitions WHERE id = $1 AND is_active = true',
+      'SELECT field_type, name FROM ticket_property_definitions WHERE id = $1 AND is_active = true',
       [property_id]
     );
     if (defRows.length === 0) {
       return res.status(404).json({ error: 'Property definition not found or inactive' });
     }
 
-    const { field_type } = defRows[0];
+    const { field_type, name: propName } = defRows[0];
 
     let valueText   = null;
     let valueArray  = null;
@@ -204,6 +205,15 @@ router.patch('/tickets/:ticketId/values', authenticate, async (req, res) => {
       if (isNaN(valueNumber)) return res.status(400).json({ error: 'value must be a number' });
     }
 
+    // Fetch old value before upsert (for the system message diff)
+    const { rows: oldRows } = await pool.query(
+      `SELECT value_text, value_array, value_number
+         FROM ticket_property_values
+        WHERE ticket_id = $1 AND property_id = $2`,
+      [ticketId, property_id]
+    );
+    const old = oldRows[0] ?? null;
+
     const { rows } = await pool.query(
       `INSERT INTO ticket_property_values (ticket_id, property_id, value_text, value_array, value_number, updated_by, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, NOW())
@@ -216,6 +226,46 @@ router.patch('/tickets/:ticketId/values', authenticate, async (req, res) => {
        RETURNING *`,
       [ticketId, property_id, valueText, valueArray, valueNumber, req.user.id]
     );
+
+    // Build human-readable old → new strings
+    function displayValue(row, ft) {
+      if (!row) return null;
+      if (ft === 'multi_select') return row.value_array?.join(', ') || null;
+      if (ft === 'number')       return row.value_number != null ? String(row.value_number) : null;
+      return row.value_text ?? null;
+    }
+    const newDisplayRow = { value_text: valueText, value_array: valueArray, value_number: valueNumber };
+    const oldDisplay = displayValue(old, field_type);
+    const newDisplay = displayValue(newDisplayRow, field_type);
+
+    // Only emit a system message when the value actually changes
+    if (oldDisplay !== newDisplay) {
+      const agentName = req.user.name || 'Agent';
+      let systemContent;
+      if (!newDisplay) {
+        systemContent = `${agentName} cleared "${propName}"`;
+      } else if (!oldDisplay) {
+        systemContent = `${agentName} set "${propName}" to "${newDisplay}"`;
+      } else {
+        systemContent = `${agentName} changed "${propName}" from "${oldDisplay}" to "${newDisplay}"`;
+      }
+
+      const { rows: msgRows } = await pool.query(
+        `INSERT INTO messages (ticket_id, sender_type, content) VALUES ($1, 'system', $2) RETURNING *`,
+        [ticketId, systemContent]
+      );
+      const msg = msgRows[0];
+      emitToTicket(ticketId, 'new_message', {
+        message: {
+          id:          msg.id,
+          role:        'system',
+          sender_type: 'system',
+          content:     msg.content,
+          created_at:  Math.floor(new Date(msg.created_at).getTime() / 1000),
+        },
+      });
+    }
+
     res.json(rows[0]);
   } catch (err) {
     console.error('[ticketProperties] PATCH /tickets/:ticketId/values error:', err);

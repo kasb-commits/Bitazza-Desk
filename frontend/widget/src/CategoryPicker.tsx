@@ -1,6 +1,47 @@
 import type { IssueCategory, IssueCategoryDef } from './types';
 import { ISSUE_CATEGORIES } from './types';
 
+// SVG line icons — stroke="currentColor", 18×18, 1.75px stroke
+const CATEGORY_ICONS: Record<IssueCategory, JSX.Element> = {
+  kyc_verification: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <circle cx="8" cy="12" r="2" />
+      <path d="M14 10h4M14 14h3" />
+    </svg>
+  ),
+  account_restriction: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="5" y="11" width="14" height="10" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    </svg>
+  ),
+  password_2fa_reset: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="7.5" cy="15.5" r="5.5" />
+      <path d="M10.85 12.15L19 4M18 5l2 2M15 8l2 2" />
+    </svg>
+  ),
+  fraud_security: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      <path d="M9 12l2 2 4-4" />
+    </svg>
+  ),
+  withdrawal_issue: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <path d="M2 10h20" />
+      <path d="M6 15h4" />
+    </svg>
+  ),
+  other: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  ),
+};
+
 interface Props {
   lang: 'en' | 'th';
   primaryColor: string;
@@ -8,17 +49,7 @@ interface Props {
   disabled?: boolean;
 }
 
-// Per-category accent palette — hue-matched to each topic
-const ACCENTS: Record<IssueCategory, { bg: string; border: string; icon: string; glow: string }> = {
-  kyc_verification:   { bg: 'linear-gradient(135deg,#eef6ff 0%,#dbeafe 100%)', border: '#93c5fd', icon: '#2563eb', glow: 'rgba(37,99,235,0.18)' },
-  account_restriction:{ bg: 'linear-gradient(135deg,#fff7ed 0%,#fed7aa 100%)', border: '#fb923c', icon: '#ea580c', glow: 'rgba(234,88,12,0.18)'  },
-  password_2fa_reset: { bg: 'linear-gradient(135deg,#f5f3ff 0%,#ede9fe 100%)', border: '#a78bfa', icon: '#7c3aed', glow: 'rgba(124,58,237,0.18)' },
-  fraud_security:     { bg: 'linear-gradient(135deg,#f0fdf4 0%,#bbf7d0 100%)', border: '#4ade80', icon: '#16a34a', glow: 'rgba(22,163,74,0.18)'  },
-  withdrawal_issue:   { bg: 'linear-gradient(135deg,#fff1f2 0%,#fecdd3 100%)', border: '#f87171', icon: '#dc2626', glow: 'rgba(220,38,38,0.18)'  },
-  other:              { bg: 'linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%)', border: '#94a3b8', icon: '#475569', glow: 'rgba(71,85,105,0.18)'  },
-};
-
-export default function CategoryPicker({ lang, primaryColor, onSelect, disabled }: Props) {
+export default function CategoryPicker({ lang, onSelect, disabled }: Props) {
   // Pair categories into rows of 2
   const pairs: (IssueCategoryDef | null)[][] = [];
   const cats = ISSUE_CATEGORIES;
@@ -36,7 +67,6 @@ export default function CategoryPicker({ lang, primaryColor, onSelect, disabled 
                 key={cat.key}
                 cat={cat}
                 lang={lang}
-                accent={ACCENTS[cat.key]}
                 disabled={disabled}
                 onSelect={onSelect}
               />
@@ -53,13 +83,11 @@ export default function CategoryPicker({ lang, primaryColor, onSelect, disabled 
 function MosaicCard({
   cat,
   lang,
-  accent,
   disabled,
   onSelect,
 }: {
   cat: IssueCategoryDef;
   lang: 'en' | 'th';
-  accent: { bg: string; border: string; icon: string; glow: string };
   disabled?: boolean;
   onSelect: (key: IssueCategory) => void;
 }) {
@@ -68,14 +96,10 @@ function MosaicCard({
       onClick={() => !disabled && onSelect(cat.key)}
       disabled={disabled}
       className="csbot-mosaic-card"
-      style={{
-        '--card-bg': accent.bg,
-        '--card-border': accent.border,
-        '--card-icon': accent.icon,
-        '--card-glow': accent.glow,
-      } as React.CSSProperties}
     >
-      <span className="csbot-mosaic-icon">{cat.icon}</span>
+      <span className="csbot-mosaic-icon" style={{ color: 'rgba(27,26,24,0.75)' }}>
+        {CATEGORY_ICONS[cat.key]}
+      </span>
       <span className="csbot-mosaic-label">{cat.label[lang]}</span>
     </button>
   );

@@ -98,6 +98,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
   const [resolutionRejections, setResolutionRejections] = useState(0);
   const [csatPending, setCsatPending] = useState(false);
   const [csatSubmitted, setCsatSubmitted] = useState(false);
+  const [csatHover, setCsatHover] = useState(0);
   const [agentClosureRequest, setAgentClosureRequest] = useState(false);
   const [prevTickets, setPrevTickets] = useState<PastTicket[]>([]);
   const [showPrevTickets, setShowPrevTickets] = useState(false);
@@ -115,6 +116,8 @@ export default function ChatWindow({ cfg, onClose }: Props) {
   const lastAgentMsgTime = useRef(0);
   const lastFailedText = useRef('');
   const sendRef = useRef<((text: string, category?: string, skipUserBubble?: boolean) => Promise<void>) | null>(null);
+  // Holds the category the customer was in before clicking "Go back", so selectCategory can show the topic-switch divider
+  const prevCategoryRef = useRef<IssueCategory | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const t = UI_TEXT[lang];
@@ -124,6 +127,16 @@ export default function ChatWindow({ cfg, onClose }: Props) {
     const existing = getStoredSession();
     if (existing) {
       // Resume: load history from backend
+      // If the stored session is a guest session but we're now authenticated, discard it
+      // so a fresh authenticated conversation starts instead.
+      if (existing.isGuest && !cfg.guestMode) {
+        clearStoredSession();
+        showGreeting();
+        startConversation(cfg)
+          .then((id) => setConvId(id))
+          .catch(() => setError('Could not connect. Please refresh.'));
+        return;
+      }
       setConvId(existing.id);
       if (existing.isGuest) setIsGuest(true);
       // Restore lang selection from session if available
@@ -267,6 +280,18 @@ export default function ChatWindow({ cfg, onClose }: Props) {
   };
 
   const selectCategory = useCallback((category: IssueCategory) => {
+    // If customer came from a previous category (went back and re-picked), inject an inline topic-switch divider
+    if (prevCategoryRef.current && prevCategoryRef.current !== category) {
+      const oldLabel = ISSUE_CATEGORIES.find((c) => c.key === prevCategoryRef.current!)?.label[lang] ?? prevCategoryRef.current;
+      const newLabel = ISSUE_CATEGORIES.find((c) => c.key === category)?.label[lang] ?? category;
+      setMessages((msgs) => [...msgs, {
+        id: crypto.randomUUID(),
+        role: 'system' as const,
+        content: `${oldLabel} → ${newLabel}`,
+        timestamp: Date.now(),
+      }]);
+      prevCategoryRef.current = null;
+    }
     setSelectedCategory(category);
     storeSessionCategory(category);
     // Load previous tickets for returning customers (not guests)
@@ -440,9 +465,9 @@ export default function ChatWindow({ cfg, onClose }: Props) {
         ]);
       } else if (humanHandling) {
         // Dashboard marked conversation as escalated but agent hasn't replied yet —
-        // dismiss the "connecting" spinner banner without waiting for a message.
+        // set escalated flag only; leave escalatedAgent null so the back button
+        // stays visible and the "connecting" banner shows until a real agent replies.
         setEscalated(true);
-        setEscalatedAgent((prev) => prev ?? { name: 'Support Agent', avatar: 'S', avatarUrl: null });
       }
     };
     const interval = setInterval(poll, 3000);
@@ -596,6 +621,34 @@ export default function ChatWindow({ cfg, onClose }: Props) {
   // Keep sendRef current so selectCategory can call send before it's in scope
   useEffect(() => { sendRef.current = send; }, [send]);
 
+  const handleTalkToAgent = useCallback(() => {
+    send(lang === 'th' ? 'ขอติดต่อเจ้าหน้าที่' : 'I need to speak to a human agent');
+  }, [send, lang]);
+
+  const handleGoBack = useCallback(() => {
+    prevCategoryRef.current = selectedCategory;
+    setSelectedCategory(null);
+    storeSessionCategory('');
+    // Keep existing messages — append a pick-topic prompt so the category picker appears below history
+    setMessages((prev) => [...prev, {
+      id: crypto.randomUUID(),
+      role: 'assistant' as const,
+      content: lang === 'th' ? 'กรุณาเลือกประเภทปัญหาที่ต้องการความช่วยเหลือ:' : 'Please select the type of issue you need help with:',
+      timestamp: Date.now(),
+      senderName: 'Bitazza Support',
+    }]);
+    setEscalated(false);
+    setEscalatedAgent(null);
+    setAwaitingFirstReply(false);
+    setResolutionRejections(0);
+    setConsecutiveLow(0);
+    setBotName(null);
+    setBotAvatarUrl(null);
+    setError(null);
+    setInput('');
+    setPendingAttachments([]);
+  }, [selectedCategory, lang]);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -603,47 +656,61 @@ export default function ChatWindow({ cfg, onClose }: Props) {
     }
   };
 
-  const primaryColor = cfg.primaryColor ?? '#6366f1';
+  const primaryColor = cfg.primaryColor ?? '#00CE80';
 
   return (
-    <div className="csbot-window flex flex-col w-[380px] h-[560px] rounded-2xl overflow-hidden">
-      {/* Header */}
+    <div className="csbot-window flex flex-col rounded-2xl overflow-hidden" style={{ width: 384, height: 'min(624px, calc(100vh - 116px))' }}>
+      {/* Header — Bitazza: flat Background Color/950 dark surface */}
       <div
-        className="csbot-header flex items-center justify-between px-4 py-3 text-white relative overflow-hidden"
-        style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${primaryColor}cc 100%)` }}
+        className="csbot-header flex items-center justify-between px-4 py-3"
+        style={{ background: '#090916', borderBottom: '1px solid #2C2C53' }}
       >
-        {/* subtle shine overlay */}
-        <div className="absolute inset-0 bg-white/5 pointer-events-none" />
-        <div className="relative flex items-center gap-3">
-          <div className="csbot-avatar-ring w-8 h-8 rounded-full bg-white/20 flex items-center justify-center font-bold text-sm overflow-hidden">
+        {/* Who — left-aligned avatar + name/status */}
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          {messages.length > 0 && langSelected && !escalatedAgent ? (
+            <button
+              onClick={handleGoBack}
+              className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-colors"
+              style={{ background: '#2C2C53', border: '1px solid #13132C', color: 'rgba(255,255,255,1)' }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#13132C')}
+              onMouseLeave={e => (e.currentTarget.style.background = '#2C2C53')}
+              aria-label="Go back to topics"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+          ) : null}
+          {/* Avatar 36×36 */}
+          <div className="w-9 h-9 rounded-full flex items-center justify-center font-extrabold text-[15px] overflow-hidden shrink-0" style={{ background: '#00CE80', color: '#1B1A18' }}>
             {escalatedAgent ? (
               escalatedAgent.avatarUrl ? (
                 <img src={escalatedAgent.avatarUrl} alt={escalatedAgent.name} className="w-full h-full object-cover" />
               ) : (
                 escalatedAgent.avatar
               )
-            ) : botName ? botName[0].toUpperCase() : (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23-.693L5 14.5m14.8.8l1.402 1.402c1 1 .03 2.798-1.414 2.798H4.213c-1.444 0-2.414-1.798-1.414-2.798L4.2 15.3" />
-              </svg>
-            )}
+            ) : 'B'}
           </div>
-          <div>
-            <div className="font-semibold text-sm leading-tight">{escalatedAgent?.name ?? botName ?? t.header}</div>
-            <div className="flex items-center gap-1 mt-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
-              <span className="text-white/70 text-[10px]">
+          <div className="min-w-0">
+            <div className="font-semibold text-[15px] leading-tight truncate" style={{ color: 'rgba(255,255,255,1)' }}>{escalatedAgent?.name ?? 'Bitazza Support'}</div>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className={"w-[7px] h-[7px] rounded-full shrink-0" + (escalatedAgent ? " animate-pulse" : "")} style={{ backgroundColor: '#10F48B' }} />
+              <span className="text-[11.5px]" style={{ color: 'rgba(255,255,255,0.6)' }}>
                 {escalatedAgent ? 'Live agent — connected' : 'Online — typically replies instantly'}
               </span>
             </div>
           </div>
         </div>
+        {/* Close button */}
         <button
           onClick={onClose}
-          className="relative w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+          className="w-[30px] h-[30px] rounded-full flex items-center justify-center shrink-0 transition-colors"
+          style={{ background: '#2C2C53', border: '1px solid #13132C', color: 'rgba(255,255,255,1)' }}
+          onMouseEnter={e => (e.currentTarget.style.background = '#13132C')}
+          onMouseLeave={e => (e.currentTarget.style.background = '#2C2C53')}
           aria-label="Close"
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
@@ -656,16 +723,16 @@ export default function ChatWindow({ cfg, onClose }: Props) {
             <>
               {escalatedAgent?.avatarUrl ? (
                 <img src={escalatedAgent.avatarUrl} alt={escalatedAgent.name} className="w-5 h-5 rounded-full" />
-              ) : escalatedAgent?.avatar ? (
-                <span className="w-5 h-5 rounded-full bg-amber-400 text-white flex items-center justify-center font-bold text-[10px]">
-                  {escalatedAgent.avatar}
+              ) : (
+                <span className="w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px]" style={{ background: '#F4B72A', color: '#1B1A18' }}>
+                  {escalatedAgent?.avatar ?? agentConnectedBanner[0].toUpperCase()}
                 </span>
-              ) : null}
+              )}
               <span><strong>{agentConnectedBanner}</strong> is connected</span>
             </>
           ) : (
             <>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
               </svg>
               <span>{t.escalationBanner}</span>
@@ -676,8 +743,8 @@ export default function ChatWindow({ cfg, onClose }: Props) {
 
       {/* Open ticket banner — shown after lang selection if customer has an unresolved ticket */}
       {showOpenTicketBanner && openTicket && (
-        <div data-testid="open-ticket-banner" className="px-4 py-3 bg-amber-50 border-b border-amber-100">
-          <p className="text-xs text-amber-800 font-medium mb-2">
+        <div data-testid="open-ticket-banner" className="px-4 py-3" style={{ background: '#FEF8EA', borderBottom: '1px solid #F4B72A' }}>
+          <p className="text-xs font-medium mb-2" style={{ color: '#705514' }}>
             {lang === 'th'
               ? `คุณมีการสนทนา "${CATEGORY_LABEL_SHORT[openTicket.category]?.[lang] ?? openTicket.category}" ที่ยังค้างอยู่ (${relativeDate(openTicket.created_at, lang)})`
               : `You have an open "${CATEGORY_LABEL_SHORT[openTicket.category]?.[lang] ?? openTicket.category}" conversation from ${relativeDate(openTicket.created_at, lang)}`
@@ -708,7 +775,10 @@ export default function ChatWindow({ cfg, onClose }: Props) {
                   }
                 });
               }}
-              className="px-3 py-1.5 rounded-full text-xs font-semibold bg-amber-500 text-white hover:bg-amber-600 transition-colors"
+              className="px-3 py-1.5 rounded-full text-xs font-semibold transition-colors"
+              style={{ background: '#00CE80', color: '#1B1A18' }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#079755')}
+              onMouseLeave={e => (e.currentTarget.style.background = '#00CE80')}
             >
               {lang === 'th' ? 'ดำเนินการต่อ' : 'Continue it'}
             </button>
@@ -724,7 +794,10 @@ export default function ChatWindow({ cfg, onClose }: Props) {
                   senderName: 'Bitazza Support',
                 }]);
               }}
-              className="px-3 py-1.5 rounded-full text-xs font-semibold bg-white border border-amber-300 text-amber-700 hover:bg-amber-50 transition-colors"
+              className="px-3 py-1.5 rounded-full text-xs font-semibold transition-colors"
+              style={{ background: '#FFFFFF', border: '1px solid #F4B72A', color: '#705514' }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#FEF8EA')}
+              onMouseLeave={e => (e.currentTarget.style.background = '#FFFFFF')}
             >
               {lang === 'th' ? 'เริ่มใหม่' : 'Start new'}
             </button>
@@ -745,6 +818,68 @@ export default function ChatWindow({ cfg, onClose }: Props) {
             primaryColor={primaryColor}
           />
         )}
+        {/* Announcement cards — shown once after language selection, at the top of the conversation */}
+        {!showGuestForm && langSelected && announcements
+          .filter(a => !dismissedAnnIds.has(a.id))
+          .map(a => {
+            const accentColor = a.color || primaryColor;
+            return (
+              <div
+                key={a.id}
+                style={{
+                  margin: '4px 0 2px',
+                  borderRadius: 12,
+                  background: '#ffffff',
+                  border: '1px solid #EDEDF8',
+                  borderLeft: `3px solid ${accentColor}`,
+                  overflow: 'hidden',
+                }}
+              >
+                <div style={{ padding: '10px 12px 11px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
+                    <div style={{
+                      flexShrink: 0, width: 28, height: 28, borderRadius: 8,
+                      background: '#FCFCFE',
+                      boxShadow: 'inset 0 0 0 1px #EDEDF8',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 1,
+                    }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M22 8.01c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h1v4l4-4h10c1.1 0 2-.9 2-2V8.01z"/>
+                      </svg>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 12, fontWeight: 600, color: '#1B1A18', marginBottom: 3, lineHeight: 1.3 }}>
+                        {lang === 'th' ? a.title_th : a.title_en}
+                      </p>
+                      <p style={{ fontSize: 12, color: 'rgba(27,26,24,0.65)', lineHeight: 1.55, margin: 0 }}>
+                        {lang === 'th' ? a.body_th : a.body_en}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setDismissedAnnIds(prev => new Set([...prev, a.id]))}
+                      style={{
+                        flexShrink: 0, marginTop: 1,
+                        width: 20, height: 20, borderRadius: 6,
+                        background: '#FCFCFE',
+                        border: '1px solid #EDEDF8',
+                        cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: 'rgba(27,26,24,0.4)', transition: 'background 0.15s, border-color 0.15s',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = '#EDEDF8'; e.currentTarget.style.borderColor = '#D8D8EC'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = '#FCFCFE'; e.currentTarget.style.borderColor = '#EDEDF8'; }}
+                      aria-label="Dismiss"
+                    >
+                      <svg width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                        <path d="M1 1l10 10M11 1L1 11"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        }
         {!showGuestForm && messages.map((m) => <MessageBubble key={m.id} message={m} primaryColor={primaryColor} botName={botName} botAvatarUrl={botAvatarUrl} escalatedAgent={escalatedAgent} />)}
         {(() => {
           const lastResMsg = [...messages].reverse().find((m) => m.offerResolution);
@@ -754,7 +889,10 @@ export default function ChatWindow({ cfg, onClose }: Props) {
             <div className="flex gap-2 justify-center pt-1 pb-2">
               <button
                 onClick={() => setCsatPending(true)}
-                className="px-5 py-2 rounded-full text-xs font-semibold bg-emerald-500 text-white hover:bg-emerald-600 transition-colors"
+                className="px-5 py-2 rounded-full text-xs font-semibold transition-colors"
+                style={{ background: '#00CE80', color: '#1B1A18' }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#079755')}
+                onMouseLeave={e => (e.currentTarget.style.background = '#00CE80')}
               >
                 {lang === 'th' ? '✓ แก้ไขแล้ว' : '✓ Yes, resolved'}
               </button>
@@ -775,7 +913,10 @@ export default function ChatWindow({ cfg, onClose }: Props) {
                     ));
                   }
                 }}
-                className="px-5 py-2 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                className="px-5 py-2 rounded-full text-xs font-semibold transition-colors"
+                style={{ background: '#FCFCFE', color: '#1B1A18', border: '1px solid #EDEDF8' }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#EDEDF8')}
+                onMouseLeave={e => (e.currentTarget.style.background = '#FCFCFE')}
               >
                 {lang === 'th' ? '✗ ยังไม่แก้ไข' : '✗ No, I need more help'}
               </button>
@@ -785,7 +926,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
         {/* Agent-initiated closure confirmation */}
         {agentClosureRequest && !csatPending && !csatSubmitted && (
           <div className="flex flex-col items-center gap-2 py-3 px-2">
-            <p className="text-sm text-gray-600 font-medium text-center">
+            <p className="text-sm font-medium text-center" style={{ color: 'rgba(27,26,24,0.75)' }}>
               {lang === 'th'
                 ? `${escalatedAgent?.name ?? 'เจ้าหน้าที่'} ต้องการปิดการสนทนานี้ ปัญหาของคุณได้รับการแก้ไขแล้วหรือยังคะ?`
                 : `${escalatedAgent?.name ?? 'Your agent'} is closing this conversation. Was your issue resolved?`}
@@ -796,7 +937,10 @@ export default function ChatWindow({ cfg, onClose }: Props) {
                   setAgentClosureRequest(false);
                   setCsatPending(true);
                 }}
-                className="px-5 py-2 rounded-full text-xs font-semibold bg-emerald-500 text-white hover:bg-emerald-600 transition-colors"
+                className="px-5 py-2 rounded-full text-xs font-semibold transition-colors"
+                style={{ background: '#00CE80', color: '#1B1A18' }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#079755')}
+                onMouseLeave={e => (e.currentTarget.style.background = '#00CE80')}
               >
                 {lang === 'th' ? '✓ แก้ไขแล้ว' : '✓ Yes, resolved'}
               </button>
@@ -818,7 +962,10 @@ export default function ChatWindow({ cfg, onClose }: Props) {
                     },
                   ]);
                 }}
-                className="px-5 py-2 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                className="px-5 py-2 rounded-full text-xs font-semibold transition-colors"
+                style={{ background: '#FCFCFE', color: '#1B1A18', border: '1px solid #EDEDF8' }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#EDEDF8')}
+                onMouseLeave={e => (e.currentTarget.style.background = '#FCFCFE')}
               >
                 {lang === 'th' ? '✗ ยังไม่แก้ไข' : '✗ No, I need more help'}
               </button>
@@ -828,13 +975,14 @@ export default function ChatWindow({ cfg, onClose }: Props) {
 
         {csatPending && !csatSubmitted && (
           <div className="flex flex-col items-center gap-3 py-4 px-2">
-            <p className="text-sm text-gray-600 font-medium text-center">
+            <p className="text-sm font-medium text-center" style={{ color: 'rgba(27,26,24,0.75)' }}>
               {lang === 'th' ? 'กรุณาให้คะแนนประสบการณ์การบริการของคุณ' : 'Please rate your support experience'}
             </p>
-            <div className="flex gap-2">
+            <div className="flex gap-1" onMouseLeave={() => setCsatHover(0)}>
               {[1, 2, 3, 4, 5].map((star) => (
                 <button
                   key={star}
+                  onMouseEnter={() => setCsatHover(star)}
                   onClick={async () => {
                     if (!convId) return;
                     try {
@@ -858,7 +1006,17 @@ export default function ChatWindow({ cfg, onClose }: Props) {
                       },
                     ]);
                   }}
-                  className="text-3xl hover:scale-110 transition-transform"
+                  style={{
+                    fontSize: 30,
+                    lineHeight: 1,
+                    padding: '0 2px',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    filter: star <= csatHover ? 'none' : 'grayscale(1) opacity(0.4)',
+                    transform: star <= csatHover ? 'scale(1.12)' : 'scale(1)',
+                    transition: 'filter 0.12s ease, transform 0.12s ease',
+                  }}
                   aria-label={`${star} star`}
                 >
                   ⭐
@@ -868,94 +1026,28 @@ export default function ChatWindow({ cfg, onClose }: Props) {
           </div>
         )}
         {csatSubmitted && (
-          <div className="text-center text-xs text-gray-400 py-2">
+          <div className="text-center text-xs py-2" style={{ color: 'rgba(27,26,24,0.5)' }}>
             {lang === 'th' ? 'การสนทนานี้ปิดแล้ว' : 'This conversation is closed.'}
           </div>
         )}
         {!showGuestForm && !langSelected && (
-          <div className="flex gap-2 justify-center pt-2 pb-1">
+          <div className="flex gap-2 pt-2 pb-1">
             <button
               onClick={() => selectLanguage('en')}
               disabled={!cfg.guestMode && !convId}
-              className="csbot-lang-btn px-5 py-2 rounded-full text-xs font-semibold transition-all disabled:opacity-40"
-              style={{ '--lang-color': primaryColor } as React.CSSProperties}
+              className="csbot-lang-btn flex-1 py-2.5 text-xs font-semibold"
             >
               🇬🇧 English
             </button>
             <button
               onClick={() => selectLanguage('th')}
               disabled={!cfg.guestMode && !convId}
-              className="csbot-lang-btn px-5 py-2 rounded-full text-xs font-semibold transition-all disabled:opacity-40"
-              style={{ '--lang-color': primaryColor } as React.CSSProperties}
+              className="csbot-lang-btn flex-1 py-2.5 text-xs font-semibold"
             >
               🇹🇭 ภาษาไทย
             </button>
           </div>
         )}
-        {!showGuestForm && langSelected && announcements
-          .filter(a => !dismissedAnnIds.has(a.id))
-          .map(a => {
-            const c = a.color || primaryColor;
-            return (
-            <div
-              key={a.id}
-              className="csbot-msg-in"
-              style={{
-                margin: '4px 0 2px',
-                borderRadius: 16,
-                background: `linear-gradient(135deg, ${c}14 0%, ${c}08 100%)`,
-                border: `1px solid ${c}28`,
-                overflow: 'hidden',
-              }}
-            >
-              {/* Accent bar */}
-              <div style={{ height: 3, background: `linear-gradient(90deg, ${c} 0%, ${c}88 100%)` }} />
-              <div style={{ padding: '10px 12px 11px' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
-                  {/* Icon */}
-                  <div style={{
-                    flexShrink: 0, width: 28, height: 28, borderRadius: 8,
-                    background: `${c}18`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 1,
-                  }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M22 8.01c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h1v4l4-4h10c1.1 0 2-.9 2-2V8.01z"/>
-                    </svg>
-                  </div>
-                  {/* Text */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 12, fontWeight: 700, color: c, marginBottom: 3, lineHeight: 1.3 }}>
-                      {lang === 'th' ? a.title_th : a.title_en}
-                    </p>
-                    <p style={{ fontSize: 12, color: '#374151', lineHeight: 1.55, margin: 0 }}>
-                      {lang === 'th' ? a.body_th : a.body_en}
-                    </p>
-                  </div>
-                  {/* Dismiss */}
-                  <button
-                    onClick={() => setDismissedAnnIds(prev => new Set([...prev, a.id]))}
-                    style={{
-                      flexShrink: 0, marginTop: 1,
-                      width: 20, height: 20, borderRadius: 6,
-                      background: `${c}12`,
-                      border: 'none', cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: c, transition: 'background 0.15s',
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.background = `${c}25`)}
-                    onMouseLeave={e => (e.currentTarget.style.background = `${c}12`)}
-                    aria-label="Dismiss"
-                  >
-                    <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                      <path d="M1 1l10 10M11 1L1 11"/>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-            );
-          })
-        }
         {!showGuestForm && !isGuest && langSelected && !selectedCategory && !escalated && !showOpenTicketBanner && (
           <CategoryPicker
             lang={lang}
@@ -976,9 +1068,27 @@ export default function ChatWindow({ cfg, onClose }: Props) {
         <div ref={bottomRef} />
       </div>
 
+      {/* Request human support pill — visible once conversation has started, until a human agent connects */}
+      {messages.length > 0 && langSelected && !escalatedAgent && !csatPending && !csatSubmitted && !agentClosureRequest && (
+        <div className="flex justify-center px-4 py-2 bg-white" style={{ borderTop: '1px solid #EDEDF8' }}>
+          <button
+            onClick={handleTalkToAgent}
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold transition-colors"
+            style={{ background: '#F0FEF8', border: '1px solid #00CE80', color: '#079755' }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#00CE80'; e.currentTarget.style.color = '#ffffff'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#F0FEF8'; e.currentTarget.style.color = '#079755'; }}
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            {lang === 'th' ? 'ขอติดต่อเจ้าหน้าที่' : 'Request human support'}
+          </button>
+        </div>
+      )}
+
       {/* Input */}
       <div
-        className={`csbot-input-area px-3 py-3 flex flex-col gap-2${isDragOver ? ' ring-2 ring-inset ring-blue-400' : ''}`}
+        className={`csbot-input-area px-3 py-3 flex flex-col gap-2${isDragOver ? ' ring-2 ring-inset ring-[#00CE80]' : ''}`}
         onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
         onDragLeave={() => setIsDragOver(false)}
         onDrop={(e) => { e.preventDefault(); setIsDragOver(false); if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files); }}
@@ -990,9 +1100,9 @@ export default function ChatWindow({ cfg, onClose }: Props) {
             {pendingAttachments.map((a) => (
               <div key={a.id} className="relative group">
                 {a.mimeType.startsWith('image/') ? (
-                  <img src={a.url} alt={a.name} className="w-14 h-14 object-cover rounded-lg border border-gray-200" />
+                  <img src={a.url} alt={a.name} className="w-14 h-14 object-cover rounded-lg" style={{ border: '1px solid #EDEDF8' }} />
                 ) : (
-                  <div className="w-14 h-14 flex items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-[10px] text-gray-500 text-center px-1 break-all">{a.name}</div>
+                  <div className="w-14 h-14 flex items-center justify-center rounded-lg text-[10px] text-center px-1 break-all" style={{ border: '1px solid #EDEDF8', background: '#FCFCFE', color: 'rgba(27,26,24,0.5)' }}>{a.name}</div>
                 )}
                 <button
                   className="absolute -top-1 -right-1 w-4 h-4 bg-gray-700 text-white rounded-full text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
@@ -1001,7 +1111,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
                 >×</button>
               </div>
             ))}
-            {uploadingFiles && <div className="w-14 h-14 flex items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-[10px] text-gray-400">...</div>}
+            {uploadingFiles && <div className="w-14 h-14 flex items-center justify-center rounded-lg text-[10px]" style={{ border: '1px solid #EDEDF8', background: '#FCFCFE', color: 'rgba(27,26,24,0.4)' }}>...</div>}
           </div>
         )}
         <div className="flex gap-2 items-center">
@@ -1038,11 +1148,11 @@ export default function ChatWindow({ cfg, onClose }: Props) {
           <button
             onClick={() => send(input)}
             disabled={showGuestForm || loading || (!input.trim() && !pendingAttachments.length) || !convId || !langSelected || (!isGuest && !selectedCategory) || awaitingFirstReply || csatPending || csatSubmitted || agentClosureRequest}
-            className="csbot-send-btn w-9 h-9 rounded-full flex items-center justify-center text-white transition-all disabled:opacity-30"
-            style={{ background: `linear-gradient(135deg, ${primaryColor}, ${primaryColor}cc)` }}
+            className="csbot-send-btn w-9 h-9 rounded-full flex items-center justify-center"
+            style={{ background: primaryColor }}
             aria-label={t.send}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1B1A18" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
             </svg>
           </button>
@@ -1051,7 +1161,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
 
       {/* Footer branding */}
       <div className="csbot-footer text-center py-1.5 text-[10px]">
-        Powered by <span className="font-semibold">CS Bot</span>
+        Powered by <span className="font-semibold">Bitazza</span>
       </div>
     </div>
   );

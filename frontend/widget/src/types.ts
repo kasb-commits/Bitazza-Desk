@@ -1,4 +1,4 @@
-export type MessageRole = 'user' | 'assistant' | 'agent';
+export type MessageRole = 'user' | 'assistant' | 'agent' | 'system';
 
 export type IssueCategory =
   | 'kyc_verification'
@@ -27,7 +27,7 @@ export const ISSUE_CATEGORIES: IssueCategoryDef[] = [
     key: 'account_restriction',
     icon: '🔒',
     label: { en: 'Account Restricted', th: 'บัญชีถูกระงับ' },
-    openingMessage: { en: 'My account has been restricted or suspended.', th: 'บัญชีของฉันถูกระงับหรือจำกัดการใช้งาน' },
+    openingMessage: { en: 'I need help with my account access.', th: 'ฉันต้องการความช่วยเหลือเกี่ยวกับการเข้าถึงบัญชี' },
   },
   {
     key: 'password_2fa_reset',
@@ -82,7 +82,7 @@ export interface CSBotConfig {
   platform: 'freedom' | 'bitazza' | 'web';
   apiUrl: string;
   token?: string;        // JWT from host app, optional
-  primaryColor?: string; // hex, default #1a56db
+  primaryColor?: string; // hex, default #00CE80 (Primary/GL/700)
   lang?: 'en' | 'th';   // override auto-detect
   guestMode?: boolean;   // true = skip token fetch, show GuestIdentityForm
 }
