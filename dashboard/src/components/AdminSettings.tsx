@@ -1078,14 +1078,21 @@ function TagsTab() {
 
 type CannedItem = { id: string; title: string; shortcut: string; body: string; scope: string };
 
+const INP: React.CSSProperties = {
+  width: '100%', fontSize: 13, color: T1,
+  background: '#f5f5f7', border: 'none', borderRadius: 8,
+  padding: '8px 11px', outline: 'none',
+};
+
 function CannedResponsesTab() {
-  const [items, setItems]     = useState<CannedItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [adding, setAdding]   = useState(false);
-  const [saving, setSaving]   = useState(false);
-  const [error, setError]     = useState('');
-  const [form, setForm]       = useState({ title: '', shortcut: '', body: '', scope: 'shared' });
+  const [items, setItems]           = useState<CannedItem[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [showForm, setShowForm]     = useState(false);
+  const [saving, setSaving]         = useState(false);
+  const [error, setError]           = useState('');
+  const [form, setForm]             = useState({ title: '', shortcut: '', body: '', scope: 'shared' });
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [hoveredId, setHoveredId]   = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -1104,7 +1111,7 @@ function CannedResponsesTab() {
       const created = await api.createCannedResponse(form) as CannedItem;
       setItems(prev => [...prev, created]);
       setForm({ title: '', shortcut: '', body: '', scope: 'shared' });
-      setAdding(false);
+      setShowForm(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed');
     } finally { setSaving(false); }
@@ -1115,100 +1122,167 @@ function CannedResponsesTab() {
     catch (e) { setError(e instanceof Error ? e.message : 'Delete failed'); }
   };
 
+  const HR = () => <div style={{ height: '0.5px', background: 'rgba(0,0,0,0.07)', marginLeft: 16 }} />;
+
   return (
-    <div className="space-y-4">
+    <div>
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
-      <div className="flex justify-end">
+      {/* Header row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <p style={{ fontSize: 11, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          {items.length} Response{items.length !== 1 ? 's' : ''}
+        </p>
         <button
-          onClick={() => { setAdding(v => !v); setError(''); }}
-          className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md transition-colors ${
-            adding ? 'bg-surface-3 ring-1 ring-surface-5 text-text-secondary' : 'bg-brand hover:bg-brand-dim text-white'
-          }`}
+          onClick={() => { setShowForm(v => !v); setError(''); }}
+          style={{ fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: 8, border: 'none', background: showForm ? '#f5f5f7' : BR, color: showForm ? T2 : 'white', cursor: 'pointer' }}
+          onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+          onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
         >
-          {adding ? 'Cancel' : <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>New Canned Response</>}
+          {showForm ? 'Cancel' : '+ New Response'}
         </button>
       </div>
 
-      {adding && (
-        <div className="bg-surface-2 ring-1 ring-surface-5 rounded-lg p-4 space-y-3 animate-slide-in-up">
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Title *">
-              <AdminInput value={form.title} onChange={v => setForm(f => ({ ...f, title: v }))} placeholder="e.g. Greeting" />
-            </Field>
-            <Field label="Shortcut * (no spaces)">
-              <AdminInput value={form.shortcut} onChange={v => setForm(f => ({ ...f, shortcut: v.replace(/\s/g, '-') }))} placeholder="e.g. greeting" className="font-mono" />
-            </Field>
+      {/* Create form */}
+      {showForm && (
+        <div style={{ background: 'white', borderRadius: 12, padding: '20px', marginBottom: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.06)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div>
+              <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>Title</p>
+              <input
+                value={form.title}
+                onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                placeholder="e.g. Greeting"
+                style={INP}
+                onFocus={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.boxShadow = `0 0 0 2px ${BR}40`; }}
+                onBlur={e => { e.currentTarget.style.background = '#f5f5f7'; e.currentTarget.style.boxShadow = 'none'; }}
+              />
+            </div>
+            <div>
+              <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>Shortcut</p>
+              <input
+                value={form.shortcut}
+                onChange={e => setForm(f => ({ ...f, shortcut: e.target.value.replace(/\s/g, '-') }))}
+                placeholder="/greeting"
+                style={{ ...INP, fontFamily: 'monospace' }}
+                onFocus={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.boxShadow = `0 0 0 2px ${BR}40`; }}
+                onBlur={e => { e.currentTarget.style.background = '#f5f5f7'; e.currentTarget.style.boxShadow = 'none'; }}
+              />
+            </div>
           </div>
-          <Field label="Body * — variables: {{customer_name}} {{ticket_id}} {{agent_name}}">
+          <div style={{ marginBottom: 12 }}>
+            <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>
+              Body <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>— use {'{{customer_name}}'}, {'{{ticket_id}}'}, {'{{agent_name}}'}</span>
+            </p>
             <textarea
               value={form.body}
               onChange={e => setForm(f => ({ ...f, body: e.target.value }))}
               placeholder="Hello {{customer_name}}, thank you for contacting Bitazza support…"
-              className={`w-full text-xs bg-surface-3 ring-1 ring-surface-5 rounded px-3 py-2 resize-none outline-none focus:ring-brand transition-all text-text-primary placeholder:text-text-muted`}
               rows={4}
+              style={{ ...INP, resize: 'vertical', lineHeight: 1.6 }}
+              onFocus={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.boxShadow = `0 0 0 2px ${BR}40`; }}
+              onBlur={e => { e.currentTarget.style.background = '#f5f5f7'; e.currentTarget.style.boxShadow = 'none'; }}
             />
-          </Field>
-          <div className="flex items-center gap-3">
-            <Field label="Scope">
-              <select value={form.scope} onChange={e => setForm(f => ({ ...f, scope: e.target.value }))}
-                className="text-xs bg-surface-3 ring-1 ring-surface-5 rounded px-2.5 py-1.5 text-text-primary outline-none focus:ring-brand">
-                <option value="shared">Shared (team-wide)</option>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>Scope</p>
+              <select
+                value={form.scope}
+                onChange={e => setForm(f => ({ ...f, scope: e.target.value }))}
+                style={{ fontSize: 12, fontWeight: 500, color: T1, background: '#f5f5f7', border: 'none', borderRadius: 7, padding: '6px 10px', outline: 'none', cursor: 'pointer' }}
+              >
+                <option value="shared">Shared — team-wide</option>
                 <option value="personal">Personal</option>
               </select>
-            </Field>
-            <button onClick={save} disabled={saving}
-              className="mt-4 text-xs px-4 py-1.5 bg-brand hover:bg-brand-dim text-white rounded-md transition-colors disabled:opacity-40 flex items-center gap-1.5">
-              {saving ? <><Spinner size="xs" /> Saving…</> : 'Save'}
+            </div>
+            <button
+              onClick={save}
+              disabled={saving}
+              style={{ fontSize: 12, fontWeight: 600, padding: '7px 18px', borderRadius: 8, border: 'none', background: BR, color: 'white', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
+              onMouseEnter={e => (e.currentTarget.style.opacity = saving ? '0.6' : '0.85')}
+              onMouseLeave={e => (e.currentTarget.style.opacity = saving ? '0.6' : '1')}
+            >
+              {saving && <Spinner size="sm" />}
+              Save Response
             </button>
           </div>
         </div>
       )}
 
+      {/* List */}
       {loading ? (
-        <div className="flex items-center gap-2 text-sm text-text-muted"><Spinner size="sm" /> Loading…</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '16px 0', fontSize: 13, color: TM }}>
+          <Spinner size="sm" /> Loading…
+        </div>
+      ) : items.length === 0 ? (
+        <div style={{ background: 'white', borderRadius: 12, padding: '40px 20px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.06)' }}>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: 28, height: 28, color: TM, opacity: 0.4, margin: '0 auto 8px' }}>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+          </svg>
+          <p style={{ fontSize: 13, color: TM }}>No canned responses yet</p>
+        </div>
       ) : (
-        <div className="bg-surface-2 ring-1 ring-surface-5 rounded-lg overflow-hidden">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-surface-5">
-                {['Title', 'Shortcut', 'Preview', 'Scope', ''].map((h, i) => (
-                  <th key={i} className="text-left text-[10px] font-semibold text-text-muted uppercase tracking-wide px-4 py-2.5">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-surface-5">
-              {items.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-6 text-sm text-text-muted text-center">No canned responses yet</td></tr>
+        <div style={{ background: 'white', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.06)' }}>
+          {items.map((item, i) => (
+            <React.Fragment key={item.id}>
+              {/* Row */}
+              <div
+                onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
+                onMouseEnter={() => setHoveredId(item.id)}
+                onMouseLeave={() => setHoveredId(null)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12, padding: '0 16px', minHeight: 48, cursor: 'pointer',
+                  background: hoveredId === item.id ? '#f9f9fb' : 'transparent', transition: 'background 0.1s',
+                }}
+              >
+                {/* Shortcut pill */}
+                <span style={{ fontSize: 11, fontWeight: 600, color: BR, background: `${BR}10`, padding: '3px 8px', borderRadius: 6, flexShrink: 0, fontFamily: 'monospace' }}>
+                  /{item.shortcut}
+                </span>
+                {/* Title */}
+                <span style={{ fontSize: 13, fontWeight: 500, color: T1, flex: '0 0 180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {item.title}
+                </span>
+                {/* Preview */}
+                <span style={{ fontSize: 12, color: TM, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {item.body}
+                </span>
+                {/* Scope */}
+                <span style={{
+                  fontSize: 10, fontWeight: 500, padding: '2px 8px', borderRadius: 20, flexShrink: 0,
+                  background: item.scope === 'shared' ? `${BR}12` : '#f5f5f7',
+                  color: item.scope === 'shared' ? BR : TM,
+                }}>
+                  {item.scope}
+                </span>
+                {/* Delete */}
+                <button
+                  onClick={e => { e.stopPropagation(); remove(item.id); }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: TM, flexShrink: 0, opacity: hoveredId === item.id ? 1 : 0, transition: 'opacity 0.15s' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')}
+                  onMouseLeave={e => (e.currentTarget.style.color = TM)}
+                >
+                  <svg width={13} height={13} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                </button>
+                {/* Chevron */}
+                <svg width={12} height={12} fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                     style={{ color: TM, flexShrink: 0, transition: 'transform 0.15s', transform: expandedId === item.id ? 'rotate(180deg)' : 'none' }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
+                </svg>
+              </div>
+              {/* Expanded body */}
+              {expandedId === item.id && (
+                <div style={{ padding: '12px 16px 16px', background: '#f9f9fb', borderTop: '0.5px solid rgba(0,0,0,0.07)' }}>
+                  <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Full body</p>
+                  <p style={{ fontSize: 13, color: T2, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{item.body}</p>
+                </div>
               )}
-              {items.map(item => (
-                <>
-                  <tr key={item.id} className="hover:bg-surface-3 transition-colors cursor-pointer" onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}>
-                    <td className="px-4 py-2.5 font-medium text-text-primary">{item.title}</td>
-                    <td className="px-4 py-2.5 font-mono text-brand">/{item.shortcut}</td>
-                    <td className="px-4 py-2.5 text-text-secondary max-w-[200px] truncate">{item.body}</td>
-                    <td className="px-4 py-2.5">
-                      <span className={`text-[9px] px-2 py-0.5 rounded-full font-medium ${
-                        item.scope === 'shared' ? 'bg-brand/10 text-brand' : 'bg-surface-4 text-text-muted'
-                      }`}>{item.scope}</span>
-                    </td>
-                    <td className="px-4 py-2.5 text-right">
-                      <button onClick={e => { e.stopPropagation(); remove(item.id); }}
-                        className="text-[10px] text-text-muted hover:text-brand transition-colors">Delete</button>
-                    </td>
-                  </tr>
-                  {expandedId === item.id && (
-                    <tr key={`${item.id}-exp`}>
-                      <td colSpan={5} className="px-4 py-3 bg-surface-3">
-                        <p className="text-[10px] text-text-muted uppercase tracking-wide mb-1.5">Full body</p>
-                        <p className="text-xs text-text-secondary whitespace-pre-wrap">{item.body}</p>
-                      </td>
-                    </tr>
-                  )}
-                </>
-              ))}
-            </tbody>
-          </table>
+              {i < items.length - 1 && !expandedId && <HR />}
+            </React.Fragment>
+          ))}
         </div>
       )}
     </div>
@@ -1240,14 +1314,14 @@ function Toggle({ on, onToggle, saving }: { on: boolean; onToggle: () => void; s
       disabled={saving}
       style={{
         width: 44, height: 26, borderRadius: 13,
-        background: on ? BR : '#d1d5db',
+        background: on ? '#10b981' : '#d1d5db',
         border: 'none', padding: 0,
         cursor: saving ? 'not-allowed' : 'pointer',
         position: 'relative', flexShrink: 0,
         transition: 'background 0.22s',
         opacity: saving ? 0.5 : 1,
         display: 'inline-block',
-        boxShadow: on ? `0 0 0 3px ${BR}22` : 'none',
+        boxShadow: on ? '0 0 0 3px rgba(16,185,129,0.15)' : 'none',
       }}
     >
       <div style={{
@@ -1632,6 +1706,8 @@ function AnnouncementsTab() {
   const [editing, setEditing]   = useState<Announcement | null>(null);
   const [form, setForm]         = useState({ ...EMPTY_ANN_FORM });
   const [saving, setSaving]     = useState(false);
+  const [previewLang, setPreviewLang] = useState<Record<string, 'en' | 'th'>>({});
+  const [hoveredId, setHoveredId]     = useState<string | null>(null);
   const { toast }               = useToast();
 
   const load = async () => {
@@ -1698,117 +1774,198 @@ function AnnouncementsTab() {
     }
   };
 
+  const [deleteTarget, setDeleteTarget] = useState<Announcement | null>(null);
+
   const handleDelete = async (a: Announcement) => {
-    if (!confirm(`Delete "${a.title_en}"?`)) return;
     try {
       await api.deleteAnnouncement(a.id);
       toast('Announcement deleted', 'success');
+      setDeleteTarget(null);
       load();
     } catch {
       toast('Delete failed', 'error');
     }
   };
 
-  const fmtDate = (s: string | null) => s ? new Date(s).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+  const fmtDate = (s: string | null) => s ? new Date(s).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
 
-  if (loading) return <div className="flex items-center gap-2" style={{ fontSize: 13, color: TM }}><Spinner size="sm" /> Loading…</div>;
+  if (loading) return <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '16px 0', fontSize: 13, color: TM }}><Spinner size="sm" /> Loading…</div>;
 
   return (
-    <div className="space-y-5">
+    <div>
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
-      <div className="flex items-center justify-between">
-        <p style={{ fontSize: 12, color: T2 }}>
-          Active announcements are shown as dismissible cards in the widget before the category picker.
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <p style={{ fontSize: 11, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          {items.filter(a => a.active).length} active · {items.filter(a => !a.active).length} inactive
         </p>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-1.5 shrink-0"
-          style={{ fontSize: 12, fontWeight: 600, padding: '7px 16px', background: BR, color: 'white', borderRadius: 10, border: 'none', cursor: 'pointer' }}
+        <button onClick={openCreate}
+          style={{ fontSize: 12, fontWeight: 600, padding: '7px 16px', borderRadius: 8, border: 'none', background: BR, color: 'white', cursor: 'pointer' }}
           onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
           onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
-        >
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
+        >+ New Announcement</button>
+      </div>
+
+      {/* Announcement list */}
+      {items.length === 0 ? (
+        <div style={{ background: 'white', borderRadius: 12, padding: '48px 20px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.06)' }}>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: 28, height: 28, color: TM, opacity: 0.4, margin: '0 auto 8px' }}>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
           </svg>
-          New Announcement
-        </button>
-      </div>
-
-      <div className="rounded-2xl overflow-hidden bg-white" style={{ border: `1px solid ${SEP}`, boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
-        <table className="w-full">
-          <thead>
-            <tr style={{ borderBottom: `1px solid ${SEP}`, background: '#fafbfc' }}>
-              {['Title (EN)', 'Title (TH)', 'Color', 'Active', 'Starts', 'Ends', 'Actions'].map(h => (
-                <th key={h} style={{ textAlign: 'left', fontSize: 10, fontWeight: 700, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em', padding: '10px 14px' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {items.length === 0 && (
-              <tr>
-                <td colSpan={7} style={{ padding: '40px 16px', textAlign: 'center', fontSize: 13, color: TM }}>No announcements yet</td>
-              </tr>
-            )}
-            {items.map((a, idx) => (
-              <tr
-                key={a.id}
-                style={{ borderTop: idx > 0 ? `1px solid ${SEP}` : 'none', background: 'transparent', transition: 'background 0.12s' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLTableRowElement).style.background = '#f9fafb'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'; }}
+          <p style={{ fontSize: 13, color: TM }}>No announcements yet</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {items.map(a => {
+            const c = a.color || BR;
+            const lang = previewLang[a.id] ?? 'en';
+            const title = lang === 'en' ? a.title_en : a.title_th;
+            const body  = lang === 'en' ? a.body_en  : a.body_th;
+            const isHov = hoveredId === a.id;
+            return (
+              <div key={a.id}
+                onMouseEnter={() => setHoveredId(a.id)}
+                onMouseLeave={() => setHoveredId(null)}
+                style={{
+                  opacity: a.active ? 1 : 0.4,
+                  transition: 'opacity 0.2s, transform 0.2s, box-shadow 0.2s',
+                  transform: isHov && a.active ? 'translateY(-2px)' : 'none',
+                  borderRadius: 16, overflow: 'hidden',
+                  boxShadow: isHov && a.active
+                    ? `0 8px 30px ${c}30, 0 0 0 0.5px rgba(0,0,0,0.06)`
+                    : '0 2px 8px rgba(0,0,0,0.07), 0 0 0 0.5px rgba(0,0,0,0.06)',
+                }}
               >
-                <td style={{ padding: '10px 14px', fontSize: 12, color: T1, fontWeight: 600, maxWidth: 200 }}>
-                  <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.title_en}</div>
-                  <div style={{ fontSize: 11, color: T2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>{a.body_en}</div>
-                </td>
-                <td style={{ padding: '10px 14px', fontSize: 12, color: T1, maxWidth: 200 }}>
-                  <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.title_th}</div>
-                </td>
-                <td style={{ padding: '10px 14px' }}>
-                  {a.color
-                    ? <div style={{ width: 18, height: 18, borderRadius: 5, background: a.color, border: '1.5px solid rgba(0,0,0,0.10)' }} title={a.color} />
-                    : <span style={{ fontSize: 11, color: TM }}>default</span>}
-                </td>
-                <td style={{ padding: '10px 14px' }}>
-                  <button
-                    onClick={() => handleToggle(a)}
-                    title={a.active ? 'Deactivate' : 'Activate'}
-                    style={{
-                      width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', padding: 0,
-                      background: a.active ? '#10b981' : '#d1d5db', transition: 'background 0.2s', position: 'relative',
-                    }}
-                  >
-                    <div style={{
-                      position: 'absolute', top: 3, left: a.active ? 18 : 3,
-                      width: 14, height: 14, borderRadius: '50%', background: 'white',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'left 0.15s',
-                    }} />
-                  </button>
-                </td>
-                <td style={{ padding: '10px 14px', fontSize: 12, color: T2 }}>{fmtDate(a.starts_at)}</td>
-                <td style={{ padding: '10px 14px', fontSize: 12, color: T2 }}>{fmtDate(a.ends_at)}</td>
-                <td style={{ padding: '10px 14px' }}>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => openEdit(a)}
-                      style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', background: '#f3f4f6', color: T2, borderRadius: 7, border: 'none', cursor: 'pointer' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = '#e5e7eb')}
-                      onMouseLeave={e => (e.currentTarget.style.background = '#f3f4f6')}
-                    >Edit</button>
-                    <button
-                      onClick={() => handleDelete(a)}
-                      style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', background: '#fef2f2', color: '#ef4444', borderRadius: 7, border: 'none', cursor: 'pointer' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = '#fee2e2')}
-                      onMouseLeave={e => (e.currentTarget.style.background = '#fef2f2')}
-                    >Delete</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                {/* Banner preview */}
+                <div style={{
+                  background: `linear-gradient(135deg, ${c} 0%, ${c}cc 100%)`,
+                  padding: '22px 28px 20px',
+                  position: 'relative', overflow: 'hidden', minHeight: 120,
+                }}>
+                  {/* Light sweep */}
+                  <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 20% 0%, rgba(255,255,255,0.15) 0%, transparent 55%)', pointerEvents: 'none' }} />
+                  {/* Watermark icon */}
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                    style={{ position: 'absolute', right: 20, bottom: 16, width: 48, height: 48, color: 'rgba(255,255,255,0.08)', pointerEvents: 'none' }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
+                      d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
+                  </svg>
 
+                  {/* Inactive overlay */}
+                  {!a.active && (
+                    <div style={{ position: 'absolute', top: 14, right: 16, background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(4px)', padding: '3px 10px', borderRadius: 6 }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Inactive</span>
+                    </div>
+                  )}
+
+                  {/* Language tabs */}
+                  <div style={{ position: 'relative', display: 'flex', gap: 2, marginBottom: 14 }}>
+                    {(['en', 'th'] as const).map(l => (
+                      <button key={l}
+                        onClick={() => setPreviewLang(p => ({ ...p, [a.id]: l }))}
+                        style={{
+                          fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+                          padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                          background: lang === l ? 'rgba(255,255,255,0.22)' : 'transparent',
+                          color: lang === l ? 'white' : 'rgba(255,255,255,0.45)',
+                          transition: 'all 0.15s',
+                        }}
+                      >{l === 'en' ? 'English' : 'ไทย'}</button>
+                    ))}
+                  </div>
+
+                  {/* Content */}
+                  <div style={{ position: 'relative' }}>
+                    <p style={{ fontSize: 17, fontWeight: 700, color: 'white', lineHeight: 1.35, marginBottom: 8 }}>{title}</p>
+                    <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.82)', lineHeight: 1.6, maxWidth: 600 }}>{body}</p>
+                  </div>
+                </div>
+
+                {/* Control bar */}
+                <div style={{
+                  background: 'white', padding: '10px 20px',
+                  display: 'flex', alignItems: 'center', gap: 10,
+                }}>
+                  <Toggle on={a.active} onToggle={() => handleToggle(a)} />
+                  <span style={{ fontSize: 11, fontWeight: 600, color: a.active ? '#10b981' : TM }}>
+                    {a.active ? 'Live' : 'Off'}
+                  </span>
+
+                  {/* Color dot */}
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: c, border: '1.5px solid rgba(0,0,0,0.1)', flexShrink: 0, marginLeft: 4 }} />
+
+                  {/* Schedule badge */}
+                  {(() => {
+                    const now = Date.now();
+                    const s = a.starts_at ? new Date(a.starts_at).getTime() : null;
+                    const e = a.ends_at   ? new Date(a.ends_at).getTime()   : null;
+                    const expired   = e && e < now;
+                    const scheduled = s && s > now;
+                    const lbl  = expired ? 'Expired' : scheduled ? 'Scheduled' : 'Always On';
+                    const lclr = expired ? '#ef4444' : scheduled ? '#f59e0b' : '#10b981';
+                    const lbg  = expired ? '#fef2f2' : scheduled ? '#fffbeb' : '#ecfdf5';
+                    return (
+                      <span style={{ fontSize: 10, fontWeight: 600, color: lclr, background: lbg, padding: '2px 8px', borderRadius: 5, marginLeft: 4 }}>
+                        {lbl}
+                      </span>
+                    );
+                  })()}
+
+                  {/* Date range */}
+                  {(a.starts_at || a.ends_at) && (
+                    <span style={{ fontSize: 10, color: TM, display: 'flex', alignItems: 'center', gap: 4, marginLeft: 4 }}>
+                      <svg width={11} height={11} fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ opacity: 0.4 }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                      </svg>
+                      {fmtDate(a.starts_at)}{a.starts_at && a.ends_at ? ' → ' : ''}{fmtDate(a.ends_at)}
+                    </span>
+                  )}
+
+                  <div style={{ flex: 1 }} />
+
+                  <button onClick={() => openEdit(a)}
+                    style={{ fontSize: 11, fontWeight: 500, color: BR, background: 'none', border: 'none', cursor: 'pointer', padding: '3px 8px' }}
+                    onMouseEnter={e => (e.currentTarget.style.opacity = '0.7')}
+                    onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+                  >Edit</button>
+                  <button onClick={() => setDeleteTarget(a)}
+                    style={{ fontSize: 11, fontWeight: 500, color: TM, background: 'none', border: 'none', cursor: 'pointer', padding: '3px 8px' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')}
+                    onMouseLeave={e => (e.currentTarget.style.color = TM)}
+                  >Delete</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Delete confirmation */}
+      {deleteTarget && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(8px)' }}>
+          <div style={{ width: '100%', maxWidth: 380, margin: '0 16px', borderRadius: 16, background: 'white', boxShadow: '0 24px 64px rgba(0,0,0,0.22)', overflow: 'hidden' }}>
+            <div style={{ padding: '22px 22px 16px' }}>
+              <p style={{ fontSize: 14, fontWeight: 600, color: T1, marginBottom: 6 }}>Delete "{deleteTarget.title_en}"?</p>
+              <p style={{ fontSize: 13, color: T2, lineHeight: 1.6 }}>This announcement will be permanently removed. This action cannot be undone.</p>
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', padding: '0 22px 22px' }}>
+              <button onClick={() => setDeleteTarget(null)}
+                style={{ fontSize: 13, fontWeight: 500, padding: '7px 16px', borderRadius: 8, border: '0.5px solid rgba(0,0,0,0.15)', background: 'white', color: T2, cursor: 'pointer' }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#f5f5f7')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'white')}
+              >Cancel</button>
+              <button onClick={() => handleDelete(deleteTarget)}
+                style={{ fontSize: 13, fontWeight: 600, padding: '7px 16px', borderRadius: 8, border: 'none', background: '#ef4444', color: 'white', cursor: 'pointer' }}
+                onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+                onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+              >Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Form modal — reuses existing ModalShell */}
       {showForm && (
         <ModalShell title={editing ? 'Edit Announcement' : 'New Announcement'} onClose={() => setShowForm(false)} width="w-[560px]">
           {error && <ErrorBanner>{error}</ErrorBanner>}
@@ -1841,7 +1998,7 @@ function AnnouncementsTab() {
             />
           </Field>
           <Field label="Card color (optional — defaults to widget brand color)">
-            <div className="flex items-center gap-2 flex-wrap">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               {PRESET_COLORS.map(c => (
                 <button
                   key={c}
@@ -1850,39 +2007,23 @@ function AnnouncementsTab() {
                   style={{
                     width: 26, height: 26, borderRadius: 7, background: c, border: 'none', cursor: 'pointer', flexShrink: 0,
                     outline: form.color === c ? `3px solid ${c}` : '2px solid transparent',
-                    outlineOffset: 2,
-                    transition: 'outline 0.1s',
+                    outlineOffset: 2, transition: 'outline 0.1s',
                   }}
-                  title={c}
                 />
               ))}
-              {/* Custom hex input */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 4 }}>
-                <input
-                  type="color"
-                  value={form.color || '#6366f1'}
-                  onChange={e => setForm(f => ({ ...f, color: e.target.value }))}
-                  style={{ width: 26, height: 26, padding: 1, border: '1px solid rgba(0,0,0,0.12)', borderRadius: 7, cursor: 'pointer', background: 'none' }}
-                  title="Custom color"
-                />
-                <input
-                  type="text"
-                  value={form.color}
-                  onChange={e => setForm(f => ({ ...f, color: e.target.value }))}
-                  placeholder="#hex or empty for default"
-                  style={{ ...ADMIN_INPUT_STYLE, width: 160 }}
-                />
+                <input type="color" value={form.color || '#6366f1'} onChange={e => setForm(f => ({ ...f, color: e.target.value }))}
+                  style={{ width: 26, height: 26, padding: 1, border: '1px solid rgba(0,0,0,0.12)', borderRadius: 7, cursor: 'pointer', background: 'none' }} />
+                <input type="text" value={form.color} onChange={e => setForm(f => ({ ...f, color: e.target.value }))}
+                  placeholder="#hex or empty" style={{ ...ADMIN_INPUT_STYLE, width: 140 }} />
                 {form.color && (
-                  <button
-                    type="button"
-                    onClick={() => setForm(f => ({ ...f, color: '' }))}
-                    style={{ fontSize: 11, color: TM, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}
-                  >clear</button>
+                  <button type="button" onClick={() => setForm(f => ({ ...f, color: '' }))}
+                    style={{ fontSize: 11, color: TM, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}>clear</button>
                 )}
               </div>
             </div>
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <Field label="Starts at (optional)">
               <input type="datetime-local" value={form.starts_at} onChange={e => setForm(f => ({ ...f, starts_at: e.target.value }))} style={ADMIN_INPUT_STYLE} />
             </Field>
@@ -2355,6 +2496,7 @@ function TicketPropertiesTab() {
   const [keyTouched, setKeyTouched] = useState(false);
   const [saving, setSaving]         = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<PropertyDefinition | null>(null);
+  const [hoveredId, setHoveredId]   = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -2478,99 +2620,158 @@ function TicketPropertiesTab() {
   };
 
   const sortedDefs = [...defs].sort((a, b) => a.display_order - b.display_order);
+  const activeDefs   = sortedDefs.filter(d => d.is_active);
+  const inactiveDefs = sortedDefs.filter(d => !d.is_active);
+  const FI: React.CSSProperties = { width: '100%', fontSize: 13, color: T1, background: '#f5f5f7', border: 'none', borderRadius: 8, padding: '8px 11px', outline: 'none' };
+  const focusIn = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => { e.currentTarget.style.background = 'white'; e.currentTarget.style.boxShadow = `0 0 0 2px ${BR}40`; };
+  const focusOut = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => { e.currentTarget.style.background = '#f5f5f7'; e.currentTarget.style.boxShadow = 'none'; };
+
+  const PropertyCard = ({ def, idx }: { def: PropertyDefinition; idx: number }) => {
+    const optCount = def.options?.length ?? 0;
+    const cats = def.applies_to?.length
+      ? def.applies_to.map(c => CATEGORY_OPTIONS.find(o => o.value === c)?.label ?? c)
+      : null;
+    return (
+      <div style={{
+        background: 'white', borderRadius: 12, overflow: 'hidden',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.06)',
+        display: 'flex', flexDirection: 'column',
+        opacity: def.is_active ? 1 : 0.5,
+        transition: 'box-shadow 0.15s, opacity 0.15s',
+      }}>
+        {/* Header: name + toggle */}
+        <div style={{ padding: '14px 16px 0', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: T1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{def.name}</p>
+            <p style={{ fontSize: 11, color: TM, fontFamily: 'monospace', marginTop: 2 }}>{def.field_key}</p>
+          </div>
+          <Toggle on={def.is_active} onToggle={() => handleToggleActive(def)} />
+        </div>
+
+        {/* Metadata chips */}
+        <div style={{ padding: '10px 16px 0', display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+          <span style={{ fontSize: 10, fontWeight: 500, color: T2, background: '#f5f5f7', padding: '3px 8px', borderRadius: 6 }}>
+            {FIELD_TYPE_LABELS[def.field_type]}
+          </span>
+          {optCount > 0 && (
+            <span style={{ fontSize: 10, fontWeight: 500, color: TM, background: '#f5f5f7', padding: '3px 8px', borderRadius: 6 }}>
+              {optCount} option{optCount !== 1 ? 's' : ''}
+            </span>
+          )}
+          {def.is_required && (
+            <span style={{ fontSize: 10, fontWeight: 600, color: '#b45309', background: '#fef3c7', padding: '3px 8px', borderRadius: 6 }}>
+              Required
+            </span>
+          )}
+        </div>
+
+        {/* Applies to */}
+        <div style={{ padding: '8px 16px 0', minHeight: 20 }}>
+          <p style={{ fontSize: 11, color: TM, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {cats ? cats.join(', ') : 'All categories'}
+          </p>
+        </div>
+
+        {/* Footer actions */}
+        <div style={{ marginTop: 'auto', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 4, borderTop: '0.5px solid rgba(0,0,0,0.06)', marginLeft: 0 }}>
+          {/* Reorder */}
+          <button onClick={() => handleOrder(def, -1)} disabled={idx === 0}
+            style={{ background: 'none', border: 'none', padding: 3, cursor: idx === 0 ? 'default' : 'pointer', color: TM, opacity: idx === 0 ? 0.2 : 0.5 }}>
+            <svg width={12} height={12} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7"/></svg>
+          </button>
+          <button onClick={() => handleOrder(def, 1)} disabled={idx === sortedDefs.length - 1}
+            style={{ background: 'none', border: 'none', padding: 3, cursor: idx === sortedDefs.length - 1 ? 'default' : 'pointer', color: TM, opacity: idx === sortedDefs.length - 1 ? 0.2 : 0.5 }}>
+            <svg width={12} height={12} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          <div style={{ flex: 1 }} />
+          <button onClick={() => openEdit(def)}
+            style={{ fontSize: 11, fontWeight: 500, color: BR, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}
+            onMouseEnter={e => (e.currentTarget.style.opacity = '0.7')}
+            onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+          >Edit</button>
+          <button onClick={() => setDeleteTarget(def)}
+            style={{ fontSize: 11, fontWeight: 500, color: TM, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}
+            onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')}
+            onMouseLeave={e => (e.currentTarget.style.color = TM)}
+          >Delete</button>
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <div className="space-y-5">
+    <div>
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-text-muted">
-          {defs.filter(d => d.is_active).length} active · {defs.filter(d => !d.is_active).length} inactive
-        </p>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-2 text-xs bg-brand hover:bg-brand-dim text-white px-3 py-2 rounded-lg transition-colors"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          New Property
-        </button>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <p style={{ fontSize: 11, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            {activeDefs.length} active · {inactiveDefs.length} inactive
+          </p>
+        </div>
+        <button onClick={openCreate}
+          style={{ fontSize: 12, fontWeight: 600, padding: '7px 16px', borderRadius: 8, border: 'none', background: BR, color: 'white', cursor: 'pointer' }}
+          onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+          onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+        >+ New Property</button>
       </div>
 
       {/* Create / Edit form */}
       {showForm && (
-        <div className="rounded-xl border border-surface-5 bg-surface-1 p-5 space-y-4">
-          <h3 className="text-sm font-semibold text-text-primary">{editId ? 'Edit Property' : 'New Property'}</h3>
+        <div style={{ background: 'white', borderRadius: 12, padding: 20, marginBottom: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.06)' }}>
+          <p style={{ fontSize: 14, fontWeight: 600, color: T1, marginBottom: 16 }}>{editId ? 'Edit Property' : 'New Property'}</p>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs text-text-muted">Display Name *</label>
-              <input
-                value={form.name}
-                onChange={e => handleNameChange(e.target.value)}
-                placeholder="e.g. KYC Sub-category"
-                className="w-full text-sm bg-surface-2 ring-1 ring-surface-5 px-3 py-2 rounded-lg outline-none focus:ring-brand text-text-primary placeholder:text-text-muted"
-              />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+            <div>
+              <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>Display Name</p>
+              <input value={form.name} onChange={e => handleNameChange(e.target.value)} placeholder="e.g. KYC Sub-category" style={FI} onFocus={focusIn} onBlur={focusOut} />
             </div>
-            <div className="space-y-1">
-              <label className="text-xs text-text-muted">Field Key * <span className="font-normal text-text-muted">(auto-generated)</span></label>
-              <input
-                value={form.field_key}
-                onChange={e => { setKeyTouched(true); setForm(f => ({ ...f, field_key: e.target.value })); }}
-                placeholder="kyc_sub_category"
-                className="w-full text-sm font-mono bg-surface-2 ring-1 ring-surface-5 px-3 py-2 rounded-lg outline-none focus:ring-brand text-text-primary placeholder:text-text-muted"
-              />
+            <div>
+              <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>Field Key <span style={{ fontWeight: 400 }}>(auto-generated)</span></p>
+              <input value={form.field_key} onChange={e => { setKeyTouched(true); setForm(f => ({ ...f, field_key: e.target.value })); }} placeholder="kyc_sub_category" style={{ ...FI, fontFamily: 'monospace' }} onFocus={focusIn} onBlur={focusOut} />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs text-text-muted">Field Type *</label>
-              <select
-                value={form.field_type}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+            <div>
+              <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>Field Type</p>
+              <select value={form.field_type} disabled={!!editId}
                 onChange={e => setForm(f => ({ ...f, field_type: e.target.value as PropertyFieldType }))}
-                className="w-full text-sm bg-surface-2 ring-1 ring-surface-5 px-3 py-2 rounded-lg outline-none focus:ring-brand text-text-primary"
-                disabled={!!editId}
+                style={{ ...FI, cursor: editId ? 'not-allowed' : 'pointer' }}
+                onFocus={focusIn} onBlur={focusOut}
               >
                 {(Object.keys(FIELD_TYPE_LABELS) as PropertyFieldType[]).map(t => (
                   <option key={t} value={t}>{FIELD_TYPE_LABELS[t]}</option>
                 ))}
               </select>
-              {editId && <p className="text-[10px] text-text-muted">Field type cannot be changed after creation.</p>}
+              {editId && <p style={{ fontSize: 10, color: TM, marginTop: 3 }}>Field type cannot be changed after creation.</p>}
             </div>
-            <div className="space-y-1">
-              <label className="text-xs text-text-muted">Required</label>
-              <div className="flex items-center gap-2 mt-2">
-                <button
-                  onClick={() => setForm(f => ({ ...f, is_required: !f.is_required }))}
-                  className={`w-9 h-5 rounded-full transition-colors relative ${form.is_required ? 'bg-brand' : 'bg-surface-5'}`}
-                >
-                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${form.is_required ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                </button>
-                <span className="text-xs text-text-muted">{form.is_required ? 'Yes — amber warning if empty' : 'No'}</span>
+            <div>
+              <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>Required</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                <Toggle on={form.is_required} onToggle={() => setForm(f => ({ ...f, is_required: !f.is_required }))} />
+                <span style={{ fontSize: 12, color: TM }}>{form.is_required ? 'Yes — amber warning if empty' : 'No'}</span>
               </div>
             </div>
           </div>
 
           {/* Applies To */}
-          <div className="space-y-2">
-            <label className="text-xs text-text-muted">Applies To <span className="font-normal">(leave empty = all categories)</span></label>
-            <div className="flex flex-wrap gap-2">
+          <div style={{ marginBottom: 14 }}>
+            <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+              Applies To <span style={{ fontWeight: 400 }}>(leave empty = all categories)</span>
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {CATEGORY_OPTIONS.map(cat => {
                 const sel = form.applies_to.includes(cat.value);
                 return (
-                  <button
-                    key={cat.value}
-                    onClick={() => setForm(f => ({
-                      ...f,
-                      applies_to: sel
-                        ? f.applies_to.filter(v => v !== cat.value)
-                        : [...f.applies_to, cat.value],
-                    }))}
-                    className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                      sel ? 'bg-brand text-white border-brand' : 'bg-surface-2 text-text-secondary border-surface-5 hover:border-brand/40'
-                    }`}
+                  <button key={cat.value}
+                    onClick={() => setForm(f => ({ ...f, applies_to: sel ? f.applies_to.filter(v => v !== cat.value) : [...f.applies_to, cat.value] }))}
+                    style={{
+                      fontSize: 11, fontWeight: 500, padding: '4px 12px', borderRadius: 20, cursor: 'pointer',
+                      background: sel ? BR : '#f5f5f7', color: sel ? 'white' : T2,
+                      border: sel ? 'none' : '0.5px solid rgba(0,0,0,0.12)',
+                      transition: 'all 0.15s',
+                    }}
                   >{cat.label}</button>
                 );
               })}
@@ -2579,11 +2780,11 @@ function TicketPropertiesTab() {
 
           {/* Options editor */}
           {(form.field_type === 'single_select' || form.field_type === 'multi_select') && (
-            <div className="space-y-2">
-              <label className="text-xs text-text-muted">Options</label>
-              <div className="space-y-1.5">
+            <div style={{ marginBottom: 14 }}>
+              <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Options</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {form.options.map((opt, i) => (
-                  <div key={i} className="flex items-center gap-2">
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <input
                       value={opt.label}
                       onChange={e => {
@@ -2591,148 +2792,90 @@ function TicketPropertiesTab() {
                         next[i] = { value: slugify(e.target.value), label: e.target.value };
                         setForm(f => ({ ...f, options: next }));
                       }}
-                      placeholder={`Option ${i + 1} label`}
-                      className="flex-1 text-xs bg-surface-2 ring-1 ring-surface-5 px-2.5 py-1.5 rounded outline-none focus:ring-brand text-text-primary placeholder:text-text-muted"
+                      placeholder={`Option ${i + 1}`}
+                      style={{ ...FI, flex: 1 }}
+                      onFocus={focusIn} onBlur={focusOut}
                     />
-                    <button
-                      onClick={() => setForm(f => ({ ...f, options: f.options.filter((_, j) => j !== i) }))}
-                      className="text-text-muted hover:text-brand transition-colors"
+                    <button onClick={() => setForm(f => ({ ...f, options: f.options.filter((_, j) => j !== i) }))}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: TM, padding: 2 }}
+                      onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')}
+                      onMouseLeave={e => (e.currentTarget.style.color = TM)}
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg width={14} height={14} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                       </svg>
                     </button>
                   </div>
                 ))}
-                <button
-                  onClick={() => setForm(f => ({ ...f, options: [...f.options, { value: '', label: '' }] }))}
-                  className="text-xs text-brand hover:text-brand-dim flex items-center gap-1 transition-colors"
+                <button onClick={() => setForm(f => ({ ...f, options: [...f.options, { value: '', label: '' }] }))}
+                  style={{ fontSize: 12, fontWeight: 500, color: BR, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, padding: '4px 0' }}
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
+                  <svg width={13} height={13} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
                   Add option
                 </button>
               </div>
             </div>
           )}
 
-          <div className="flex gap-2 pt-1">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="text-xs bg-brand hover:bg-brand-dim text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5"
+          <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+            <button onClick={handleSave} disabled={saving}
+              style={{ fontSize: 12, fontWeight: 600, padding: '7px 18px', borderRadius: 8, border: 'none', background: BR, color: 'white', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: 5 }}
+              onMouseEnter={e => (e.currentTarget.style.opacity = saving ? '0.6' : '0.85')}
+              onMouseLeave={e => (e.currentTarget.style.opacity = saving ? '0.6' : '1')}
             >
-              {saving ? <><Spinner size="xs" /> Saving…</> : (editId ? 'Save Changes' : 'Create Property')}
+              {saving && <Spinner size="sm" />}
+              {editId ? 'Save Changes' : 'Create Property'}
             </button>
-            <button
-              onClick={() => setShowForm(false)}
-              className="text-xs px-4 py-2 rounded-lg border border-surface-5 text-text-secondary hover:text-text-primary hover:bg-surface-3 transition-colors"
+            <button onClick={() => setShowForm(false)}
+              style={{ fontSize: 12, fontWeight: 500, padding: '7px 16px', borderRadius: 8, border: '0.5px solid rgba(0,0,0,0.15)', background: 'white', color: T2, cursor: 'pointer' }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#f5f5f7')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'white')}
             >Cancel</button>
           </div>
         </div>
       )}
 
-      {/* Table */}
+      {/* Property grid */}
       {loading ? (
-        <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-10 bg-surface-2 rounded animate-pulse" />)}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '16px 0', fontSize: 13, color: TM }}>
+          <Spinner size="sm" /> Loading…
+        </div>
       ) : sortedDefs.length === 0 ? (
-        <div className="text-center py-12 text-text-muted text-sm">No properties defined yet.</div>
+        <div style={{ background: 'white', borderRadius: 12, padding: '48px 20px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.06)' }}>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: 28, height: 28, color: TM, opacity: 0.4, margin: '0 auto 8px' }}>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+          <p style={{ fontSize: 13, color: TM }}>No properties defined yet</p>
+        </div>
       ) : (
-        <div className="rounded-xl border border-surface-5 overflow-hidden">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="bg-surface-2 border-b border-surface-5">
-                <th className="text-left px-4 py-2.5 text-text-muted font-medium">Name</th>
-                <th className="text-left px-4 py-2.5 text-text-muted font-medium">Key</th>
-                <th className="text-left px-4 py-2.5 text-text-muted font-medium">Type</th>
-                <th className="text-left px-4 py-2.5 text-text-muted font-medium">Applies To</th>
-                <th className="text-center px-4 py-2.5 text-text-muted font-medium">Req.</th>
-                <th className="text-center px-4 py-2.5 text-text-muted font-medium">Active</th>
-                <th className="text-center px-4 py-2.5 text-text-muted font-medium">Order</th>
-                <th className="px-4 py-2.5" />
-              </tr>
-            </thead>
-            <tbody>
-              {sortedDefs.map((def, idx) => (
-                <tr key={def.id} className={`border-b border-surface-5 last:border-0 ${!def.is_active ? 'opacity-50' : ''}`}>
-                  <td className="px-4 py-3 font-medium text-text-primary">{def.name}</td>
-                  <td className="px-4 py-3 font-mono text-text-muted">{def.field_key}</td>
-                  <td className="px-4 py-3 text-text-secondary">{FIELD_TYPE_LABELS[def.field_type]}</td>
-                  <td className="px-4 py-3 text-text-secondary">
-                    {def.applies_to?.length
-                      ? def.applies_to.map(c => CATEGORY_OPTIONS.find(o => o.value === c)?.label ?? c).join(', ')
-                      : <span className="italic text-text-muted">All</span>
-                    }
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {def.is_required
-                      ? <span className="inline-block w-2 h-2 rounded-full bg-accent-amber" />
-                      : <span className="text-text-muted">—</span>
-                    }
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <button
-                      onClick={() => handleToggleActive(def)}
-                      className={`w-9 h-5 rounded-full transition-colors relative ${def.is_active ? 'bg-brand' : 'bg-surface-5'}`}
-                    >
-                      <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${def.is_active ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                    </button>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      <button onClick={() => handleOrder(def, -1)} disabled={idx === 0}
-                        className="p-0.5 text-text-muted hover:text-text-primary disabled:opacity-30 transition-colors">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                        </svg>
-                      </button>
-                      <button onClick={() => handleOrder(def, 1)} disabled={idx === sortedDefs.length - 1}
-                        className="p-0.5 text-text-muted hover:text-text-primary disabled:opacity-30 transition-colors">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2 justify-end">
-                      <button onClick={() => openEdit(def)} className="text-text-muted hover:text-brand transition-colors" title="Edit">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                        </svg>
-                      </button>
-                      <button onClick={() => setDeleteTarget(def)} className="text-text-muted hover:text-brand transition-colors" title="Delete">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
+          {sortedDefs.map((def, idx) => (
+            <PropertyCard key={def.id} def={def} idx={idx} />
+          ))}
         </div>
       )}
 
-      {/* Delete confirmation modal */}
+      {/* Delete confirmation */}
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-surface-0 rounded-xl border border-surface-5 shadow-xl p-6 w-96 space-y-4">
-            <h3 className="text-sm font-semibold text-text-primary">Delete "{deleteTarget.name}"?</h3>
-            <p className="text-xs text-text-muted">
-              If this property has existing values on tickets it will be deactivated instead of permanently deleted. You can reactivate it any time.
-            </p>
-            <div className="flex gap-2 pt-1">
-              <button
-                onClick={() => handleDelete(deleteTarget)}
-                className="text-xs bg-brand hover:bg-brand-dim text-white px-4 py-2 rounded-lg transition-colors"
-              >Delete / Deactivate</button>
-              <button
-                onClick={() => setDeleteTarget(null)}
-                className="text-xs px-4 py-2 rounded-lg border border-surface-5 text-text-secondary hover:text-text-primary hover:bg-surface-3 transition-colors"
+        <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(8px)' }}>
+          <div style={{ width: '100%', maxWidth: 380, margin: '0 16px', borderRadius: 16, background: 'white', boxShadow: '0 24px 64px rgba(0,0,0,0.22)', overflow: 'hidden' }}>
+            <div style={{ padding: '22px 22px 16px' }}>
+              <p style={{ fontSize: 14, fontWeight: 600, color: T1, marginBottom: 6 }}>Delete "{deleteTarget.name}"?</p>
+              <p style={{ fontSize: 13, color: T2, lineHeight: 1.6 }}>
+                If this property has existing values on tickets it will be deactivated instead of permanently deleted.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', padding: '0 22px 22px' }}>
+              <button onClick={() => setDeleteTarget(null)}
+                style={{ fontSize: 13, fontWeight: 500, padding: '7px 16px', borderRadius: 8, border: '0.5px solid rgba(0,0,0,0.15)', background: 'white', color: T2, cursor: 'pointer' }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#f5f5f7')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'white')}
               >Cancel</button>
+              <button onClick={() => handleDelete(deleteTarget)}
+                style={{ fontSize: 13, fontWeight: 600, padding: '7px 16px', borderRadius: 8, border: 'none', background: '#ef4444', color: 'white', cursor: 'pointer' }}
+                onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+                onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+              >Delete</button>
             </div>
           </div>
         </div>
