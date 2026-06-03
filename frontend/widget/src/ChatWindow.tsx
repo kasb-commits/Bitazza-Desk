@@ -465,9 +465,9 @@ export default function ChatWindow({ cfg, onClose }: Props) {
         ]);
       } else if (humanHandling) {
         // Dashboard marked conversation as escalated but agent hasn't replied yet —
-        // dismiss the "connecting" spinner banner without waiting for a message.
+        // set escalated flag only; leave escalatedAgent null so the back button
+        // stays visible and the "connecting" banner shows until a real agent replies.
         setEscalated(true);
-        setEscalatedAgent((prev) => prev ?? { name: 'Support Agent', avatar: 'S', avatarUrl: null });
       }
     };
     const interval = setInterval(poll, 3000);
@@ -667,7 +667,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
       >
         {/* Who — left-aligned avatar + name/status */}
         <div className="flex items-center gap-3 min-w-0 flex-1">
-          {selectedCategory && !escalatedAgent ? (
+          {messages.length > 0 && langSelected && !escalatedAgent ? (
             <button
               onClick={handleGoBack}
               className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-colors"
@@ -1068,8 +1068,8 @@ export default function ChatWindow({ cfg, onClose }: Props) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Request human support pill — Bitazza secondary: mint-tinted with solid mint border */}
-      {selectedCategory && !escalatedAgent && !loading && !csatPending && !csatSubmitted && !agentClosureRequest && !awaitingFirstReply && (
+      {/* Request human support pill — visible once conversation has started, until a human agent connects */}
+      {messages.length > 0 && langSelected && !escalatedAgent && !csatPending && !csatSubmitted && !agentClosureRequest && (
         <div className="flex justify-center px-4 py-2 bg-white" style={{ borderTop: '1px solid #EDEDF8' }}>
           <button
             onClick={handleTalkToAgent}

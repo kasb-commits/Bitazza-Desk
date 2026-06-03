@@ -27,7 +27,7 @@ export const ISSUE_CATEGORIES: IssueCategoryDef[] = [
     key: 'account_restriction',
     icon: '🔒',
     label: { en: 'Account Restricted', th: 'บัญชีถูกระงับ' },
-    openingMessage: { en: 'My account has been restricted or suspended.', th: 'บัญชีของฉันถูกระงับหรือจำกัดการใช้งาน' },
+    openingMessage: { en: 'I need help with my account access.', th: 'ฉันต้องการความช่วยเหลือเกี่ยวกับการเข้าถึงบัญชี' },
   },
   {
     key: 'password_2fa_reset',
