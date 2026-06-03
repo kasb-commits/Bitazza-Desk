@@ -56,9 +56,9 @@ const CHANNEL_LABELS: Record<string, string> = {
   web: 'Web', line: 'LINE', facebook: 'Facebook', email: 'Email',
 };
 const CHANNEL_PIE_COLORS: Record<string, string> = {
-  web: '#3b82f6', line: '#22c55e', facebook: '#6366f1', email: '#f59e0b',
+  web: '#528AF1', line: '#00CE80', facebook: '#32579D', email: '#F4B72A',
 };
-const CHANNEL_PIE_FALLBACK = '#6b7280';
+const CHANNEL_PIE_FALLBACK = 'rgba(27,26,24,0.5)';
 
 // ── Background Blobs ──────────────────────────────────────────────────────────
 
@@ -68,17 +68,17 @@ function BgBlobs() {
       <div style={{
         position: 'absolute', width: 600, height: 600, top: -200, right: -100,
         borderRadius: '50%', filter: 'blur(80px)', opacity: 0.35,
-        background: 'radial-gradient(circle, #a5b4fc, #818cf8)',
+        background: 'radial-gradient(circle, #A2FBD2, #00CE80)',
       }} />
       <div style={{
         position: 'absolute', width: 400, height: 400, bottom: -100, left: 200,
         borderRadius: '50%', filter: 'blur(80px)', opacity: 0.2,
-        background: 'radial-gradient(circle, #c7d2fe, #6366f1)',
+        background: 'radial-gradient(circle, #D3FCEA, #079755)',
       }} />
       <div style={{
         position: 'absolute', width: 300, height: 300, top: '40%', right: '30%',
         borderRadius: '50%', filter: 'blur(80px)', opacity: 0.18,
-        background: 'radial-gradient(circle, #bfdbfe, #93c5fd)',
+        background: 'radial-gradient(circle, #F0FEF8, #A2FBD2)',
       }} />
     </div>
   );
@@ -119,23 +119,23 @@ const IconClock = () => (
 function TicketRow({ ticket, onClick }: { ticket: Ticket; onClick: () => void }) {
   const name = ticket.customer?.name ?? 'Unknown';
   const urgency = getUrgencyLevel(ticket);
-  const urgencyBorder = urgency === 'critical' ? 'border-l-2 border-l-red-400' : urgency === 'warning' ? 'border-l-2 border-l-amber-400' : '';
-  const urgencyTime = urgency === 'critical' ? 'text-red-500 font-semibold' : urgency === 'warning' ? 'text-amber-500 font-semibold' : 'text-gray-400';
+  const urgencyBorder = urgency === 'critical' ? 'border-l-2 border-l-[#EF4150]' : urgency === 'warning' ? 'border-l-2 border-l-[#F4B72A]' : '';
+  const urgencyTime = urgency === 'critical' ? 'font-semibold' : urgency === 'warning' ? 'font-semibold' : '';
 
   return (
     <div
       onClick={onClick}
-      className={`group flex items-center gap-3 px-4 py-3 border-b border-gray-100 glass-row cursor-pointer transition-colors duration-100 ${urgencyBorder}`}
+      className={`group flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors duration-100 ${urgencyBorder}`} style={{ borderBottom: '1px solid #EDEDF8' }}
     >
       <Avatar name={name} size="sm" className="shrink-0" />
       <div className="min-w-0 flex-1">
-        <div className="text-xs font-semibold text-gray-900 truncate">{name}</div>
-        <div className="text-xs text-gray-500 truncate mt-0.5">{ticket.last_message ?? '—'}</div>
+        <div className="text-xs font-semibold truncate" style={{ color: 'rgba(27,26,24,1)' }}>{name}</div>
+        <div className="text-xs truncate mt-0.5" style={{ color: 'rgba(27,26,24,0.5)' }}>{ticket.last_message ?? '—'}</div>
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <ChannelBadge channel={ticket.channel as any} size="xs" />
         {ticket.priority !== 3 && <PriorityBadge priority={ticket.priority as Priority} size="xs" />}
-        <span className={`text-[10px] w-8 text-right tabular-nums ${urgencyTime}`}>
+        <span className={`text-[10px] w-8 text-right tabular-nums ${urgencyTime}`} style={{ color: urgency === 'critical' ? '#EF4150' : urgency === 'warning' ? '#F4B72A' : 'rgba(27,26,24,0.4)' }}>
           {relativeTime(ticket.last_message_at ?? ticket.created_at)}
         </span>
       </div>
@@ -153,21 +153,21 @@ function TicketTable({
 }) {
   return (
     <div className="glass-table">
-      <div className="flex items-center justify-between px-4 py-3.5 border-b border-gray-100 shrink-0">
+      <div className="flex items-center justify-between px-4 py-3.5 shrink-0" style={{ borderBottom: '1px solid #EDEDF8' }}>
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-gray-900">{title}</span>
+          <span className="text-sm font-semibold" style={{ color: 'rgba(27,26,24,1)' }}>{title}</span>
           {badge}
         </div>
-        <span className="text-xs text-gray-400">{tickets.length} tickets</span>
+        <span className="text-xs" style={{ color: 'rgba(27,26,24,0.5)' }}>{tickets.length} tickets</span>
       </div>
       <div className="overflow-y-auto flex-1">
         {loading
           ? Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
-                <div className="w-7 h-7 rounded-full bg-gray-200 animate-pulse shrink-0" />
+              <div key={i} className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: '1px solid #EDEDF8' }}>
+                <div className="w-7 h-7 rounded-full animate-pulse shrink-0" style={{ background: '#EDEDF8' }} />
                 <div className="flex-1 space-y-1.5">
-                  <div className="h-2.5 bg-gray-200 rounded animate-pulse w-2/3" />
-                  <div className="h-2 bg-gray-100 rounded animate-pulse w-1/2" />
+                  <div className="h-2.5 rounded animate-pulse w-2/3" style={{ background: '#EDEDF8' }} />
+                  <div className="h-2 rounded animate-pulse w-1/2" style={{ background: '#F0FEF8' }} />
                 </div>
               </div>
             ))
@@ -186,10 +186,10 @@ function EscalatedStrip({ tickets, onTicketClick }: { tickets: Ticket[]; onTicke
   if (tickets.length === 0) return null;
   const shown = tickets.slice(0, 3);
   return (
-    <div className="rounded-xl border border-red-200 px-4 py-3 flex flex-col gap-2" style={{ background: 'rgba(239,68,68,0.06)' }}>
+    <div className="rounded-xl px-4 py-3 flex flex-col gap-2" style={{ background: '#FBECEA', border: '1px solid #EF4150' }}>
       <div className="flex items-center gap-2 mb-0.5">
-        <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-        <span className="text-xs font-semibold text-red-500 uppercase tracking-wide">
+        <span className="inline-block w-2 h-2 rounded-full animate-pulse" style={{ background: '#EF4150' }} />
+        <span className="text-xs font-semibold uppercase" style={{ color: '#EF4150' }}>
           {tickets.length} ticket{tickets.length !== 1 ? 's' : ''} need immediate attention
         </span>
       </div>
@@ -197,17 +197,17 @@ function EscalatedStrip({ tickets, onTicketClick }: { tickets: Ticket[]; onTicke
         <div key={t.id} onClick={() => onTicketClick(t.id)}
           className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity">
           <Avatar name={t.customer?.name ?? 'Unknown'} size="xs" className="shrink-0" />
-          <span className="text-xs font-medium text-gray-800 truncate flex-1">
+          <span className="text-xs font-medium truncate flex-1" style={{ color: 'rgba(27,26,24,1)' }}>
             {t.customer?.name ?? 'Unknown'}
           </span>
           <ChannelBadge channel={t.channel as any} size="xs" />
-          <span className="text-[10px] text-red-400 tabular-nums w-8 text-right shrink-0">
+          <span className="text-[10px] tabular-nums w-8 text-right shrink-0" style={{ color: '#EF4150' }}>
             {relativeTime(t.last_message_at ?? t.created_at)}
           </span>
         </div>
       ))}
       {tickets.length > 3 && (
-        <span className="text-[10px] text-gray-400 mt-0.5">+{tickets.length - 3} more — go to Inbox</span>
+        <span className="text-[10px] mt-0.5" style={{ color: 'rgba(27,26,24,0.5)' }}>+{tickets.length - 3} more — go to Inbox</span>
       )}
     </div>
   );
@@ -217,20 +217,20 @@ function EscalatedStrip({ tickets, onTicketClick }: { tickets: Ticket[]; onTicke
 
 function ResolutionCard({ total, resolved }: { total: number; resolved: number }) {
   const rate = total > 0 ? Math.round((resolved / total) * 100) : null;
-  const color = rate == null ? 'text-gray-400' : rate >= 70 ? 'text-emerald-600' : rate >= 40 ? 'text-amber-600' : 'text-red-500';
-  const barColor = rate == null ? '' : rate >= 70 ? 'bg-emerald-500' : rate >= 40 ? 'bg-amber-500' : 'bg-red-500';
+  const rateColor = rate == null ? 'rgba(27,26,24,0.4)' : rate >= 70 ? '#056639' : rate >= 40 ? '#705514' : '#EF4150';
+  const barBg = rate == null ? '' : rate >= 70 ? '#00CE80' : rate >= 40 ? '#F4B72A' : '#EF4150';
   return (
     <div className="glass-card flex flex-col gap-2">
-      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Resolution Today</span>
-      <div className={`text-3xl font-bold tabular-nums ${color}`}>
+      <span className="text-xs font-semibold uppercase" style={{ color: 'rgba(27,26,24,0.5)' }}>Resolution Today</span>
+      <div className="text-3xl font-bold tabular-nums" style={{ color: rateColor }}>
         {rate != null ? `${rate}%` : '—'}
       </div>
-      <span className="text-xs text-gray-500">
+      <span className="text-xs" style={{ color: 'rgba(27,26,24,0.5)' }}>
         {resolved} resolved / {total} opened
       </span>
       {rate != null && (
-        <div className="mt-1 h-1.5 rounded-full bg-gray-200 overflow-hidden">
-          <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${rate}%` }} />
+        <div className="mt-1 h-1.5 rounded-full overflow-hidden" style={{ background: '#EDEDF8' }}>
+          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${rate}%`, background: barBg }} />
         </div>
       )}
     </div>
@@ -246,8 +246,8 @@ function ChannelPie({ data }: { data: { channel: string; count: number }[] }) {
   if (sorted.length === 0) {
     return (
       <div className="glass-card flex flex-col gap-3">
-        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Channels Today</span>
-        <span className="text-xs text-gray-400">No data yet</span>
+        <span className="text-xs font-semibold uppercase" style={{ color: 'rgba(27,26,24,0.5)' }}>Channels Today</span>
+        <span className="text-xs" style={{ color: 'rgba(27,26,24,0.4)' }}>No data yet</span>
       </div>
     );
   }
@@ -260,7 +260,7 @@ function ChannelPie({ data }: { data: { channel: string; count: number }[] }) {
 
   return (
     <div className="glass-card flex flex-col gap-3">
-      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Channels Today</span>
+      <span className="text-xs font-semibold uppercase" style={{ color: 'rgba(27,26,24,0.5)' }}>Channels Today</span>
       <div className="flex items-center gap-4">
         <div className="w-24 h-24 shrink-0">
           <ResponsiveContainer width="100%" height="100%">
@@ -269,7 +269,7 @@ function ChannelPie({ data }: { data: { channel: string; count: number }[] }) {
                 {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
               </Pie>
               <Tooltip
-                contentStyle={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
+                contentStyle={{ background: '#fff', border: '1px solid #EDEDF8', borderRadius: 8, fontSize: 10 }}
                 formatter={(v: number, name: string) => [`${v} (${Math.round(v / total * 100)}%)`, name]}
               />
             </PieChart>
@@ -279,8 +279,8 @@ function ChannelPie({ data }: { data: { channel: string; count: number }[] }) {
           {pieData.map(d => (
             <div key={d.name} className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full shrink-0" style={{ background: d.color }} />
-              <span className="text-xs text-gray-600 truncate flex-1">{d.name}</span>
-              <span className="text-xs tabular-nums text-gray-900 font-medium shrink-0">{d.value}</span>
+              <span className="text-xs truncate flex-1" style={{ color: 'rgba(27,26,24,0.75)' }}>{d.name}</span>
+              <span className="text-xs tabular-nums font-medium shrink-0" style={{ color: 'rgba(27,26,24,1)' }}>{d.value}</span>
             </div>
           ))}
         </div>
@@ -295,19 +295,19 @@ function TodaySummary({ opened, resolved, pending, escalated }: {
   opened: number; resolved: number; pending: number; escalated: number;
 }) {
   const rows = [
-    { label: 'Opened today',   value: opened,   color: 'text-blue-600'   },
-    { label: 'Resolved today', value: resolved,  color: 'text-emerald-600'},
-    { label: 'Pending reply',  value: pending,   color: 'text-purple-600' },
-    { label: 'Escalated',      value: escalated, color: 'text-red-500'    },
+    { label: 'Opened today',   value: opened,   hex: '#32579D'  },
+    { label: 'Resolved today', value: resolved,  hex: '#056639'  },
+    { label: 'Pending reply',  value: pending,   hex: '#F4B72A'  },
+    { label: 'Escalated',      value: escalated, hex: '#EF4150'  },
   ];
   return (
     <div className="glass-card flex flex-col gap-3">
-      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Today's Summary</span>
+      <span className="text-xs font-semibold uppercase" style={{ color: 'rgba(27,26,24,0.5)' }}>Today's Summary</span>
       <div className="flex flex-col gap-2.5">
         {rows.map(r => (
           <div key={r.label} className="flex items-center justify-between">
-            <span className="text-xs text-gray-600">{r.label}</span>
-            <span className={`text-sm font-bold tabular-nums ${r.color}`}>{r.value}</span>
+            <span className="text-xs" style={{ color: 'rgba(27,26,24,0.75)' }}>{r.label}</span>
+            <span className="text-sm font-bold tabular-nums" style={{ color: r.hex }}>{r.value}</span>
           </div>
         ))}
       </div>
@@ -318,12 +318,12 @@ function TodaySummary({ opened, resolved, pending, escalated }: {
 // ── Agent Activity ────────────────────────────────────────────────────────────
 
 const AGENT_DOT: Record<string, string> = {
-  Available:       'bg-emerald-500',
-  Busy:            'bg-amber-500',
-  Break:           'bg-gray-400',
-  after_call_work: 'bg-gray-400',
-  Offline:         'bg-gray-300',
-  away:            'bg-gray-300',
+  Available:       '#00CE80',
+  Busy:            '#F4B72A',
+  Break:           'rgba(27,26,24,0.4)',
+  after_call_work: 'rgba(27,26,24,0.4)',
+  Offline:         '#EDEDF8',
+  away:            '#EDEDF8',
 };
 
 function AgentActivity({ agents }: { agents: Agent[] }) {
@@ -332,20 +332,20 @@ function AgentActivity({ agents }: { agents: Agent[] }) {
   return (
     <div className="glass-card-sm" style={{ padding: '14px 16px' }}>
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-xs font-semibold text-gray-900">Agent Activity</span>
-        <span className="text-[10px] text-gray-400">{active.length} online</span>
+        <span className="text-xs font-semibold" style={{ color: 'rgba(27,26,24,1)' }}>Agent Activity</span>
+        <span className="text-[10px]" style={{ color: 'rgba(27,26,24,0.5)' }}>{active.length} online</span>
       </div>
       <div className="flex flex-wrap gap-2">
         {active.map(a => {
           const state = a.state ?? a.status ?? 'Offline';
           const tickets = Number(a.active_chats ?? a.active_conversation_count ?? 0);
           const max = a.max_chats ?? a.max_capacity ?? 0;
-          const dotClass = AGENT_DOT[state] ?? 'bg-gray-300';
+          const dotColor = AGENT_DOT[state] ?? '#EDEDF8';
           return (
-            <div key={a.id} className="flex items-center gap-2 rounded-xl px-3 py-1.5 flex-1 min-w-0" style={{ background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.7)' }}>
-              <span className={`w-2 h-2 rounded-full shrink-0 ${dotClass}`} />
-              <span className="text-xs font-medium text-gray-800 truncate flex-1">{a.name}</span>
-              <span className="text-[10px] tabular-nums text-gray-400 shrink-0">
+            <div key={a.id} className="flex items-center gap-2 rounded-xl px-3 py-1.5 flex-1 min-w-0" style={{ background: 'rgba(255,255,255,0.8)', border: '1px solid #EDEDF8' }}>
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: dotColor }} />
+              <span className="text-xs font-medium truncate flex-1" style={{ color: 'rgba(27,26,24,1)' }}>{a.name}</span>
+              <span className="text-[10px] tabular-nums shrink-0" style={{ color: 'rgba(27,26,24,0.5)' }}>
                 {tickets}{max > 0 ? `/${max}` : ''} tickets
               </span>
             </div>
@@ -447,18 +447,18 @@ export default function HomeDashboard({ onSelectTicket, onNavigateInbox }: HomeD
   const firstLoad = loading && allTickets.length === 0;
 
   return (
-    <div className="glass-page flex-1 overflow-y-auto relative">
+    <div className="flex-1 overflow-y-auto relative" style={{ background: '#FCFCFE' }}>
       <BgBlobs />
 
       <div className="relative max-w-7xl mx-auto p-6 space-y-5" style={{ zIndex: 1 }}>
 
         {/* Error banner */}
         {error && (
-          <div className="flex items-center justify-between gap-4 rounded-xl border border-red-200 px-4 py-3" style={{ background: 'rgba(239,68,68,0.06)' }}>
-            <span className="text-sm text-red-500">{error}</span>
+          <div className="flex items-center justify-between gap-4 rounded-xl px-4 py-3" style={{ background: '#FBECEA', border: '1px solid #EF4150' }}>
+            <span className="text-sm" style={{ color: '#EF4150' }}>{error}</span>
             <div className="flex items-center gap-3 shrink-0">
-              <button onClick={() => loadRef.current()} className="text-xs font-semibold text-red-500 hover:text-red-400 transition-colors">Retry</button>
-              <button onClick={() => setError(null)} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">Dismiss</button>
+              <button onClick={() => loadRef.current()} className="text-xs font-semibold transition-colors" style={{ color: '#EF4150' }}>Retry</button>
+              <button onClick={() => setError(null)} className="text-xs transition-colors" style={{ color: 'rgba(27,26,24,0.4)' }}>Dismiss</button>
             </div>
           </div>
         )}
@@ -466,21 +466,21 @@ export default function HomeDashboard({ onSelectTicket, onNavigateInbox }: HomeD
         {/* Greeting header */}
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-gray-900" style={{ letterSpacing: '-0.3px' }}>
+            <h2 className="text-xl font-bold" style={{ color: 'rgba(27,26,24,1)' }}>
               {getGreeting()}{userName ? `, ${userName.split(' ')[0]}` : ''}.
             </h2>
             {escalatedCount === 0 && (
-              <p className="text-sm text-gray-500 mt-0.5">Here's what's happening today.</p>
+              <p className="text-sm mt-0.5" style={{ color: 'rgba(27,26,24,0.5)' }}>Here's what's happening today.</p>
             )}
           </div>
           <div className="flex items-center gap-3 shrink-0 pt-0.5">
-            {updatedLabel && <span className="text-[10px] text-gray-400 tabular-nums">{updatedLabel}</span>}
+            {updatedLabel && <span className="text-[10px] tabular-nums" style={{ color: 'rgba(27,26,24,0.4)' }}>{updatedLabel}</span>}
             <button
               onClick={() => loadRef.current()} disabled={loading} title="Refresh"
               className="w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-150 disabled:opacity-40"
-              style={{ background: 'rgba(255,255,255,0.75)', border: '1px solid rgba(255,255,255,0.6)', backdropFilter: 'blur(12px)', color: '#6b7280' }}
-              onMouseEnter={e => (e.currentTarget.style.color = '#6366f1')}
-              onMouseLeave={e => (e.currentTarget.style.color = '#6b7280')}
+              style={{ background: 'rgba(255,255,255,0.75)', border: '1px solid #EDEDF8', backdropFilter: 'blur(12px)', color: 'rgba(27,26,24,0.5)' }}
+              onMouseEnter={e => (e.currentTarget.style.color = '#00CE80')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'rgba(27,26,24,0.5)')}
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
                 fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
@@ -541,7 +541,7 @@ export default function HomeDashboard({ onSelectTicket, onNavigateInbox }: HomeD
           <TicketTable
             title="VIP Tickets"
             badge={
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.1)', color: '#6366f1' }}>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: '#F0FEF8', color: '#056639' }}>
                 VIP
               </span>
             }
