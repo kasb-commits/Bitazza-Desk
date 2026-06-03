@@ -22,6 +22,8 @@ export interface StoredSession {
   category?: string;
   agent?: StoredAgent;
   isGuest?: boolean;
+  botName?: string;
+  botAvatarUrl?: string | null;
 }
 
 export function clearStoredSession() {
@@ -46,18 +48,26 @@ export function getStoredSession(): StoredSession | null {
   try {
     const raw = localStorage.getItem(SESSION_KEY);
     if (!raw) return null;
-    const { id, ts, lang, category, agent, isGuest } = JSON.parse(raw);
+    const { id, ts, lang, category, agent, isGuest, botName, botAvatarUrl } = JSON.parse(raw);
     if (Date.now() - ts > SESSION_TTL_MS) {
       localStorage.removeItem(SESSION_KEY);
       return null;
     }
-    return { id, lang, category, agent, isGuest: !!isGuest } as StoredSession;
+    return { id, lang, category, agent, isGuest: !!isGuest, botName, botAvatarUrl } as StoredSession;
   } catch {
     return null;
   }
 }
 
-function storeSession(id: string, lang?: 'en' | 'th', category?: string, agent?: StoredAgent, isGuest?: boolean) {
+function storeSession(
+  id: string,
+  lang?: 'en' | 'th',
+  category?: string,
+  agent?: StoredAgent,
+  isGuest?: boolean,
+  botName?: string,
+  botAvatarUrl?: string | null,
+) {
   const existing = getStoredSession();
   localStorage.setItem(SESSION_KEY, JSON.stringify({
     id,
@@ -66,22 +76,29 @@ function storeSession(id: string, lang?: 'en' | 'th', category?: string, agent?:
     category: category ?? existing?.category,
     agent: agent ?? existing?.agent,
     isGuest: isGuest ?? existing?.isGuest ?? false,
+    botName: botName ?? existing?.botName,
+    botAvatarUrl: botAvatarUrl !== undefined ? botAvatarUrl : existing?.botAvatarUrl,
   }));
 }
 
 export function storeSessionLang(lang: 'en' | 'th') {
   const existing = getStoredSession();
-  if (existing) storeSession(existing.id, lang, existing.category, existing.agent);
+  if (existing) storeSession(existing.id, lang, existing.category, existing.agent, existing.isGuest, existing.botName, existing.botAvatarUrl);
 }
 
 export function storeSessionCategory(category: string) {
   const existing = getStoredSession();
-  if (existing) storeSession(existing.id, existing.lang, category, existing.agent);
+  if (existing) storeSession(existing.id, existing.lang, category, existing.agent, existing.isGuest, existing.botName, existing.botAvatarUrl);
 }
 
 export function storeSessionAgent(agent: StoredAgent) {
   const existing = getStoredSession();
-  if (existing) storeSession(existing.id, existing.lang, existing.category, agent);
+  if (existing) storeSession(existing.id, existing.lang, existing.category, agent, existing.isGuest, existing.botName, existing.botAvatarUrl);
+}
+
+export function storeSessionBotInfo(botName: string, botAvatarUrl: string | null) {
+  const existing = getStoredSession();
+  if (existing) storeSession(existing.id, existing.lang, existing.category, existing.agent, existing.isGuest, botName, botAvatarUrl);
 }
 
 let _startPromise: Promise<string> | null = null;

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Message, MessageAttachment, CSBotConfig, IssueCategory } from './types';
 import { ISSUE_CATEGORIES } from './types';
-import { startConversation, sendMessage, uploadAttachment, fetchHistory, setCategoryAgent, getStoredSession, storeSessionLang, storeSessionCategory, storeSessionAgent, clearStoredSession, fetchCustomerTickets, fetchOpenTicket, getStoredCustomerId, emergencyEscalate, fetchAnnouncements } from './api';
+import { startConversation, sendMessage, uploadAttachment, fetchHistory, setCategoryAgent, getStoredSession, storeSessionLang, storeSessionCategory, storeSessionAgent, storeSessionBotInfo, clearStoredSession, fetchCustomerTickets, fetchOpenTicket, getStoredCustomerId, emergencyEscalate, fetchAnnouncements } from './api';
 import type { PastTicket, Announcement } from './api';
 import MessageBubble from './MessageBubble';
 import TypingIndicator from './TypingIndicator';
@@ -143,10 +143,16 @@ export default function ChatWindow({ cfg, onClose }: Props) {
       if (existing.lang) {
         setLang(existing.lang);
         setLangSelected(true);
+        fetchAnnouncements(cfg).then(setAnnouncements).catch(() => {});
       }
       // Restore category from session if available
       if (existing.category) {
         setSelectedCategory(existing.category as IssueCategory);
+      }
+      // Restore AI bot persona so message bubbles show the correct name instead of "Bitazza Support"
+      if (existing.botName) {
+        setBotName(existing.botName);
+        setBotAvatarUrl(existing.botAvatarUrl ?? null);
       }
       fetchHistory(cfg, existing.id).then(({ messages: history, humanHandling }) => {
         if (history.length === 0) {
@@ -156,22 +162,33 @@ export default function ChatWindow({ cfg, onClose }: Props) {
           return;
         }
         // Always use the latest agent message from history as ground truth
-        const firstAgentMsg = history.find((m) => m.role === 'agent');
-        const restoredAgent = firstAgentMsg?.agent_name ? {
-          name: firstAgentMsg.agent_name,
-          avatar: firstAgentMsg.agent_avatar ?? firstAgentMsg.agent_name[0].toUpperCase(),
-          avatarUrl: firstAgentMsg.agent_avatar_url ?? null,
+        const lastAgentMsg = [...history].reverse().find((m) => m.role === 'agent');
+        const restoredAgent = lastAgentMsg?.agent_name ? {
+          name: lastAgentMsg.agent_name,
+          avatar: lastAgentMsg.agent_avatar ?? lastAgentMsg.agent_name[0].toUpperCase(),
+          avatarUrl: lastAgentMsg.agent_avatar_url ?? null,
         } : (existing.agent ?? null);
         if (restoredAgent) {
           setEscalated(true);
           setEscalatedAgent(restoredAgent);
+          storeSessionAgent(restoredAgent); // persist so next reload still has agent identity
         } else if (humanHandling) {
-          // Human has taken over from dashboard but hasn't replied yet — dismiss the "connecting" banner
+          // Human has taken over from dashboard but hasn't replied yet —
+          // only set the escalated flag; leave escalatedAgent null so the back button
+          // stays visible (matches poll path behaviour).
           setEscalated(true);
-          setEscalatedAgent({ name: 'Support Agent', avatar: 'S', avatarUrl: null });
         }
-        const restored: Message[] = history.map((m) => ({
-          id: `restored-${m.created_at}`,
+        // Re-populate previous tickets for restored sessions (mirrors selectCategory logic)
+        if (existing.category && !existing.isGuest && getStoredCustomerId()) {
+          fetchCustomerTickets(cfg, 1, 20).then((tickets) => {
+            if (tickets.length > 0) {
+              setPrevTickets(tickets);
+              setShowPrevTickets(true);
+            }
+          }).catch(() => {});
+        }
+        const restored: Message[] = history.map((m, idx) => ({
+          id: `restored-${m.created_at}-${idx}`,
           role: m.role as Message['role'],
           content: m.content,
           timestamp: m.created_at * 1000,
@@ -228,6 +245,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
           const resolvedName = agentName ?? 'Ploy';
           setBotName(resolvedName);
           setBotAvatarUrl(agentAvatarUrl || null);
+          storeSessionBotInfo(resolvedName, agentAvatarUrl || null);
           setTimeout(() => {
             const greeting = lang === 'th'
               ? `สวัสดีค่ะ ฉันชื่อ${resolvedName}! 😊 มีอะไรให้ช่วยได้บ้างคะ?`
@@ -329,6 +347,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
         const resolvedName = agentName ?? 'Support Agent';
         setBotName(resolvedName);
         setBotAvatarUrl(agentAvatarUrl || null);
+        storeSessionBotInfo(resolvedName, agentAvatarUrl || null);
 
         // 2. After a short human-feel delay, show the agent's intro message
         //    Skip for "other" — the AI's first response will ask what they need.
@@ -549,6 +568,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
           if (result.agentName) {
             setBotName(incomingName);
             setBotAvatarUrl(incomingAvatarUrl);
+            storeSessionBotInfo(incomingName!, incomingAvatarUrl);
           }
 
           // 3. Brief pause, then specialist's reply — pinned to specialist's identity
@@ -827,7 +847,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
               <div
                 key={a.id}
                 style={{
-                  margin: '4px 0 2px',
+                  margin: '4px 0 40px',
                   borderRadius: 12,
                   background: '#ffffff',
                   border: '1px solid #EDEDF8',
@@ -835,30 +855,18 @@ export default function ChatWindow({ cfg, onClose }: Props) {
                   overflow: 'hidden',
                 }}
               >
-                <div style={{ padding: '10px 12px 11px' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
-                    <div style={{
-                      flexShrink: 0, width: 28, height: 28, borderRadius: 8,
-                      background: '#FCFCFE',
-                      boxShadow: 'inset 0 0 0 1px #EDEDF8',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 1,
-                    }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M22 8.01c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h1v4l4-4h10c1.1 0 2-.9 2-2V8.01z"/>
+                <div style={{ padding: '10px 12px 11px 11px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 3 }}>
+                    <p style={{ fontSize: 14, fontWeight: 600, color: '#1B1A18', lineHeight: '20px', margin: 0, display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                        <path d="M22 4 12 8H5a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h1l2 5h2l-1-5h2l10 4V4z"/>
                       </svg>
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 12, fontWeight: 600, color: '#1B1A18', marginBottom: 3, lineHeight: 1.3 }}>
-                        {lang === 'th' ? a.title_th : a.title_en}
-                      </p>
-                      <p style={{ fontSize: 12, color: 'rgba(27,26,24,0.65)', lineHeight: 1.55, margin: 0 }}>
-                        {lang === 'th' ? a.body_th : a.body_en}
-                      </p>
-                    </div>
+                      {lang === 'th' ? a.title_th : a.title_en}
+                    </p>
                     <button
                       onClick={() => setDismissedAnnIds(prev => new Set([...prev, a.id]))}
                       style={{
-                        flexShrink: 0, marginTop: 1,
+                        flexShrink: 0,
                         width: 20, height: 20, borderRadius: 6,
                         background: '#FCFCFE',
                         border: '1px solid #EDEDF8',
@@ -875,6 +883,9 @@ export default function ChatWindow({ cfg, onClose }: Props) {
                       </svg>
                     </button>
                   </div>
+                  <p style={{ fontSize: 14, color: 'rgba(27,26,24,0.65)', lineHeight: '20px', margin: 0 }}>
+                    {lang === 'th' ? a.body_th : a.body_en}
+                  </p>
                 </div>
               </div>
             );

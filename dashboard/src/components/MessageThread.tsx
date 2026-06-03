@@ -109,12 +109,12 @@ function StatusDropdown({
 
   // Status color map — explicit styles (never Tailwind vars that may not compile)
   const STATUS_STYLE: Record<string, { bg: string; color: string; dot: string }> = {
-    Open_Live:           { bg: '#f0fdf4', color: '#15803d', dot: '#22c55e' },
-    In_Progress:         { bg: '#eff6ff', color: '#1d4ed8', dot: '#3b82f6' },
-    Pending_Customer:    { bg: '#fffbeb', color: '#92400e', dot: '#f59e0b' },
-    Escalated:           { bg: '#fef2f2', color: '#b91c1c', dot: '#ef4444' },
-    Closed_Resolved:     { bg: '#f9fafb', color: '#6b7280', dot: '#9ca3af' },
-    Closed_Unresponsive: { bg: '#f9fafb', color: '#9ca3af', dot: '#d1d5db' },
+    Open_Live:           { bg: '#EEF3FE', color: '#32579D', dot: '#528AF1' },
+    In_Progress:         { bg: '#FEF8EA', color: '#705514', dot: '#F4B72A' },
+    Pending_Customer:    { bg: '#EDEDF8', color: 'rgba(27,26,24,0.5)', dot: '#9CA3AF' },
+    Escalated:           { bg: '#FEF8EA', color: '#705514', dot: '#EF4150' },
+    Closed_Resolved:     { bg: '#F0FEF8', color: '#056639', dot: '#00CE80' },
+    Closed_Unresponsive: { bg: '#F0FEF8', color: '#056639', dot: '#EDEDF8' },
   };
   const sty = STATUS_STYLE[status] ?? { bg: '#f3f4f6', color: '#6b7280', dot: '#9ca3af' };
 
@@ -186,7 +186,7 @@ function ImageLightbox({ url, onClose }: { url: string; onClose: () => void }) {
       <img
         src={url}
         alt="full size"
-        className="max-w-[90vw] max-h-[90vh] rounded-xl shadow-2xl object-contain"
+        className="max-w-[90vw] max-h-[90vh] rounded-xl ring-1 ring-white/10 object-contain"
         onClick={(e) => e.stopPropagation()}
       />
       <button
@@ -648,7 +648,7 @@ export default function MessageThread({ ticketId, ws, onStatusChange, pendingDra
       </div>
 
       {/* ── Message list ── */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-2" style={{ background: 'linear-gradient(160deg, #f0f4ff 0%, #e8f2f8 100%)' }}>
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-2" style={{ background: '#FCFCFE' }}>
         {isVirtual && <div style={{ height: topPad }} />}
 
         {visibleMessages.map((msg, i) => {
@@ -675,11 +675,11 @@ export default function MessageThread({ ticketId, ws, onStatusChange, pendingDra
       {/* ── Canned response dropdown ── */}
       {cannedMatches.length > 0 && (
         <div className="mx-3 mb-1 rounded-xl overflow-hidden animate-slide-in-up"
-          style={{ background: '#fff', boxShadow: '0 4px 20px rgba(80,100,160,0.12)', border: '1px solid rgba(180,195,220,0.4)' }}>
+          style={{ background: '#fff', border: '1px solid #EDEDF8' }}>
           {cannedMatches.map(c => (
             <button key={c.id} onClick={() => applyCanned(c.body)}
-              className="w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 border-b border-gray-100 last:border-0 transition-colors">
-              <span className="font-semibold text-indigo-600">/{c.shortcut}</span>
+              className="w-full text-left px-3 py-2.5 text-sm transition-colors" style={{ borderBottom: '1px solid #EDEDF8' }}>
+              <span className="font-semibold" style={{ color: '#00CE80' }}>/{c.shortcut}</span>
               <span className="text-text-muted ml-2 text-xs">{c.body.slice(0, 60)}…</span>
             </button>
           ))}
@@ -688,16 +688,16 @@ export default function MessageThread({ ticketId, ws, onStatusChange, pendingDra
 
       {/* ── Composer ── */}
       {(canReply || canInternalNote) && (
-        <div className="px-4 pb-4 pt-3 shrink-0 bg-white" style={{ borderTop: '1px solid rgba(180,195,220,0.35)' }}>
+        <div className="px-4 pb-4 pt-3 shrink-0" style={{ background: '#FFFFFF', borderTop: '1px solid #EDEDF8' }}>
 
           {/* Inline AI summary result */}
           {inlineSummary && (
-            <div className="mb-2 rounded-xl p-3 flex gap-2 items-start" style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)' }}>
-              <svg className="w-3.5 h-3.5 text-indigo-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="mb-2 rounded-xl p-3 flex gap-2 items-start" style={{ background: '#F0FEF8', border: '1px solid #D3FCEA' }}>
+              <svg className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: '#00CE80' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
               </svg>
               <div className="flex-1 min-w-0">
-                <div className="text-[10px] font-semibold text-indigo-600 uppercase tracking-wide mb-1">AI Summary</div>
+                <div className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: '#00CE80' }}>AI Summary</div>
                 <p className="text-xs text-gray-700 leading-relaxed">{inlineSummary}</p>
               </div>
               <button onClick={() => setInlineSummary('')} className="text-gray-400 hover:text-gray-600 shrink-0">
@@ -720,8 +720,8 @@ export default function MessageThread({ ticketId, ws, onStatusChange, pendingDra
 
           {/* Glass card composer */}
           <div
-            className={`rounded-xl overflow-hidden transition-all ${isDragOver ? 'ring-2 ring-indigo-400' : isNote ? 'ring-2 ring-amber-300' : 'ring-1 ring-gray-200 focus-within:ring-2 focus-within:ring-indigo-300'}`}
-            style={{ background: '#ffffff', boxShadow: '0 1px 8px rgba(80,100,160,0.08)' }}
+            className={`rounded-xl overflow-hidden transition-all ${isDragOver ? 'ring-2 ring-[#00CE80]' : isNote ? 'ring-2 ring-amber-300' : 'ring-1 ring-[#EDEDF8] focus-within:ring-2 focus-within:ring-[#00CE80]'}`}
+            style={{ background: '#ffffff' }}
             onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
             onDragLeave={() => setIsDragOver(false)}
             onDrop={(e) => { e.preventDefault(); setIsDragOver(false); if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files); }}
@@ -761,7 +761,7 @@ export default function MessageThread({ ticketId, ws, onStatusChange, pendingDra
                         title={fbLocked ? 'Facebook 24h window closed' : ch}
                         className={`text-[10px] px-2 py-0.5 rounded-full capitalize transition-colors font-medium ${
                           replyChannel === ch && !isNote
-                            ? 'bg-indigo-600 text-white'
+                            ? 'text-[#1B1A18] bg-[#00CE80]'
                             : fbLocked
                             ? 'text-gray-300 cursor-not-allowed'
                             : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
@@ -775,7 +775,7 @@ export default function MessageThread({ ticketId, ws, onStatusChange, pendingDra
 
               {/* AI Draft label */}
               {isAiDraft && !isNote && (
-                <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-indigo-500">
+                <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold" style={{ color: '#00CE80' }}>
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
                   </svg>
@@ -830,16 +830,16 @@ export default function MessageThread({ ticketId, ws, onStatusChange, pendingDra
             />
 
             {/* Bottom bar: AI actions + char count + send */}
-            <div className="flex items-center gap-1.5 px-2.5 py-2" style={{ borderTop: '1px solid rgba(180,195,220,0.3)' }}>
+            <div className="flex items-center gap-1.5 px-2.5 py-2" style={{ borderTop: '1px solid #EDEDF8' }}>
               {/* AI Copilot quick actions */}
               <button
                 onClick={handleSuggestReply}
                 disabled={!!aiLoading}
                 title="AI Suggest Reply"
-                className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-full font-medium text-indigo-600 hover:bg-indigo-50 transition-colors disabled:opacity-40"
+                className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-full font-medium transition-colors disabled:opacity-40" style={{ color: '#00CE80' }}
               >
                 {aiLoading === 'suggest' ? (
-                  <Spinner size="xs" className="text-indigo-500" />
+                  <Spinner size="xs" style={{ color: '#00CE80' }} />
                 ) : (
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
@@ -884,7 +884,7 @@ export default function MessageThread({ ticketId, ws, onStatusChange, pendingDra
               <button
                 onClick={send}
                 disabled={(!reply.trim() && !pendingAttachments.length) || sending}
-                className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1.5 rounded-xl font-semibold disabled:opacity-30 transition-colors active:scale-[0.98] shadow-sm"
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl font-semibold disabled:opacity-30 transition-colors active:scale-[0.98]" style={{ background: '#00CE80', color: '#1B1A18' }}
               >
                 {sending ? <Spinner size="xs" className="text-white" /> : (
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

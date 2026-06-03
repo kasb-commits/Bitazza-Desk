@@ -119,14 +119,14 @@ function ReassignModal({
     >
       <div
         className="rounded-2xl p-5 w-72 space-y-4 animate-scale-in"
-        style={{ background: '#ffffff', boxShadow: '0 20px 60px rgba(0,0,0,0.18)', border: '1px solid #e8ecf2' }}
+        style={{ background: '#ffffff', boxShadow: 'none', border: '1px solid #e8ecf2' }}
       >
         <div>
           <p className="text-sm font-semibold mb-0.5" style={{ color: '#111827' }}>Reassign ticket?</p>
           <p className="text-xs" style={{ color: '#6b7280' }}>This conversation will be moved to:</p>
         </div>
 
-        <div className="flex items-center gap-2.5 rounded-xl p-2.5" style={{ background: '#f5f3ff', border: '1px solid #ede9fe' }}>
+        <div className="flex items-center gap-2.5 rounded-xl p-2.5" style={{ background: '#F0FEF8', border: '1px solid #D3FCEA' }}>
           <Avatar name={agent.name} size="sm" />
           <div className="min-w-0">
             <p className="text-xs font-semibold truncate" style={{ color: '#111827' }}>{agent.name}</p>
@@ -147,7 +147,7 @@ function ReassignModal({
             rows={2}
             className="w-full text-xs px-2.5 py-2 rounded-lg outline-none resize-none transition-all"
             style={{ background: '#f9fafb', border: '1px solid #e5e7eb', color: '#111827' }}
-            onFocus={e => { e.currentTarget.style.borderColor = '#6366f1'; }}
+            onFocus={e => { e.currentTarget.style.borderColor = '#00CE80'; }}
             onBlur={e => { e.currentTarget.style.borderColor = '#e5e7eb'; }}
           />
         </div>
@@ -164,7 +164,7 @@ function ReassignModal({
             onClick={onConfirm}
             disabled={loading}
             className="flex-1 text-xs py-2 rounded-lg transition-colors font-semibold disabled:opacity-50"
-            style={{ background: '#6366f1', color: '#ffffff' }}
+            style={{ background: '#00CE80', color: '#1B1A18' }}
           >
             {loading ? 'Reassigning…' : 'Confirm'}
           </button>
@@ -341,8 +341,8 @@ export default function PropertiesPanel({ ticket, onUpdate, partialDraft = '', o
                   }}
                 >
                   {isAiHandled ? (
-                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-indigo-100 shrink-0">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#6366f1' }}>
+                    <span className="flex items-center justify-center w-5 h-5 rounded-full shrink-0" style={{ background: '#F0FEF8' }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#00CE80' }}>
                         <rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/>
                       </svg>
                     </span>
@@ -355,7 +355,7 @@ export default function PropertiesPanel({ ticket, onUpdate, partialDraft = '', o
                       </svg>
                     </span>
                   )}
-                  <span className="flex-1 text-xs truncate" style={{ color: isAiHandled ? '#6366f1' : '#111827', fontWeight: isAiHandled ? 500 : 400 }}>
+                  <span className="flex-1 text-xs truncate" style={{ color: isAiHandled ? '#00CE80' : '#111827', fontWeight: isAiHandled ? 500 : 400 }}>
                     {assignedName}
                   </span>
                   {canAssign && (
@@ -367,7 +367,7 @@ export default function PropertiesPanel({ ticket, onUpdate, partialDraft = '', o
 
                 {/* Inline agent list */}
                 {showAgentList && (
-                  <div className="mt-1 rounded-lg overflow-hidden animate-slide-in-up" style={{ border: '1px solid #e5e7eb', background: '#ffffff', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
+                  <div className="mt-1 rounded-lg overflow-hidden animate-slide-in-up" style={{ border: '1px solid #e5e7eb', background: '#ffffff', border: '1px solid #EDEDF8' }}>
                     {availableAgents.length === 0 ? (
                       <p className="text-xs px-3 py-2.5" style={{ color: '#9ca3af' }}>No agents available</p>
                     ) : (
@@ -386,16 +386,16 @@ export default function PropertiesPanel({ ticket, onUpdate, partialDraft = '', o
                               style={{
                                 opacity: full ? 0.4 : 1,
                                 cursor: full ? 'not-allowed' : 'pointer',
-                                background: isCurrent ? '#f5f3ff' : 'transparent',
+                                background: isCurrent ? '#F0FEF8' : 'transparent',
                               }}
                               onMouseEnter={e => { if (!full && !isCurrent) (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb'; }}
-                              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = isCurrent ? '#f5f3ff' : 'transparent'; }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = isCurrent ? '#F0FEF8' : 'transparent'; }}
                             >
                               <Avatar name={a.name} size="xs" />
                               <span className="flex-1 text-xs truncate" style={{ color: '#111827', fontWeight: isCurrent ? 600 : 400 }}>{a.name}</span>
                               <span className="text-[10px] font-mono shrink-0" style={{ color: full ? '#ef4444' : '#9ca3af' }}>{active}/{max}</span>
                               {isCurrent && (
-                                <svg className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 20 20" style={{ color: '#6366f1' }}>
+                                <svg className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 20 20" style={{ color: '#00CE80' }}>
                                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
                                 </svg>
                               )}
@@ -510,13 +510,13 @@ export default function PropertiesPanel({ ticket, onUpdate, partialDraft = '', o
           {/* ── AI Copilot ── */}
           <div
             className="rounded-xl overflow-hidden"
-            style={{ background: '#ffffff', border: '1px solid #e8ecf2', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
+            style={{ background: '#ffffff', border: '1px solid #e8ecf2', border: '1px solid #EDEDF8' }}
           >
-            <div className="px-3 py-2.5 flex items-center gap-1.5" style={{ background: '#f5f3ff', borderBottom: '1px solid #ede9fe' }}>
-              <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#6366f1' }}>
+            <div className="px-3 py-2.5 flex items-center gap-1.5" style={{ background: '#F0FEF8', borderBottom: '1px solid #ede9fe' }}>
+              <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#00CE80' }}>
                 <path d="M12 2a7 7 0 0 1 7 7c0 4-3 6-5 8H10c-2-2-5-4-5-8a7 7 0 0 1 7-7z"/><line x1="9" y1="17" x2="15" y2="17"/><line x1="9" y1="20" x2="15" y2="20"/>
               </svg>
-              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: '#6366f1' }}>AI Copilot</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: '#00CE80' }}>AI Copilot</span>
             </div>
             <CopilotPanel ticketId={ticket.id} partialDraft={partialDraft} onAcceptDraft={onAcceptDraft} onSelectTicket={onSelectTicket} />
           </div>
@@ -545,7 +545,7 @@ function Section({ children }: { children: React.ReactNode }) {
   return (
     <div
       className="rounded-xl p-3 space-y-3"
-      style={{ background: '#ffffff', border: '1px solid #e8ecf2', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
+      style={{ background: '#ffffff', border: '1px solid #e8ecf2', border: '1px solid #EDEDF8' }}
     >
       {children}
     </div>
@@ -651,8 +651,8 @@ function TicketPropertiesSection({ ticketId, category }: { ticketId: string; cat
                         }}
                         className="text-[10px] px-2 py-0.5 rounded-full transition-colors"
                         style={{
-                          background: selected ? '#ede9fe' : '#f3f4f6',
-                          color: selected ? '#6366f1' : '#6b7280',
+                          background: selected ? '#D3FCEA' : '#f3f4f6',
+                          color: selected ? '#00CE80' : '#6b7280',
                           border: selected ? '1px solid #c4b5fd' : '1px solid #e5e7eb',
                         }}
                       >
@@ -692,7 +692,7 @@ function TicketPropertiesSection({ ticketId, category }: { ticketId: string; cat
                   disabled={isSaving}
                   onClick={() => handleChange(def, committed === 'true' ? 'false' : 'true')}
                   className="w-8 rounded-full relative transition-colors"
-                  style={{ height: 18, background: committed === 'true' ? '#6366f1' : '#e5e7eb' }}
+                  style={{ height: 18, background: committed === 'true' ? '#00CE80' : '#e5e7eb' }}
                 >
                   <span
                     className="absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white shadow transition-transform"

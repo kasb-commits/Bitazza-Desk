@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import logoImg from './assets/logo.png';
 import { Routes, Route, NavLink, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { PermissionProvider } from './PermissionContext';
 import type { Ticket, InboxView, StatusFilter, AgentStatus, WSEvent, Role, Notification } from './types';
@@ -113,12 +114,7 @@ function LoginPage({ onLogin }: { onLogin: (u: AuthUser) => void }) {
       >
         {/* Logo */}
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-8 h-8 rounded-md bg-brand flex items-center justify-center shrink-0">
-            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
-                d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 01-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 011-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 011.52 0C14.51 3.81 17 5 19 5a1 1 0 011 1z"/>
-            </svg>
-          </div>
+          <img src={logoImg} alt="Logo" className="w-8 h-8 rounded-md shrink-0 object-cover" />
           <div>
             <div className="text-text-primary font-bold text-md leading-tight">Bitazza Help Desk</div>
             <div className="text-text-muted text-xs">Customer Support Platform</div>
@@ -319,64 +315,85 @@ function AgentStateToggle({ status, activeChats, onChange }: AgentToggleProps) {
 
 const Icons = {
   home: (
+    /* LayoutGrid — dashboard overview */
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-[18px] h-[18px]">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-        d="M3 9.75L12 3l9 6.75V21a.75.75 0 01-.75.75H15v-6H9v6H3.75A.75.75 0 013 21V9.75z" />
+      <rect x="3" y="3" width="7" height="7" rx="1.5" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/>
+      <rect x="14" y="3" width="7" height="7" rx="1.5" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/>
+      <rect x="14" y="14" width="7" height="7" rx="1.5" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/>
+      <rect x="3" y="14" width="7" height="7" rx="1.5" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   ),
   inbox: (
+    /* Inbox — ticket queue tray */
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-[18px] h-[18px]">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-        d="M2.25 13.5h3.86a2.25 2.25 0 012.012 1.244l.256.512a2.25 2.25 0 002.013 1.244h3.218a2.25 2.25 0 002.013-1.244l.256-.512a2.25 2.25 0 012.013-1.244h3.859M3 7.5h18M3 12h18" />
+        d="M22 12h-6l-2 3h-4l-2-3H2M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6L18.55 5.11A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z" />
     </svg>
   ),
   analytics: (
+    /* BarChart2 — analytics bars */
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-[18px] h-[18px]">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-        d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+        d="M18 20V10M12 20V4M6 20v-6" />
     </svg>
   ),
   supervisor: (
+    /* Clipboard with checkmarks — supervisor review */
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-[18px] h-[18px]">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-        d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+        d="M9 4H7a2 2 0 00-2 2v13a2 2 0 002 2h10a2 2 0 002-2V6a2 2 0 00-2-2h-2" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+        d="M9 4a1 1 0 011-1h4a1 1 0 011 1v1a1 1 0 01-1 1h-4a1 1 0 01-1-1V4z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+        d="M9 11l1.5 1.5L13 10" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+        d="M9 15.5l1.5 1.5L13 14.5" />
     </svg>
   ),
   metrics: (
+    /* Activity — pulse / live metrics */
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-[18px] h-[18px]">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-        d="M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25z" />
+        d="M22 12h-4l-3 9L9 3l-3 9H2" />
     </svg>
   ),
   insights: (
+    /* TrendingUp — performance insights */
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-[18px] h-[18px]">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-        d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+        d="M23 6L13.5 15.5l-5-5L1 18M17 6h6v6" />
     </svg>
   ),
   studio: (
+    /* GitBranch — workflow automation */
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-[18px] h-[18px]">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-        d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25zm.75-12h9v9h-9v-9z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 3v12" />
+      <circle cx="18" cy="6" r="3" fill="none" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/>
+      <circle cx="6" cy="18" r="3" fill="none" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/>
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M18 9a9 9 0 01-9 9" />
     </svg>
   ),
   knowledge: (
+    /* BookOpen — knowledge base */
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-[18px] h-[18px]">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-        d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.966 8.966 0 00-6 2.292m0-14.25v14.25" />
+        d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2zM22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z" />
     </svg>
   ),
   users: (
+    /* CircleUser — 360° customer profile */
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-[18px] h-[18px]">
+      <circle cx="12" cy="12" r="10" fill="none" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/>
+      <circle cx="12" cy="10" r="3" fill="none" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/>
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-        d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/>
+        d="M7 20.662V19a2 2 0 012-2h6a2 2 0 012 2v1.662" />
     </svg>
   ),
   admin: (
+    /* SlidersHorizontal — admin controls */
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-[18px] h-[18px]">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-        d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        d="M21 4H14M10 4H3M21 12h-7M8 12H3M21 20h-4M13 20H3M14 2v4M8 10v4M17 18v4" />
     </svg>
   ),
   chevronLeft: (
@@ -489,7 +506,7 @@ function Sidebar({ user, collapsed, onToggle, onLogout, theme, onThemeToggle }: 
         onClick={onToggle}
         title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         className="absolute -right-3 top-1/2 -translate-y-1/2 z-20 w-6 h-10 flex items-center justify-center rounded-full bg-surface-2 border border-surface-5 text-text-muted hover:text-text-primary hover:bg-surface-3 transition-all shadow-sm"
-        style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+        style={{ border: '1px solid var(--surface-5)' }}
       >
         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           {collapsed
@@ -500,12 +517,7 @@ function Sidebar({ user, collapsed, onToggle, onLogout, theme, onThemeToggle }: 
       </button>
       {/* Logo */}
       <div className={`flex items-center gap-3 px-3.5 h-12 border-b border-surface-5 shrink-0 ${collapsed ? 'justify-center' : ''}`}>
-        <div className="w-7 h-7 rounded-md bg-brand flex items-center justify-center shrink-0">
-          <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
-              d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 01-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 011-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 011.52 0C14.51 3.81 17 5 19 5a1 1 0 011 1z"/>
-          </svg>
-        </div>
+        <img src={logoImg} alt="Logo" className="w-7 h-7 rounded-md shrink-0 object-cover" />
         {!collapsed && (
           <span className="text-text-primary font-bold text-sm whitespace-nowrap">Help Desk</span>
         )}

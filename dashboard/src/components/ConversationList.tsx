@@ -20,12 +20,12 @@ const VIEWS: { id: InboxView; label: string }[] = [
 // Status filter options
 const STATUS_FILTERS: { id: StatusFilter; label: string; dot: string }[] = [
   { id: 'all',                  label: 'Any Status',  dot: '' },
-  { id: 'Open_Live',            label: 'Open',        dot: '#22c55e' },
-  { id: 'In_Progress',          label: 'Active',      dot: '#3b82f6' },
-  { id: 'Pending_Customer',     label: 'Pending',     dot: '#f59e0b' },
-  { id: 'Escalated',            label: 'Escalated',   dot: '#ef4444' },
-  { id: 'Closed_Resolved',      label: 'Resolved',    dot: '#9ca3af' },
-  { id: 'Closed_Unresponsive',  label: 'Closed',      dot: '#d1d5db' },
+  { id: 'Open_Live',            label: 'Open',        dot: '#00CE80' },
+  { id: 'In_Progress',          label: 'Active',      dot: '#528AF1' },
+  { id: 'Pending_Customer',     label: 'Pending',     dot: '#F4B72A' },
+  { id: 'Escalated',            label: 'Escalated',   dot: '#EF4150' },
+  { id: 'Closed_Resolved',      label: 'Resolved',    dot: '#9CA3AF' },
+  { id: 'Closed_Unresponsive',  label: 'Closed',      dot: '#EDEDF8' },
 ];
 
 type SortOption = 'newest' | 'oldest' | 'priority' | 'sla';
@@ -37,14 +37,6 @@ const SORT_OPTIONS: { id: SortOption; label: string }[] = [
 ];
 
 // Left accent bar color per status
-const STATUS_BAR: Partial<Record<TicketStatus, string>> = {
-  Open_Live:           '#22c55e',
-  In_Progress:         '#3b82f6',
-  Pending_Customer:    '#f59e0b',
-  Escalated:           '#ef4444',
-  Closed_Resolved:     '#d1d5db',
-  Closed_Unresponsive: '#e5e7eb',
-};
 
 // Category display config (explicit light-mode colors)
 const CATEGORY_LABEL: Partial<Record<TicketCategory, { label: string; bg: string; color: string }>> = {
@@ -142,14 +134,14 @@ function PortalDropdown<T extends string>({
               key={opt.id}
               onClick={() => { onChange(opt.id); setOpen(false); }}
               className="ds-dropdown-item"
-              style={opt.id === value ? { background: '#eef2ff', color: '#4338ca', fontWeight: 600 } : {}}
+              style={opt.id === value ? { background: '#F0FEF8', color: '#00CE80', fontWeight: 600 } : {}}
             >
               {opt.dot && (
                 <span className="w-2 h-2 rounded-full shrink-0" style={{ background: opt.dot }} />
               )}
               <span className="flex-1">{opt.label}</span>
               {opt.id === value && (
-                <svg className="w-3.5 h-3.5 shrink-0 text-indigo-500" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-3.5 h-3.5 shrink-0" style={{ color: '#00CE80' }} fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
                 </svg>
               )}
@@ -273,12 +265,12 @@ export default function ConversationList({
   };
 
   const BULK_STATUS_OPTIONS: { status: TicketStatus; label: string; dot: string }[] = [
-    { status: 'Open_Live',           label: 'Open',            dot: '#22c55e' },
-    { status: 'In_Progress',         label: 'In Progress',     dot: '#3b82f6' },
-    { status: 'Pending_Customer',    label: 'Pending Customer', dot: '#f59e0b' },
-    { status: 'Escalated',           label: 'Escalated',       dot: '#ef4444' },
-    { status: 'Closed_Resolved',     label: 'Resolved',        dot: '#9ca3af' },
-    { status: 'Closed_Unresponsive', label: 'Closed',          dot: '#d1d5db' },
+    { status: 'Open_Live',           label: 'Open',            dot: '#00CE80' },
+    { status: 'In_Progress',         label: 'In Progress',     dot: '#528AF1' },
+    { status: 'Pending_Customer',    label: 'Pending Customer', dot: '#F4B72A' },
+    { status: 'Escalated',           label: 'Escalated',       dot: '#EF4150' },
+    { status: 'Closed_Resolved',     label: 'Resolved',        dot: '#9CA3AF' },
+    { status: 'Closed_Unresponsive', label: 'Closed',          dot: '#EDEDF8' },
   ];
 
   const currentFilter = STATUS_FILTERS.find(f => f.id === statusFilter) ?? STATUS_FILTERS[0];
@@ -302,8 +294,8 @@ export default function ConversationList({
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-4">
             <StatPill label="Open"      value={ticketStats.open} />
-            <StatPill label="Active"    value={ticketStats.active} color="#1d4ed8" />
-            <StatPill label="Escalated" value={ticketStats.escalated} color={ticketStats.escalated > 0 ? '#b91c1c' : undefined} />
+            <StatPill label="Active"    value={ticketStats.active} color="#528AF1" />
+            <StatPill label="Escalated" value={ticketStats.escalated} color={ticketStats.escalated > 0 ? '#EF4150' : undefined} />
           </div>
           <button
             onClick={onRefresh}
@@ -371,8 +363,8 @@ export default function ConversationList({
                 ref={ref}
                 className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg ring-1 transition-all shrink-0"
                 style={{
-                  background: sort !== 'newest' ? '#eef2ff' : '#ffffff',
-                  color: sort !== 'newest' ? '#4338ca' : '#374151',
+                  background: sort !== 'newest' ? '#F0FEF8' : '#ffffff',
+                  color: sort !== 'newest' ? '#00CE80' : '#374151',
                   ringColor: sort !== 'newest' ? '#c7d2fe' : '#e5e7eb',
                   border: `1px solid ${sort !== 'newest' ? '#c7d2fe' : '#e5e7eb'}`,
                 }}
@@ -417,27 +409,27 @@ export default function ConversationList({
 
       {/* ── Bulk action bar ── */}
       {selected.size > 0 && (
-        <div className="px-3 py-2 flex items-center gap-2 shrink-0" style={{ background: '#eef2ff', borderBottom: '1px solid #e0e7ff' }}>
+        <div className="px-3 py-2 flex items-center gap-2 shrink-0" style={{ background: '#F0FEF8', borderBottom: '1px solid #D3FCEA' }}>
           {/* Select-all checkbox */}
           <button
             onClick={toggleSelectAll}
             className="w-4 h-4 rounded flex items-center justify-center shrink-0"
-            style={{ border: `1.5px solid ${isAllSelected ? '#6366f1' : isPartialSelected ? '#6366f1' : '#d1d5db'}`, background: isAllSelected ? '#6366f1' : '#fff', transition: 'all 0.1s' }}
+            style={{ border: `1.5px solid ${isAllSelected ? '#00CE80' : isPartialSelected ? '#00CE80' : '#d1d5db'}`, background: isAllSelected ? '#00CE80' : '#fff', transition: 'all 0.1s' }}
             title={isAllSelected ? 'Deselect all' : 'Select all'}
           >
             {isAllSelected
               ? <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
               : isPartialSelected
-              ? <span style={{ width: 8, height: 2, background: '#6366f1', borderRadius: 1, display: 'block' }} />
+              ? <span style={{ width: 8, height: 2, background: '#00CE80', borderRadius: 1, display: 'block' }} />
               : null
             }
           </button>
 
-          <span className="text-xs text-indigo-700 font-medium">{selected.size} selected</span>
+          <span className="text-xs font-medium" style={{ color: '#00CE80' }}>{selected.size} selected</span>
 
           {/* Select all label */}
           {!isAllSelected && (
-            <button onClick={toggleSelectAll} className="text-[10px] text-indigo-500 hover:text-indigo-700 underline underline-offset-2">
+            <button onClick={toggleSelectAll} className="text-[10px] underline underline-offset-2" style={{ color: '#00CE80' }}>
               Select all {sortedTickets.length}
             </button>
           )}
@@ -449,14 +441,14 @@ export default function ConversationList({
               onClick={openStatusMenu}
               disabled={bulkLoading}
               className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full transition-colors disabled:opacity-40"
-              style={{ background: '#6366f1', color: '#fff', border: 'none' }}
+              style={{ background: '#00CE80', color: '#fff', border: 'none' }}
             >
               {bulkLoading ? 'Updating…' : 'Change status'}
               <svg className={`w-3 h-3 transition-transform ${statusMenuOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7"/>
               </svg>
             </button>
-            <button onClick={() => setSelected(new Set())} className="text-indigo-400 hover:text-indigo-700 transition-colors">
+            <button onClick={() => setSelected(new Set())} className="transition-colors" style={{ color: '#9CA3AF' }}>
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12"/>
               </svg>
@@ -472,7 +464,7 @@ export default function ConversationList({
           style={{
             position: 'fixed', top: statusMenuPos.top, left: statusMenuPos.left, zIndex: 9999,
             background: '#ffffff', border: '1px solid rgba(0,0,0,0.1)',
-            borderRadius: 10, boxShadow: '0 8px 32px rgba(80,100,160,0.18)',
+            borderRadius: 12, boxShadow: 'none',
             minWidth: 180, padding: '4px 0', overflow: 'hidden',
           }}
         >
@@ -515,7 +507,6 @@ export default function ConversationList({
           const lastTs = ticket.last_message_at ?? ticket.updated_at ?? ticket.created_at;
           const isSelected = selectedId === ticket.id;
           const isChecked = selected.has(ticket.id);
-          const accentColor = STATUS_BAR[ticket.status] ?? '#e5e7eb';
           const preview = ticket.last_message ?? '—';
           const catCfg = ticket.category ? CATEGORY_LABEL[ticket.category as TicketCategory] : null;
           const chCfg = ticket.channel ? (CHANNEL_LABEL[ticket.channel.toLowerCase()] ?? CHANNEL_LABEL.web) : null;
@@ -528,7 +519,7 @@ export default function ConversationList({
               style={{
                 borderBottom: '1px solid rgba(180,195,220,0.2)',
                 background: isSelected ? '#ffffff' : undefined,
-                boxShadow: isSelected ? 'inset 3px 0 0 #6366f1' : `inset 3px 0 0 ${accentColor}`,
+                boxShadow: isSelected ? 'inset 3px 0 0 #00CE80' : undefined,
               }}
               onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.7)'; }}
               onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = ''; }}
@@ -540,7 +531,7 @@ export default function ConversationList({
               >
                 <div
                   className="w-4 h-4 rounded flex items-center justify-center"
-                  style={{ border: `1.5px solid ${isChecked ? '#6366f1' : '#d1d5db'}`, background: isChecked ? '#6366f1' : '#fff', transition: 'all 0.1s' }}
+                  style={{ border: `1.5px solid ${isChecked ? '#00CE80' : '#d1d5db'}`, background: isChecked ? '#00CE80' : '#fff', transition: 'all 0.1s' }}
                 >
                   {isChecked && <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>}
                 </div>
@@ -562,7 +553,7 @@ export default function ConversationList({
                       {ticket.customer?.name ?? 'Unknown'}
                     </span>
                     {ticket.customer?.tier === 'VIP' && (
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: '#fef2f2', color: '#b91c1c' }}>VIP</span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: '#FBECEA', color: '#EF4150' }}>VIP</span>
                     )}
                   </div>
                   <span className="text-[10px] text-gray-400 tabular-nums shrink-0">{timeAgo(lastTs)}</span>
@@ -588,7 +579,7 @@ export default function ConversationList({
                   {(risk || ticket.sla_breached) && (
                     <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md" style={{
                       background: ticket.sla_breached ? '#fef2f2' : '#fffbeb',
-                      color: ticket.sla_breached ? '#b91c1c' : '#92400e',
+                      color: ticket.sla_breached ? '#EF4150' : '#705514',
                     }}>
                       {ticket.sla_breached ? '⚠ SLA Breached' : '⏱ SLA Risk'}
                     </span>

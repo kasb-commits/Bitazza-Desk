@@ -22,20 +22,20 @@ module.exports = {
         },
         // ── Brand ──
         brand: {
-          DEFAULT: 'rgb(230 57 70)',
-          dim:     'rgb(193 48 59)',
-          subtle:  'rgba(230,57,70,0.08)',
+          DEFAULT: '#00CE80',
+          dim:     '#079755',
+          subtle:  'rgba(0,206,128,0.08)',
         },
         // ── Status / Accent ──
         accent: {
-          blue:  'rgb(59 130 246)',
-          green: 'rgb(34 197 94)',
-          amber: 'rgb(245 158 11)',
-          red:   'rgb(230 57 70)',
+          blue:  '#528AF1',
+          green: '#00CE80',
+          amber: '#F4B72A',
+          red:   '#EF4150',
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: ['"FF Mark Pro"', '"Mark Pro"', '"Noto Sans"', 'Inter', 'system-ui', 'sans-serif'],
         mono: ['"JetBrains Mono"', '"Fira Code"', 'monospace'],
       },
       fontSize: {
@@ -49,14 +49,14 @@ module.exports = {
         '2xl': ['32px', { lineHeight: '40px' }],
       },
       boxShadow: {
-        card:    '0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2)',
-        panel:   '0 4px 24px rgba(0,0,0,0.4)',
-        modal:   '0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05)',
-        tooltip: '0 4px 12px rgba(0,0,0,0.5)',
+        card:    'none',
+        panel:   'none',
+        modal:   'none',
+        tooltip: 'none',
       },
       borderRadius: {
-        sm:  '4px',
-        DEFAULT: '6px',
+        sm:  '8px',
+        DEFAULT: '8px',
         md:  '8px',
         lg:  '12px',
         xl:  '16px',
