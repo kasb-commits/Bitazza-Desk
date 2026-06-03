@@ -116,15 +116,15 @@ html {
 /* ── Glass Context: CSS var overrides for light frosted-glass pages ─────── */
 /*    Apply .glass-context to a wrapper to make all surface/text vars light   */
 .glass-context {
-  --surface-0: #FCFCFE;
-  --surface-1: rgba(255, 255, 255, 0.90);
-  --surface-2: rgba(255, 255, 255, 0.80);
-  --surface-3: rgba(255, 255, 255, 0.70);
-  --surface-4: rgba(255, 255, 255, 0.55);
-  --surface-5: rgba(237, 237, 248, 0.70);
-  --text-primary:   rgba(27,26,24,1);
-  --text-secondary: rgba(27,26,24,0.75);
-  --text-muted:     rgba(27,26,24,0.50);
+  --surface-0: #eef2f7;
+  --surface-1: rgba(255, 255, 255, 0.82);
+  --surface-2: rgba(255, 255, 255, 0.75);
+  --surface-3: rgba(255, 255, 255, 0.60);
+  --surface-4: rgba(255, 255, 255, 0.48);
+  --surface-5: rgba(180, 195, 220, 0.45);
+  --text-primary:   #1a1d2e;
+  --text-secondary: #6b7280;
+  --text-muted:     #9ca3af;
 }
 
 /* Applied to each panel to add backdrop-filter blur */
@@ -135,8 +135,8 @@ html {
 
 /* ── Frosted Glass Design System (Home Dashboard) ────────────────────────── */
 .glass-page {
-  background: #FCFCFE;
-  color: rgba(27,26,24,1);
+  background: #eef2f7;
+  color: #1a1d2e;
 }
 
 .glass-card {
