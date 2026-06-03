@@ -1,4 +1,6 @@
 """Chat API routes — user-facing message endpoint."""
+import asyncio
+import time
 from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from api.middleware.auth import get_user_id, get_optional_user_id
@@ -6,13 +8,13 @@ from api.ws_manager import manager
 from db.conversation_store import (
     init_db, create_conversation, add_message, get_history, get_paginated_history,
     assign_ai_persona, get_ai_persona, is_human_handling, has_human_agent_replied,
-    update_ticket_category, count_consecutive_low_confidence,
+    update_ticket_category, get_ticket_category, count_consecutive_low_confidence,
     get_customer_id_for_user, get_customer_tickets, get_open_ticket_for_customer,
     get_ticket_by_id, update_ticket_status, get_ticket_id_by_conversation,
     get_info_collection_phase, set_info_collection_phase, count_collection_turns,
     create_emergency_ticket,
 )
-from engine.assignment_client import trigger_auto_assign
+from engine.assignment_client import trigger_auto_assign, emit_ticket_event
 from workflow_engine.interceptor import workflow_interceptor as chat
 from engine.mock_agents import pick_agent
 from engine.prompt_templates import build_greeting
@@ -142,13 +144,31 @@ class SetCategoryResponse(BaseModel):
     agent_avatar_url: str
 
 
+_CATEGORY_LABEL: dict[str, str] = {
+    "kyc_verification":    "KYC Verification",
+    "account_restriction": "Account Restriction",
+    "password_2fa_reset":  "Password / 2FA Reset",
+    "fraud_security":      "Fraud & Security",
+    "withdrawal_issue":    "Withdrawal Issue",
+    "other":               "Other",
+}
+
+
 @router.post("/set-category", response_model=SetCategoryResponse)
 def set_category(body: SetCategoryRequest, user_id: str | None = Depends(get_optional_user_id)):
     """
     Called when the user selects an issue category in the widget.
     Re-assigns the AI persona to the specialist agent for that category
     and updates the ticket category for the dashboard.
+    If the ticket already has a category (customer went back and re-picked),
+    inserts a system message so agents can see the topic switch in the thread.
     """
+    existing = get_ticket_category(body.conversation_id)
+    if existing and existing not in ("unclassified", body.category):
+        old_label = _CATEGORY_LABEL.get(existing, existing.replace("_", " ").title())
+        new_label = _CATEGORY_LABEL.get(body.category, body.category.replace("_", " ").title())
+        add_message(body.conversation_id, "system",
+                    f"── Customer switched topic: {old_label} → {new_label} ──")
     agent = pick_agent(body.category)
     assign_ai_persona(body.conversation_id, agent["name"], agent["avatar"], agent["avatar_url"])
     update_ticket_category(body.conversation_id, body.category)
@@ -288,12 +308,25 @@ async def send_message(request: Request, body: MessageRequest, user_id: str | No
     _attachments = _resolve_attachments(body.attachment_ids, _base_url)
 
     # Persist user message (with attachments in metadata if present)
-    add_message(
+    _user_msg_id = add_message(
         body.conversation_id,
         "user",
         body.message,
         attachments=_attachments if _attachments else None,
     )
+    # Emit to dashboard so agents see the customer's message in real-time
+    _now_ts = int(time.time())
+    asyncio.create_task(emit_ticket_event(body.conversation_id, "new_message", {
+        "message": {
+            "id": _user_msg_id,
+            "role": "user",
+            "sender_type": "customer",
+            "content": body.message,
+            "created_at": _now_ts,
+            "channel": "widget",
+            **({"attachments": _attachments} if _attachments else {}),
+        },
+    }))
 
     # Guard: once a human agent has sent their first reply, the AI must not reply.
     # Before that first reply, even escalated tickets can still get AI answers —
@@ -351,6 +384,7 @@ async def send_message(request: Request, body: MessageRequest, user_id: str | No
     _ticket_id = get_ticket_id_by_conversation(body.conversation_id)
     if _ticket_id and not _already_escalated:
         update_ticket_status(_ticket_id, "in_progress")
+        asyncio.create_task(emit_ticket_event(_ticket_id, "status_change", {"status": "In_Progress"}))
 
     # ── Attachment escalation ──────────────────────────────────────────────────
     # If the user sent an attachment, escalate immediately — AI never reads files.
@@ -382,8 +416,12 @@ async def send_message(request: Request, body: MessageRequest, user_id: str | No
         from engine.agent import detect_language
         _lang = body.language if body.language in ("en", "th") else (detect_language(body.message) if body.message.strip() else "en")
         _reply_text = build_attachment_handoff_message(bool(_attachments), _lang)
-        add_message(body.conversation_id, "assistant", _reply_text, {"escalated": True, "escalation_reason": "attachment"})
+        _bot_msg_id = add_message(body.conversation_id, "assistant", _reply_text, {"escalated": True, "escalation_reason": "attachment"})
         update_ticket_status(_ticket_id, "pending_human")
+        asyncio.create_task(emit_ticket_event(body.conversation_id, "new_message", {
+            "message": {"id": _bot_msg_id, "role": "assistant", "sender_type": "bot", "content": _reply_text, "created_at": int(time.time())},
+        }))
+        asyncio.create_task(emit_ticket_event(_ticket_id, "status_change", {"status": "Pending_Human"}))
         return MessageResponse(
             reply=_reply_text,
             language=_lang,
@@ -394,8 +432,7 @@ async def send_message(request: Request, body: MessageRequest, user_id: str | No
     # ── Run agent ─────────────────────────────────────────────────────────────
     # workflow_interceptor is sync+blocking (Gemini HTTP calls inside);
     # run in a thread pool to avoid blocking the event loop.
-    import asyncio as _asyncio
-    result = await _asyncio.to_thread(
+    result = await asyncio.to_thread(
         chat,
         conversation_id=body.conversation_id,
         user_id=user_id,
@@ -423,13 +460,19 @@ async def send_message(request: Request, body: MessageRequest, user_id: str | No
         _reply_meta["info_collection"] = True
     if getattr(result, "profile_fetched", False):
         _reply_meta["profile_fetched"] = True
-    add_message(body.conversation_id, "assistant", result.text, _reply_meta)
+    _bot_msg_id = add_message(body.conversation_id, "assistant", result.text, _reply_meta)
+    asyncio.create_task(emit_ticket_event(body.conversation_id, "new_message", {
+        "message": {"id": _bot_msg_id, "role": "assistant", "sender_type": "bot", "content": result.text, "created_at": int(time.time())},
+    }))
 
     # After the AI replies, move status to Pending_Customer (ball is in customer's court).
     # Skip if the AI escalated — agent.py already wrote the correct Escalated status.
     # Also skip if the ticket was already escalated before this turn — never downgrade.
     if not result.escalated and _ticket_id and not _already_escalated:
         update_ticket_status(_ticket_id, "pending_customer")
+        asyncio.create_task(emit_ticket_event(_ticket_id, "status_change", {"status": "Pending_Customer"}))
+    elif result.escalated and _ticket_id and not _already_escalated:
+        asyncio.create_task(emit_ticket_event(_ticket_id, "status_change", {"status": "Pending_Human"}))
 
     # Merge intent-resolver agent update with any mid-conversation upgrade from the agent.
     # result fields take precedence (agent upgrade is more specific).

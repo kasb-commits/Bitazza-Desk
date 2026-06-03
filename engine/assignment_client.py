@@ -46,3 +46,16 @@ def trigger_auto_assign(ticket_id, category, priority, customer_id):
             )
         except Exception as exc:
             log.warning("[assignment] sync call failed ticket=%s: %s", ticket_id, exc)
+
+
+async def emit_ticket_event(ticket_id: str, event: str, payload: dict) -> None:
+    """Fire-and-forget: emit a socket event to all dashboard agents viewing this ticket."""
+    url = f"{DASHBOARD_INTERNAL_URL}/api/internal/emit"
+    try:
+        await _get_client().post(
+            url,
+            json={"event": event, "ticket_id": ticket_id, "payload": payload},
+            headers={"X-Internal-Secret": INTERNAL_SECRET},
+        )
+    except Exception as exc:
+        log.warning("[dashboard] emit failed ticket=%s event=%s: %s", ticket_id, event, exc)
