@@ -56,6 +56,7 @@ def main():
             "text": text,
             "metadata": {
                 "source": "freshdesk",
+                "doc_type": "ticket",
                 "category": t.get("category", ""),
                 "language": t.get("language", ""),
                 "resolution_type": t.get("resolution_type", ""),

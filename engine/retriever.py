@@ -11,13 +11,18 @@ logger = logging.getLogger(__name__)
 # Gemini embedding-001 cosine distances: <0.35 = strong match, <0.55 = relevant
 _DISTANCE_THRESHOLD = 0.55
 
+# Exclude Freshdesk ticket chunks from all retrieval — they describe specific user problems
+# and add noise. Only documentation and blog chunks are used for KB answers.
+_EXCLUDE_TICKETS = {"doc_type": {"$ne": "ticket"}}
+
 
 def retrieve(user_message: str, n: int = MAX_RAG_CHUNKS) -> list[dict]:
     """
     Returns top-n relevant knowledge chunks for the given user message.
     Each chunk: {text, metadata: {source, doc_type, ...}, distance}
+    Ticket chunks are always excluded — only docs and blog content are returned.
     """
-    chunks = query(user_message, n_results=n)
+    chunks = query(user_message, n_results=n, where=_EXCLUDE_TICKETS)
     filtered = [c for c in chunks if (c.get("distance") or 1.0) < _DISTANCE_THRESHOLD]
     return filtered
 

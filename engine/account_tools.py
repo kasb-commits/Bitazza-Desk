@@ -195,7 +195,7 @@ def get_trading_availability(user_id: str) -> dict:
         return data
     return {
         "available": data.get("trading_available", True),
-        "reason": data.get("trading_block_reason") or "No trading restrictions active.",
+        "reason": data.get("trading_block_reason"),
     }
 
 

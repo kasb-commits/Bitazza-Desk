@@ -8,6 +8,12 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 
+@pytest.fixture(autouse=True)
+def mock_is_human_handling():
+    with patch("db.conversation_store.is_human_handling", return_value=False):
+        yield
+
+
 def _make_trigger(channel="widget", category="kyc_verification"):
     from workflow_engine.models import WorkflowTrigger
     return WorkflowTrigger(channel=channel, category=category)

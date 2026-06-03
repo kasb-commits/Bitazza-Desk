@@ -157,10 +157,14 @@ def upsert_documents(docs: list[dict], collection_name: str = "knowledge_base") 
     )
 
 
-def query(text: str, n_results: int = 5, collection_name: str = "knowledge_base") -> list[dict]:
-    """Returns top-n chunks with text and metadata."""
+def query(text: str, n_results: int = 5, collection_name: str = "knowledge_base",
+          where: dict | None = None) -> list[dict]:
+    """Returns top-n chunks with text and metadata. Optionally filter by metadata via ChromaDB where clause."""
     col = get_collection(collection_name)
-    results = col.query(query_texts=[text], n_results=n_results)
+    query_kwargs: dict = {"query_texts": [text], "n_results": n_results}
+    if where:
+        query_kwargs["where"] = where
+    results = col.query(**query_kwargs)
     chunks = []
     for i, doc in enumerate(results["documents"][0]):
         chunks.append({

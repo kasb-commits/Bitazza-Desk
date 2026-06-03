@@ -10,7 +10,7 @@ import json, logging, re, time
 from google import genai
 from google.genai import types as genai_types
 from google.genai import errors as genai_errors
-from config.settings import GEMINI_API_KEY, MODEL, CLASSIFIER_MODEL, MAX_TOKENS, ESCALATION_CONFIDENCE_THRESHOLD
+from config.settings import GEMINI_API_KEY, MODEL, MAX_TOKENS, ESCALATION_CONFIDENCE_THRESHOLD
 from engine.retriever import retrieve_with_fallback
 from engine.account_tools import TOOLS, TOOL_DEFINITIONS, get_user_profile
 from engine.security_filter import pre_filter, post_filter, contains_financial_advice_request
@@ -60,55 +60,31 @@ def _call_with_retry(fn, max_attempts: int = 3, base_delay: float = 0.5):
     raise last_exc  # type: ignore[misc]
 
 
-_INTENT_CLASSIFIER_PROMPT = """\
-You are an intent classifier for a customer support system. Respond with exactly one word.
 
-Active support category: {category}
-Recent conversation:
-{history}
-Current message: "{message}"
-
-Does answering the current message require looking up this specific user's personal account data \
-(their specific KYC application status or rejection reason, their personal transaction history, \
-their account restrictions, their account profile)?
-
-IMPORTANT: General questions about how the platform works are informational — NOT account_specific. \
-Examples of informational: "how many KYC levels are there?", "what is the difference between KYC levels?", \
-"what documents are required?", "what withdrawal limit does each level have?", \
-"what level would I be on after approval?", "how long does verification take?". \
-Examples of account_specific: "why was my KYC rejected?", "what is my current KYC status?", \
-"why is my account restricted?", "where is my deposit?", "why was my withdrawal declined?".
-
-Reply with exactly one word: informational OR account_specific"""
+# Fields that must never be fabricated when null — replace with explicit marker
+# before passing tool results to Gemini so the model cannot guess a reason.
+_NULL_REASON_FIELDS = {
+    "rejection_reason", "restriction_reason", "failure_reason",
+    "trading_block_reason", "resolution_steps",
+}
 
 
-def _classify_intent(user_message: str, recent_history: list, category: str | None) -> bool:
-    """
-    Returns True if the message is informational (no account data needed),
-    False if it is account-specific (account tools required).
-    Defaults to False (account_specific) on any failure — safer to over-fetch than under-fetch.
-    """
-    history_lines = ""
-    for msg in recent_history[-3:]:
-        role = "User" if msg["role"] == "user" else "Agent"
-        history_lines += f"{role}: {msg['content']}\n"
-
-    prompt = _INTENT_CLASSIFIER_PROMPT.format(
-        category=category or "general",
-        history=history_lines.strip() or "(no prior turns)",
-        message=user_message,
-    )
-    try:
-        resp = client.models.generate_content(
-            model=CLASSIFIER_MODEL,
-            contents=prompt,
-            config=genai_types.GenerateContentConfig(max_output_tokens=10),
-        )
-        result = (resp.text or "").strip().lower()
-        return "informational" in result
-    except Exception as e:
-        logging.warning("Intent classifier failed: %s — defaulting to account_specific", e)
-        return False
+def _sanitize_tool_result(result: dict) -> dict:
+    """Replace null values in sensitive reason-fields with an explicit do-not-guess marker."""
+    sanitized = {}
+    for key, value in result.items():
+        if isinstance(value, dict):
+            sanitized[key] = _sanitize_tool_result(value)
+        elif isinstance(value, list):
+            sanitized[key] = [
+                _sanitize_tool_result(item) if isinstance(item, dict) else item
+                for item in value
+            ]
+        elif key in _NULL_REASON_FIELDS and value is None:
+            sanitized[key] = "[NOT PROVIDED — do not guess or infer this value]"
+        else:
+            sanitized[key] = value
+    return sanitized
 
 
 _LANG_KEYWORDS_TH = ["ขอ", "คุณ", "ไม่", "ได้", "ว่า", "ใน", "และ", "มี", "การ", "ที่"]
@@ -416,17 +392,8 @@ def chat(
             escalation_reason=reason, ticket_id=ticket_id,
         )
 
-    # 3c. Intent classification
-    # Determines whether the question is informational (no account data needed) or
-    # account-specific (account tools required). Only runs for account categories on
-    # authenticated sessions — guest and "other" are already tool-free, skip those.
-    # On classifier failure, defaults to account_specific (safe over-fetch > under-fetch).
-    _CLASSIFY_CATEGORIES = {"kyc_verification", "account_restriction", "withdrawal_issue",
-                            "deposit_issue", "trade_issue", "fraud_security", "password_2fa_reset"}
+    # 3c. History for short-query RAG context (re-used in section 4)
     _prior_history = get_history(conversation_id, limit=4)
-    _is_informational = False
-    if not (user_id is None) and category in _CLASSIFY_CATEGORIES:
-        _is_informational = _classify_intent(user_message, _prior_history, category)
 
     # 4. RAG retrieval
     # Short follow-up messages (< 8 words) often lack enough terms for the retriever
@@ -475,6 +442,10 @@ def chat(
     # below re-adds it with RAG context prepended. Sending it twice causes two consecutive
     # user messages which makes Gemini repeat its previous answer and ignore the follow-up.
     history_for_gemini = history[:-1] if history and history[-1]["role"] == "user" else history
+
+    # Suppress self-introductions on follow-up turns.
+    if history_for_gemini:
+        system_prompt += "\n\nCONTEXT: This is a follow-up message in an ongoing conversation. Do NOT introduce yourself or say your name."
     gemini_history = []
     for msg in history_for_gemini:
         role = "model" if msg["role"] == "assistant" else "user"
@@ -546,11 +517,11 @@ def chat(
         ):
             force_tool_name = "get_futures_positions"
 
-    # For "other" category, guest sessions, or informational questions, omit account tools.
+    # For "other" category or guest sessions, omit account tools entirely.
+    # For all authenticated account categories, tools are always available — the overlay
+    # STEP 0 instructs Gemini whether to USE them based on question type.
     is_other_category = category == "other"
-    if _is_informational:
-        force_tool_name = None
-    if is_other_category or is_guest_session or _is_informational:
+    if is_other_category or is_guest_session:
         active_tool_defs = []
     elif prior_successful_reply:
         # After the first successful reply, remove get_user_profile from the tool list.
@@ -588,6 +559,17 @@ def chat(
         )
     except Exception as e:
         ticket_id = get_ticket_id_by_conversation(conversation_id)
+        from db.conversation_store import is_human_handling as _is_already_escalated
+        if _is_already_escalated(conversation_id):
+            # Ticket already escalated — don't re-escalate or show handoff again.
+            # Return a calm holding message so the customer knows the specialist is coming.
+            _hold_msg = (
+                "A specialist has been notified and will be with you shortly."
+                if language == "en"
+                else "เจ้าหน้าที่ผู้เชี่ยวชาญได้รับแจ้งแล้วและจะติดต่อกลับในไม่ช้าค่ะ"
+            )
+            return AgentResponse(text=_hold_msg, language=language, escalated=False,
+                                 escalation_reason="ai_service_unavailable")
         if ticket_id:
             _escalation_status = "Escalated" if platform == "email" else "pending_human"
             update_ticket_status(ticket_id, _escalation_status)
@@ -637,11 +619,14 @@ def chat(
                 # conversation creation time.
                 if fn_call.name == "get_user_profile" and "error" not in result:
                     update_customer_from_profile(user_id, result)
+                # Replace null reason-fields with explicit markers before sending to
+                # Gemini — prevents the model from fabricating plausible-sounding reasons.
+                sanitized_result = _sanitize_tool_result(result)
                 fn_response_parts.append(
                     genai_types.Part(
                         function_response=genai_types.FunctionResponse(
                             name=fn_call.name,
-                            response={"result": result},
+                            response={"result": sanitized_result},
                         )
                     )
                 )
@@ -660,6 +645,15 @@ def chat(
             )
         except Exception as e:
             ticket_id = get_ticket_id_by_conversation(conversation_id)
+            from db.conversation_store import is_human_handling as _is_already_escalated
+            if _is_already_escalated(conversation_id):
+                _hold_msg = (
+                    "A specialist has been notified and will be with you shortly."
+                    if language == "en"
+                    else "เจ้าหน้าที่ผู้เชี่ยวชาญได้รับแจ้งแล้วและจะติดต่อกลับในไม่ช้าค่ะ"
+                )
+                return AgentResponse(text=_hold_msg, language=language, escalated=False,
+                                     escalation_reason="ai_service_unavailable")
             if ticket_id:
                 _escalation_status = "Escalated" if platform == "email" else "pending_human"
                 update_ticket_status(ticket_id, _escalation_status)
