@@ -338,13 +338,16 @@ const Icons = {
     </svg>
   ),
   supervisor: (
-    /* Users — team supervision */
+    /* Clipboard with checkmarks — supervisor review */
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-[18px] h-[18px]">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-        d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-      <circle cx="9" cy="7" r="4" fill="none" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"/>
+        d="M9 4H7a2 2 0 00-2 2v13a2 2 0 002 2h10a2 2 0 002-2V6a2 2 0 00-2-2h-2" />
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-        d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
+        d="M9 4a1 1 0 011-1h4a1 1 0 011 1v1a1 1 0 01-1 1h-4a1 1 0 01-1-1V4z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+        d="M9 11l1.5 1.5L13 10" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+        d="M9 15.5l1.5 1.5L13 14.5" />
     </svg>
   ),
   metrics: (
@@ -495,7 +498,7 @@ function Sidebar({ user, collapsed, onToggle, onLogout, theme, onThemeToggle }: 
 
   return (
     <aside
-      className="flex flex-col bg-surface-1 shrink-0 transition-all duration-200 relative"
+      className="flex flex-col bg-surface-1 shrink-0 border-r border-surface-5 transition-all duration-200 relative"
       style={{ width: collapsed ? 56 : 220 }}
     >
       {/* Edge collapse toggle — always visible on the right border */}
@@ -513,7 +516,7 @@ function Sidebar({ user, collapsed, onToggle, onLogout, theme, onThemeToggle }: 
         </svg>
       </button>
       {/* Logo */}
-      <div className={`flex items-center gap-3 px-3.5 h-12 shrink-0 ${collapsed ? 'justify-center' : ''}`}>
+      <div className={`flex items-center gap-3 px-3.5 h-12 border-b border-surface-5 shrink-0 ${collapsed ? 'justify-center' : ''}`}>
         <img src={logoImg} alt="Logo" className="w-7 h-7 rounded-md shrink-0 object-cover" />
         {!collapsed && (
           <span className="text-text-primary font-bold text-sm whitespace-nowrap">Help Desk</span>
