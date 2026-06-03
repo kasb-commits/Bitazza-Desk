@@ -156,22 +156,33 @@ export default function ChatWindow({ cfg, onClose }: Props) {
           return;
         }
         // Always use the latest agent message from history as ground truth
-        const firstAgentMsg = history.find((m) => m.role === 'agent');
-        const restoredAgent = firstAgentMsg?.agent_name ? {
-          name: firstAgentMsg.agent_name,
-          avatar: firstAgentMsg.agent_avatar ?? firstAgentMsg.agent_name[0].toUpperCase(),
-          avatarUrl: firstAgentMsg.agent_avatar_url ?? null,
+        const lastAgentMsg = [...history].reverse().find((m) => m.role === 'agent');
+        const restoredAgent = lastAgentMsg?.agent_name ? {
+          name: lastAgentMsg.agent_name,
+          avatar: lastAgentMsg.agent_avatar ?? lastAgentMsg.agent_name[0].toUpperCase(),
+          avatarUrl: lastAgentMsg.agent_avatar_url ?? null,
         } : (existing.agent ?? null);
         if (restoredAgent) {
           setEscalated(true);
           setEscalatedAgent(restoredAgent);
+          storeSessionAgent(restoredAgent); // persist so next reload still has agent identity
         } else if (humanHandling) {
-          // Human has taken over from dashboard but hasn't replied yet — dismiss the "connecting" banner
+          // Human has taken over from dashboard but hasn't replied yet —
+          // only set the escalated flag; leave escalatedAgent null so the back button
+          // stays visible (matches poll path behaviour).
           setEscalated(true);
-          setEscalatedAgent({ name: 'Support Agent', avatar: 'S', avatarUrl: null });
         }
-        const restored: Message[] = history.map((m) => ({
-          id: `restored-${m.created_at}`,
+        // Re-populate previous tickets for restored sessions (mirrors selectCategory logic)
+        if (existing.category && !existing.isGuest && getStoredCustomerId()) {
+          fetchCustomerTickets(cfg, 1, 20).then((tickets) => {
+            if (tickets.length > 0) {
+              setPrevTickets(tickets);
+              setShowPrevTickets(true);
+            }
+          }).catch(() => {});
+        }
+        const restored: Message[] = history.map((m, idx) => ({
+          id: `restored-${m.created_at}-${idx}`,
           role: m.role as Message['role'],
           content: m.content,
           timestamp: m.created_at * 1000,
