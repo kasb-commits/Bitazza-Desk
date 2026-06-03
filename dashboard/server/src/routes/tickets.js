@@ -246,8 +246,8 @@ router.get('/', async (req, res) => {
         c.kyc_tier    AS customer_kyc_tier,
         c.external_id AS customer_external_id,
         u.name AS assigned_to_name,
-        (SELECT content FROM messages WHERE ticket_id = t.id ORDER BY created_at DESC LIMIT 1) AS last_message,
-        (SELECT EXTRACT(EPOCH FROM created_at)::bigint FROM messages WHERE ticket_id = t.id ORDER BY created_at DESC LIMIT 1) AS last_message_at
+        (SELECT content FROM messages WHERE ticket_id = t.id AND sender_type NOT IN ('system','internal_note') ORDER BY created_at DESC LIMIT 1) AS last_message,
+        (SELECT EXTRACT(EPOCH FROM created_at)::bigint FROM messages WHERE ticket_id = t.id AND sender_type NOT IN ('system','internal_note') ORDER BY created_at DESC LIMIT 1) AS last_message_at
       FROM tickets t
       LEFT JOIN customers c ON t.customer_id = c.id
       LEFT JOIN users u ON t.assigned_to = u.id

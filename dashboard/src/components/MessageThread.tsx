@@ -297,12 +297,10 @@ function MessageBubble({ msg, showTs }: BubbleProps) {
       ? `Resolution Request Sent By ${msg.agent_name || 'Agent'}`
       : msg.content;
     return (
-      <div className="flex items-center gap-2 my-2 px-1">
-        <div className="flex-1 h-px bg-gray-200" />
-        <span className="text-[11px] text-gray-400 font-medium shrink-0 select-none">
+      <div className="flex justify-center my-2">
+        <span className="text-[11px] text-gray-500 bg-gray-100 border border-gray-200 px-3 py-1 rounded-full select-none">
           {displayContent}
         </span>
-        <div className="flex-1 h-px bg-gray-200" />
       </div>
     );
   }

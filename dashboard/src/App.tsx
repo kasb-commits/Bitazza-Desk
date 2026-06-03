@@ -939,6 +939,8 @@ export default function App() {
         }
 
         if (e.type === 'new_message') {
+          // Don't update last_message preview for system events (assignment, status changes, etc.)
+          if (e.message.role === 'system' || e.message.sender_type === 'system') return;
           // Patch the ticket's last_message and updated_at in place — no API call
           setTickets(prev => prev.map(t => {
             if (t.id !== e.conversation_id) return t;
