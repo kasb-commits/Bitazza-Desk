@@ -163,14 +163,14 @@ const CARD: React.CSSProperties = {
   border: '1px solid rgba(255,255,255,0.6)',
   borderRadius: 16,
   backdropFilter: 'blur(16px)',
-  boxShadow: '0 2px 16px rgba(80,100,160,0.10)',
+  border: '1px solid #EDEDF8',
 };
 
 const INNER_CARD: React.CSSProperties = {
   background: '#ffffff',
   border: '1px solid #f0f2f5',
   borderRadius: 12,
-  boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+  border: '1px solid #EDEDF8',
 };
 
 const SECTION_LABEL: React.CSSProperties = {
@@ -178,7 +178,7 @@ const SECTION_LABEL: React.CSSProperties = {
   fontWeight: 700,
   color: '#9ca3af',
   textTransform: 'uppercase',
-  letterSpacing: 1,
+  letterSpacing: 0,
 };
 
 const T_PRIMARY   = '#1a1d2e';
@@ -649,7 +649,7 @@ export default function User360() {
             style={{
               padding: '8px 20px', fontSize: 13, fontWeight: 600, borderRadius: 10, border: 'none', cursor: searching ? 'not-allowed' : 'pointer',
               background: 'linear-gradient(135deg, #6366f1, #818cf8)', color: '#fff',
-              boxShadow: '0 2px 8px rgba(99,102,241,0.3)', opacity: searching ? 0.6 : 1, flexShrink: 0, transition: 'all 0.15s',
+              border: '1px solid #D3FCEA', opacity: searching ? 0.6 : 1, flexShrink: 0, transition: 'all 0.15s',
             }}
           >
             {searching ? 'Searching…' : 'Search'}
@@ -667,7 +667,7 @@ export default function User360() {
           <div style={{ padding: 24 }}>
             <div style={CARD}>
               <div style={{ padding: '16px 20px', borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 15, fontWeight: 700, color: T_PRIMARY, letterSpacing: '-0.3px' }}>All Customers</span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: T_PRIMARY, letterSpacing: 0 }}>All Customers</span>
                 {custList && <span style={{ fontSize: 11, color: T_MUTED }}>{custList.total} total</span>}
               </div>
 
@@ -748,7 +748,7 @@ export default function User360() {
                     background: 'linear-gradient(135deg, #6366f1, #818cf8)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 18, fontWeight: 700, color: '#fff', flexShrink: 0,
-                    boxShadow: '0 4px 12px rgba(99,102,241,0.35)',
+                    border: '1px solid #D3FCEA',
                   }}>
                     {initials}
                   </div>
@@ -756,7 +756,7 @@ export default function User360() {
                   {/* Identity */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
-                      <h2 style={{ fontSize: 18, fontWeight: 700, color: T_PRIMARY, margin: 0, letterSpacing: '-0.3px' }}>
+                      <h2 style={{ fontSize: 18, fontWeight: 700, color: T_PRIMARY, margin: 0, letterSpacing: 0 }}>
                         {user.first_name} {user.last_name}
                       </h2>
                       <Badge label={user.tier} cfg={TIER_BADGE[user.tier] ?? TIER_BADGE.Standard} />

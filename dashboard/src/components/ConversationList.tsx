@@ -464,7 +464,7 @@ export default function ConversationList({
           style={{
             position: 'fixed', top: statusMenuPos.top, left: statusMenuPos.left, zIndex: 9999,
             background: '#ffffff', border: '1px solid rgba(0,0,0,0.1)',
-            borderRadius: 10, boxShadow: '0 8px 32px rgba(80,100,160,0.18)',
+            borderRadius: 12, boxShadow: 'none',
             minWidth: 180, padding: '4px 0', overflow: 'hidden',
           }}
         >

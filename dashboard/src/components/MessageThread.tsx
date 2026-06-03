@@ -186,7 +186,7 @@ function ImageLightbox({ url, onClose }: { url: string; onClose: () => void }) {
       <img
         src={url}
         alt="full size"
-        className="max-w-[90vw] max-h-[90vh] rounded-xl shadow-2xl object-contain"
+        className="max-w-[90vw] max-h-[90vh] rounded-xl ring-1 ring-white/10 object-contain"
         onClick={(e) => e.stopPropagation()}
       />
       <button

@@ -506,7 +506,7 @@ function Sidebar({ user, collapsed, onToggle, onLogout, theme, onThemeToggle }: 
         onClick={onToggle}
         title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         className="absolute -right-3 top-1/2 -translate-y-1/2 z-20 w-6 h-10 flex items-center justify-center rounded-full bg-surface-2 border border-surface-5 text-text-muted hover:text-text-primary hover:bg-surface-3 transition-all shadow-sm"
-        style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+        style={{ border: '1px solid var(--surface-5)' }}
       >
         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           {collapsed

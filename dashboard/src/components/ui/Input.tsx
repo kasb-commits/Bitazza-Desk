@@ -7,8 +7,8 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   rightSlot?: React.ReactNode;
 }
 
-const BASE_STY: React.CSSProperties = { background: '#f9fafb', border: '1px solid #e5e7eb', color: '#1a1d2e' };
-const ERR_STY:  React.CSSProperties = { background: '#f9fafb', border: '1px solid #6366f1', color: '#1a1d2e' };
+const BASE_STY: React.CSSProperties = { background: '#FCFCFE', border: '1.5px solid #EDEDF8', color: 'rgba(27,26,24,1)' };
+const ERR_STY:  React.CSSProperties = { background: '#FBECEA', border: '1.5px solid #EF4150', color: 'rgba(27,26,24,1)' };
 
 export function Input({ label, error, leftIcon, rightSlot, className = '', style, ...props }: InputProps) {
   return (
@@ -27,8 +27,8 @@ export function Input({ label, error, leftIcon, rightSlot, className = '', style
           style={{ ...(error ? ERR_STY : BASE_STY), ...style }}
           className={`
             w-full px-3 py-2 text-sm rounded-md outline-none
-            focus:ring-1 focus:ring-[#6366f1] transition-all
-            placeholder:text-[#9ca3af]
+            focus:ring-1 focus:ring-[#00CE80] transition-all
+            placeholder:text-[rgba(27,26,24,0.4)]
             disabled:opacity-50 disabled:cursor-not-allowed
             ${leftIcon ? 'pl-9' : ''}
             ${rightSlot ? 'pr-9' : ''}
@@ -41,7 +41,7 @@ export function Input({ label, error, leftIcon, rightSlot, className = '', style
           </span>
         )}
       </div>
-      {error && <p className="text-xs" style={{ color: '#6366f1' }}>{error}</p>}
+      {error && <p className="text-xs" style={{ color: '#EF4150' }}>{error}</p>}
     </div>
   );
 }
@@ -62,13 +62,13 @@ export function Textarea({ label, error, className = '', style, ...props }: Text
         style={{ ...(error ? ERR_STY : BASE_STY), ...style }}
         className={`
           w-full px-3 py-2.5 text-sm rounded-md outline-none
-          focus:ring-1 focus:ring-[#6366f1] transition-all resize-none
-          placeholder:text-[#9ca3af]
+          focus:ring-1 focus:ring-[#00CE80] transition-all resize-none
+          placeholder:text-[rgba(27,26,24,0.4)]
           disabled:opacity-50 disabled:cursor-not-allowed
           ${className}
         `.trim()}
       />
-      {error && <p className="text-xs" style={{ color: '#6366f1' }}>{error}</p>}
+      {error && <p className="text-xs" style={{ color: '#EF4150' }}>{error}</p>}
     </div>
   );
 }

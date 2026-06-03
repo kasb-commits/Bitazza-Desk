@@ -16,7 +16,7 @@ const CARD: React.CSSProperties = {
   border: '1px solid rgba(255,255,255,0.6)',
   borderRadius: 16,
   backdropFilter: 'blur(16px)',
-  boxShadow: '0 2px 16px rgba(80,100,160,0.10)',
+  border: '1px solid #EDEDF8',
 };
 
 const CARD_HEADER: React.CSSProperties = {
@@ -32,7 +32,7 @@ const SECTION_LABEL: React.CSSProperties = {
   fontWeight: 700,
   color: '#9ca3af',
   textTransform: 'uppercase',
-  letterSpacing: 1,
+  letterSpacing: 0,
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -251,7 +251,7 @@ function AttentionCard({
         )}
       </div>
       <div>
-        <div style={{ fontSize: 26, fontWeight: 700, color: p.numColor, lineHeight: 1, letterSpacing: '-0.5px' }}>{count}</div>
+        <div style={{ fontSize: 26, fontWeight: 700, color: p.numColor, lineHeight: 1, letterSpacing: 0 }}>{count}</div>
         <div style={{ fontSize: 12, fontWeight: 600, color: '#1a1d2e', marginTop: 4 }}>{label}</div>
         {sublabel && <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{sublabel}</div>}
       </div>
@@ -412,7 +412,7 @@ function AssignDropdown({ ticketId, agents, onAssigned }: { ticketId: string; ag
           style={{
             position: 'fixed', top: pos.top, right: pos.right, zIndex: 9999,
             background: '#ffffff', border: '1px solid rgba(0,0,0,0.1)',
-            borderRadius: 10, boxShadow: '0 8px 32px rgba(80,100,160,0.18)',
+            borderRadius: 10, boxShadow: 'none',
             minWidth: 160, padding: '4px 0', overflow: 'hidden',
           }}
         >
@@ -491,7 +491,7 @@ function AgentSlideOver({ agent, agents, onClose, onReassign }: {
       <div
         style={{
           position: 'absolute', top: 0, right: 0, height: '100%', width: 400,
-          background: '#ffffff', boxShadow: '-8px 0 40px rgba(0,0,0,0.14)',
+          background: '#ffffff', borderLeft: '1px solid #EDEDF8',
           display: 'flex', flexDirection: 'column',
         }}
         onClick={e => e.stopPropagation()}
@@ -589,7 +589,7 @@ function AgentSlideOver({ agent, agents, onClose, onReassign }: {
                             <div style={{
                               position: 'absolute', right: 0, top: 'calc(100% + 4px)', zIndex: 30,
                               background: '#ffffff', border: '1px solid rgba(0,0,0,0.1)',
-                              borderRadius: 10, boxShadow: '0 8px 32px rgba(80,100,160,0.18)',
+                              borderRadius: 10, boxShadow: 'none',
                               minWidth: 170, padding: '4px 0', overflow: 'hidden',
                             }}>
                               {otherAgents.length === 0 ? (
@@ -723,7 +723,7 @@ export default function SupervisorDashboard() {
         {/* ── Header ── */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1a1d2e', letterSpacing: '-0.3px', margin: 0 }}>Supervisor</h1>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1a1d2e', letterSpacing: 0, margin: 0 }}>Supervisor</h1>
             <p style={{ fontSize: 13, color: '#6b7280', margin: '2px 0 0' }}>Live operations · auto-refreshes every 30s</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -736,7 +736,7 @@ export default function SupervisorDashboard() {
                 display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 500,
                 padding: '8px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.6)',
                 background: 'rgba(255,255,255,0.75)', backdropFilter: 'blur(12px)',
-                boxShadow: '0 2px 16px rgba(80,100,160,0.10)', color: '#6b7280',
+                border: '1px solid #EDEDF8', color: '#6b7280',
                 cursor: 'pointer', transition: 'all 0.15s',
               }}
               onMouseEnter={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = '#6366f1'; }}
@@ -838,7 +838,7 @@ export default function SupervisorDashboard() {
                     borderRight: i < 6 ? '1px solid rgba(0,0,0,0.06)' : undefined,
                   }}
                 >
-                  <div style={{ fontSize: 22, fontWeight: 700, color: accent ?? '#1a1d2e', letterSpacing: '-0.5px', fontVariantNumeric: 'tabular-nums' }}>{val}</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: accent ?? '#1a1d2e', letterSpacing: 0, fontVariantNumeric: 'tabular-nums' }}>{val}</div>
                   <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 4 }}>{label}</div>
                   {sub && <div style={{ fontSize: 10, color: '#9ca3af' }}>{sub}</div>}
                 </div>
@@ -892,7 +892,7 @@ export default function SupervisorDashboard() {
               {!loading && channelHealth.length > 0 && (
                 <>
                   <div style={{ padding: '10px 20px 6px', borderTop: '1px solid rgba(0,0,0,0.06)', background: 'rgba(0,0,0,0.015)' }}>
-                    <span style={{ fontSize: 10, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 700 }}>By Channel</span>
+                    <span style={{ fontSize: 10, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0, fontWeight: 700 }}>By Channel</span>
                   </div>
                   {channelHealth.map(ch => (
                     <div

@@ -153,7 +153,7 @@ export default function AdminSettings({ currentUser }: Props) {
 
               {/* Right: setting rows */}
               <div className="rounded-2xl overflow-hidden bg-white flex flex-col"
-                   style={{ border: `1px solid ${SEP}`, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+                   style={{ border: `1px solid ${SEP}`, border: '1px solid rgba(0,0,0,0.06)' }}>
                 {group.items.map((t, i) => (
                   <button
                     key={t}
@@ -322,7 +322,7 @@ function AgentsTab({ currentUser }: { currentUser: AuthUser }) {
           { label: 'Roles',        value: uniqueRoles,     icon: 'M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z', color: '#0ea5e9' },
         ] as { label: string; value: number; icon: string; color: string }[]).map(s => (
           <div key={s.label} className="rounded-2xl bg-white flex items-center gap-4 px-5 py-4"
-               style={{ border: `1px solid ${SEP}`, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+               style={{ border: `1px solid ${SEP}`, border: '1px solid rgba(0,0,0,0.06)' }}>
             <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${s.color}14` }}>
               <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: s.color, width: 18, height: 18 }}>
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d={s.icon} />
@@ -340,7 +340,7 @@ function AgentsTab({ currentUser }: { currentUser: AuthUser }) {
       <div className="flex items-center justify-between">
         <label className="flex items-center gap-2.5 cursor-pointer select-none">
           <div onClick={toggleInactive} className="relative cursor-pointer shrink-0"
-               style={{ width: 32, height: 18, borderRadius: 9, background: showInactive ? BR : '#d1d5db', transition: 'background 0.2s' }}>
+               style={{ width: 32, height: 18, borderRadius: 8, background: showInactive ? BR : '#d1d5db', transition: 'background 0.2s' }}>
             <div style={{ position: 'absolute', top: 2, left: showInactive ? 14 : 2, width: 14, height: 14, borderRadius: '50%', background: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.2)', transition: 'left 0.15s' }} />
           </div>
           <span style={{ fontSize: 12, color: T2 }}>Show inactive agents</span>
@@ -378,14 +378,14 @@ function AgentsTab({ currentUser }: { currentUser: AuthUser }) {
 
             return (
               <div key={a.id} className="rounded-2xl bg-white flex flex-col overflow-hidden"
-                   style={{ border: `1px solid ${SEP}`, boxShadow: '0 1px 6px rgba(0,0,0,0.05)', opacity: isInactive ? 0.55 : 1 }}>
+                   style={{ border: `1px solid ${SEP}`, border: '1px solid rgba(0,0,0,0.06)', opacity: isInactive ? 0.55 : 1 }}>
 
                 {/* Top — gradient band with avatar */}
                 <div className="relative flex flex-col items-center pb-4 pt-5"
                      style={{ background: `linear-gradient(145deg, ${rc}18 0%, ${rc}08 100%)`, borderBottom: `1px solid ${rc}18` }}>
                   {isInactive && (
                     <span className="absolute top-3 right-3"
-                          style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.05em', background: `${BR}15`, color: BR, padding: '2px 7px', borderRadius: 20 }}>
+                          style={{ fontSize: 9, fontWeight: 700, letterSpacing: 0, background: `${BR}15`, color: BR, padding: '2px 7px', borderRadius: 20 }}>
                       INACTIVE
                     </span>
                   )}
@@ -402,7 +402,7 @@ function AgentsTab({ currentUser }: { currentUser: AuthUser }) {
                   </button>
                   <p style={{ fontSize: 14, fontWeight: 700, color: T1, textAlign: 'center' }}>{a.name}</p>
                   <span className="mt-1.5"
-                        style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'capitalize', background: `${rc}18`, color: rc, padding: '3px 10px', borderRadius: 20 }}>
+                        style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0, textTransform: 'capitalize', background: `${rc}18`, color: rc, padding: '3px 10px', borderRadius: 20 }}>
                     {a.role ?? 'agent'}
                   </span>
                 </div>
@@ -691,7 +691,7 @@ function PermChecklist({ available, selected, onChange }: { available: string[];
         return (
           <div key={g.label}>
             <div className="mb-2">
-              <p style={{ fontSize: 10, fontWeight: 700, color: T2, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{g.label}</p>
+              <p style={{ fontSize: 10, fontWeight: 700, color: T2, textTransform: 'uppercase', letterSpacing: 0 }}>{g.label}</p>
               <p style={{ fontSize: 10, color: TM, marginTop: 2 }}>{g.description}</p>
             </div>
             <div className="space-y-0.5">
@@ -815,7 +815,7 @@ function RolesTab({ currentUser: _ }: { currentUser: AuthUser }) {
           { label: 'Permissions Available', value: allPerms.length,                        icon: 'M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z', color: '#10b981' },
         ] as { label: string; value: number; icon: string; color: string }[]).map(s => (
           <div key={s.label} className="rounded-2xl bg-white flex items-center gap-4 px-5 py-4"
-               style={{ border: `1px solid ${SEP}`, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+               style={{ border: `1px solid ${SEP}`, border: '1px solid rgba(0,0,0,0.06)' }}>
             <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${s.color}14` }}>
               <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: s.color, width: 18, height: 18 }}>
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d={s.icon} />
@@ -843,7 +843,7 @@ function RolesTab({ currentUser: _ }: { currentUser: AuthUser }) {
       </div>
 
       {/* Role list */}
-      <div className="rounded-2xl bg-white overflow-hidden" style={{ border: `1px solid ${SEP}`, boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
+      <div className="rounded-2xl bg-white overflow-hidden" style={{ border: `1px solid ${SEP}`, border: '1px solid rgba(0,0,0,0.06)' }}>
         {roles.map((r, idx) => {
           const rc     = getRoleAccent(r.name);
           const perms  = r.permissions ?? [];
@@ -887,7 +887,7 @@ function RolesTab({ currentUser: _ }: { currentUser: AuthUser }) {
                 </div>
 
                 {/* Type badge */}
-                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', flexShrink: 0,
+                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', flexShrink: 0,
                   background: r.is_preset ? `${BR}12` : '#fef3c7',
                   color: r.is_preset ? BR : '#b45309',
                   padding: '3px 9px', borderRadius: 20 }}>
@@ -933,7 +933,7 @@ function RolesTab({ currentUser: _ }: { currentUser: AuthUser }) {
                       if (!active.length) return null;
                       return (
                         <div key={g.label}>
-                          <p style={{ fontSize: 10, fontWeight: 700, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 7 }}>
+                          <p style={{ fontSize: 10, fontWeight: 700, color: TM, textTransform: 'uppercase', letterSpacing: 0, marginBottom: 7 }}>
                             {g.label}
                             <span style={{ fontWeight: 500, marginLeft: 5, color: TM, opacity: 0.6 }}>{active.length}/{g.perms.length}</span>
                           </p>
@@ -996,7 +996,7 @@ function TagsTab() {
           { label: 'Simple Tags',    value: simple,      icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', color: '#10b981' },
         ] as { label: string; value: number; icon: string; color: string }[]).map(s => (
           <div key={s.label} className="rounded-2xl bg-white flex items-center gap-4 px-5 py-4"
-               style={{ border: `1px solid ${SEP}`, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+               style={{ border: `1px solid ${SEP}`, border: '1px solid rgba(0,0,0,0.06)' }}>
             <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${s.color}14` }}>
               <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: s.color, width: 18, height: 18 }}>
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d={s.icon} />
@@ -1012,7 +1012,7 @@ function TagsTab() {
 
       {/* Add tag input */}
       <div className="rounded-2xl bg-white px-5 py-4 flex gap-3 items-center"
-           style={{ border: `1px solid ${SEP}`, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+           style={{ border: `1px solid ${SEP}`, border: '1px solid rgba(0,0,0,0.06)' }}>
         <div style={{ position: 'relative', flex: 1 }}>
           <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: TM, fontSize: 13, pointerEvents: 'none' }}>#</span>
           <input
@@ -1035,7 +1035,7 @@ function TagsTab() {
 
       {/* Tag list */}
       <div className="rounded-2xl bg-white px-5 py-5"
-           style={{ border: `1px solid ${SEP}`, boxShadow: '0 1px 4px rgba(0,0,0,0.04)', minHeight: 80 }}>
+           style={{ border: `1px solid ${SEP}`, border: '1px solid rgba(0,0,0,0.06)', minHeight: 80 }}>
         {tags.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 gap-2">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: 32, height: 32, color: TM, opacity: 0.5 }}>
@@ -1130,7 +1130,7 @@ function CannedResponsesTab() {
 
       {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-        <p style={{ fontSize: 11, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        <p style={{ fontSize: 11, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: 0 }}>
           {items.length} Response{items.length !== 1 ? 's' : ''}
         </p>
         <button
@@ -1145,10 +1145,10 @@ function CannedResponsesTab() {
 
       {/* Create form */}
       {showForm && (
-        <div style={{ background: 'white', borderRadius: 12, padding: '20px', marginBottom: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.06)' }}>
+        <div style={{ background: 'white', borderRadius: 12, padding: '20px', marginBottom: 16, border: '1px solid rgba(0,0,0,0.08)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div>
-              <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>Title</p>
+              <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: 0, marginBottom: 5 }}>Title</p>
               <input
                 value={form.title}
                 onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
@@ -1159,7 +1159,7 @@ function CannedResponsesTab() {
               />
             </div>
             <div>
-              <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>Shortcut</p>
+              <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: 0, marginBottom: 5 }}>Shortcut</p>
               <input
                 value={form.shortcut}
                 onChange={e => setForm(f => ({ ...f, shortcut: e.target.value.replace(/\s/g, '-') }))}
@@ -1171,7 +1171,7 @@ function CannedResponsesTab() {
             </div>
           </div>
           <div style={{ marginBottom: 12 }}>
-            <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>
+            <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: 0, marginBottom: 5 }}>
               Body <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>— use {'{{customer_name}}'}, {'{{ticket_id}}'}, {'{{agent_name}}'}</span>
             </p>
             <textarea
@@ -1186,7 +1186,7 @@ function CannedResponsesTab() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>Scope</p>
+              <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: 0, marginBottom: 5 }}>Scope</p>
               <select
                 value={form.scope}
                 onChange={e => setForm(f => ({ ...f, scope: e.target.value }))}
@@ -1216,14 +1216,14 @@ function CannedResponsesTab() {
           <Spinner size="sm" /> Loading…
         </div>
       ) : items.length === 0 ? (
-        <div style={{ background: 'white', borderRadius: 12, padding: '40px 20px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.06)' }}>
+        <div style={{ background: 'white', borderRadius: 12, padding: '40px 20px', textAlign: 'center', border: '1px solid rgba(0,0,0,0.08)' }}>
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: 28, height: 28, color: TM, opacity: 0.4, margin: '0 auto 8px' }}>
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
           </svg>
           <p style={{ fontSize: 13, color: TM }}>No canned responses yet</p>
         </div>
       ) : (
-        <div style={{ background: 'white', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.06)' }}>
+        <div style={{ background: 'white', borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.08)' }}>
           {items.map((item, i) => (
             <React.Fragment key={item.id}>
               {/* Row */}
@@ -1276,7 +1276,7 @@ function CannedResponsesTab() {
               {/* Expanded body */}
               {expandedId === item.id && (
                 <div style={{ padding: '12px 16px 16px', background: '#f9f9fb', borderTop: '0.5px solid rgba(0,0,0,0.07)' }}>
-                  <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Full body</p>
+                  <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: 0, marginBottom: 6 }}>Full body</p>
                   <p style={{ fontSize: 13, color: T2, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{item.body}</p>
                 </div>
               )}
@@ -1340,7 +1340,7 @@ function Group({ label, description, locked, children }: { label: string; descri
   return (
     <div style={{ marginBottom: 28 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, paddingLeft: 2 }}>
-        <p style={{ fontSize: 11, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</p>
+        <p style={{ fontSize: 11, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: 0 }}>{label}</p>
         {locked && (
           <svg width={11} height={11} fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: TM }}>
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
@@ -1348,7 +1348,7 @@ function Group({ label, description, locked, children }: { label: string; descri
         )}
       </div>
       {description && <p style={{ fontSize: 12, color: TM, marginBottom: 8, paddingLeft: 2, lineHeight: 1.5 }}>{description}</p>}
-      <div style={{ background: 'white', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.06)' }}>
+      <div style={{ background: 'white', borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.08)' }}>
         {children}
       </div>
     </div>
@@ -1463,7 +1463,7 @@ function AssignmentRulesTab() {
           display: 'flex', alignItems: 'flex-start', gap: 10,
           padding: '12px 16px', borderRadius: 12, maxWidth: 360,
           background: toast.type === 'error' ? '#1c0505' : 'white',
-          boxShadow: '0 4px 24px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.08)',
+          border: '1px solid #EDEDF8',
           color: toast.type === 'error' ? '#fca5a5' : T1,
           fontSize: 13, lineHeight: 1.5,
         }}>
@@ -1486,7 +1486,7 @@ function AssignmentRulesTab() {
       {/* Confirmation modal */}
       {confirm && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(8px)' }}>
-          <div style={{ width: '100%', maxWidth: 380, margin: '0 16px', borderRadius: 16, background: 'white', boxShadow: '0 24px 64px rgba(0,0,0,0.22)', overflow: 'hidden' }}>
+          <div style={{ width: '100%', maxWidth: 380, margin: '0 16px', borderRadius: 16, background: 'white', boxShadow: 'none', overflow: 'hidden' }}>
             <div style={{ padding: '22px 22px 16px' }}>
               <p style={{ fontSize: 14, fontWeight: 600, color: T1, marginBottom: 6 }}>{confirm.title}</p>
               <p style={{ fontSize: 13, color: T2, lineHeight: 1.6 }}>{confirm.description}</p>
@@ -1797,7 +1797,7 @@ function AnnouncementsTab() {
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <p style={{ fontSize: 11, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        <p style={{ fontSize: 11, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: 0 }}>
           {items.filter(a => a.active).length} active · {items.filter(a => !a.active).length} inactive
         </p>
         <button onClick={openCreate}
@@ -1809,7 +1809,7 @@ function AnnouncementsTab() {
 
       {/* Announcement list */}
       {items.length === 0 ? (
-        <div style={{ background: 'white', borderRadius: 12, padding: '48px 20px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.06)' }}>
+        <div style={{ background: 'white', borderRadius: 12, padding: '48px 20px', textAlign: 'center', border: '1px solid rgba(0,0,0,0.08)' }}>
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: 28, height: 28, color: TM, opacity: 0.4, margin: '0 auto 8px' }}>
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
           </svg>
@@ -1855,7 +1855,7 @@ function AnnouncementsTab() {
                   {/* Inactive overlay */}
                   {!a.active && (
                     <div style={{ position: 'absolute', top: 14, right: 16, background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(4px)', padding: '3px 10px', borderRadius: 6 }}>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Inactive</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: 0 }}>Inactive</span>
                     </div>
                   )}
 
@@ -1865,7 +1865,7 @@ function AnnouncementsTab() {
                       <button key={l}
                         onClick={() => setPreviewLang(p => ({ ...p, [a.id]: l }))}
                         style={{
-                          fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+                          fontSize: 10, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase',
                           padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
                           background: lang === l ? 'rgba(255,255,255,0.22)' : 'transparent',
                           color: lang === l ? 'white' : 'rgba(255,255,255,0.45)',
@@ -1944,7 +1944,7 @@ function AnnouncementsTab() {
       {/* Delete confirmation */}
       {deleteTarget && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(8px)' }}>
-          <div style={{ width: '100%', maxWidth: 380, margin: '0 16px', borderRadius: 16, background: 'white', boxShadow: '0 24px 64px rgba(0,0,0,0.22)', overflow: 'hidden' }}>
+          <div style={{ width: '100%', maxWidth: 380, margin: '0 16px', borderRadius: 16, background: 'white', boxShadow: 'none', overflow: 'hidden' }}>
             <div style={{ padding: '22px 22px 16px' }}>
               <p style={{ fontSize: 14, fontWeight: 600, color: T1, marginBottom: 6 }}>Delete "{deleteTarget.title_en}"?</p>
               <p style={{ fontSize: 13, color: T2, lineHeight: 1.6 }}>This announcement will be permanently removed. This action cannot be undone.</p>
@@ -2091,7 +2091,7 @@ function AdminSelect({ value, onChange, options }: { value: string; onChange: (v
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <label style={{ fontSize: 10, fontWeight: 700, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</label>
+      <label style={{ fontSize: 10, fontWeight: 700, color: TM, textTransform: 'uppercase', letterSpacing: 0 }}>{label}</label>
       {children}
     </div>
   );
@@ -2134,7 +2134,7 @@ function ModalFooter({ onClose, onSave, saving, saveLabel, disabled = false }: {
   return (
     <div className="flex justify-end gap-2 pt-4 mt-2" style={{ borderTop: `1px solid ${SEP}` }}>
       <button onClick={onClose}
-        style={{ fontSize: 12, fontWeight: 600, padding: '7px 16px', background: '#f3f4f6', color: T2, borderRadius: 9, border: 'none', cursor: 'pointer', transition: 'background 0.15s' }}
+        style={{ fontSize: 12, fontWeight: 600, padding: '7px 16px', background: '#f3f4f6', color: T2, borderRadius: 8, border: 'none', cursor: 'pointer', transition: 'background 0.15s' }}
         onMouseEnter={e => (e.currentTarget.style.background = '#e5e7eb')}
         onMouseLeave={e => (e.currentTarget.style.background = '#f3f4f6')}>
         Cancel
@@ -2143,7 +2143,7 @@ function ModalFooter({ onClose, onSave, saving, saveLabel, disabled = false }: {
         onClick={onSave}
         disabled={saving || disabled}
         className="flex items-center gap-1.5"
-        style={{ fontSize: 12, fontWeight: 600, padding: '7px 16px', background: disabled || saving ? '#a5b4fc' : BR, color: 'white', borderRadius: 9, border: 'none', cursor: disabled ? 'not-allowed' : 'pointer', transition: 'opacity 0.15s' }}
+        style={{ fontSize: 12, fontWeight: 600, padding: '7px 16px', background: disabled || saving ? '#a5b4fc' : BR, color: 'white', borderRadius: 8, border: 'none', cursor: disabled ? 'not-allowed' : 'pointer', transition: 'opacity 0.15s' }}
         onMouseEnter={e => { if (!disabled && !saving) e.currentTarget.style.opacity = '0.85'; }}
         onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
       >
@@ -2634,7 +2634,7 @@ function TicketPropertiesTab() {
     return (
       <div style={{
         background: 'white', borderRadius: 12, overflow: 'hidden',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.06)',
+        border: '1px solid rgba(0,0,0,0.08)',
         display: 'flex', flexDirection: 'column',
         opacity: def.is_active ? 1 : 0.5,
         transition: 'box-shadow 0.15s, opacity 0.15s',
@@ -2705,7 +2705,7 @@ function TicketPropertiesTab() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <p style={{ fontSize: 11, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          <p style={{ fontSize: 11, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: 0 }}>
             {activeDefs.length} active · {inactiveDefs.length} inactive
           </p>
         </div>
@@ -2718,23 +2718,23 @@ function TicketPropertiesTab() {
 
       {/* Create / Edit form */}
       {showForm && (
-        <div style={{ background: 'white', borderRadius: 12, padding: 20, marginBottom: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.06)' }}>
+        <div style={{ background: 'white', borderRadius: 12, padding: 20, marginBottom: 20, border: '1px solid rgba(0,0,0,0.08)' }}>
           <p style={{ fontSize: 14, fontWeight: 600, color: T1, marginBottom: 16 }}>{editId ? 'Edit Property' : 'New Property'}</p>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
             <div>
-              <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>Display Name</p>
+              <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: 0, marginBottom: 5 }}>Display Name</p>
               <input value={form.name} onChange={e => handleNameChange(e.target.value)} placeholder="e.g. KYC Sub-category" style={FI} onFocus={focusIn} onBlur={focusOut} />
             </div>
             <div>
-              <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>Field Key <span style={{ fontWeight: 400 }}>(auto-generated)</span></p>
+              <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: 0, marginBottom: 5 }}>Field Key <span style={{ fontWeight: 400 }}>(auto-generated)</span></p>
               <input value={form.field_key} onChange={e => { setKeyTouched(true); setForm(f => ({ ...f, field_key: e.target.value })); }} placeholder="kyc_sub_category" style={{ ...FI, fontFamily: 'monospace' }} onFocus={focusIn} onBlur={focusOut} />
             </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
             <div>
-              <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>Field Type</p>
+              <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: 0, marginBottom: 5 }}>Field Type</p>
               <select value={form.field_type} disabled={!!editId}
                 onChange={e => setForm(f => ({ ...f, field_type: e.target.value as PropertyFieldType }))}
                 style={{ ...FI, cursor: editId ? 'not-allowed' : 'pointer' }}
@@ -2747,7 +2747,7 @@ function TicketPropertiesTab() {
               {editId && <p style={{ fontSize: 10, color: TM, marginTop: 3 }}>Field type cannot be changed after creation.</p>}
             </div>
             <div>
-              <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>Required</p>
+              <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: 0, marginBottom: 5 }}>Required</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
                 <Toggle on={form.is_required} onToggle={() => setForm(f => ({ ...f, is_required: !f.is_required }))} />
                 <span style={{ fontSize: 12, color: TM }}>{form.is_required ? 'Yes — amber warning if empty' : 'No'}</span>
@@ -2757,7 +2757,7 @@ function TicketPropertiesTab() {
 
           {/* Applies To */}
           <div style={{ marginBottom: 14 }}>
-            <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+            <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: 0, marginBottom: 6 }}>
               Applies To <span style={{ fontWeight: 400 }}>(leave empty = all categories)</span>
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -2781,7 +2781,7 @@ function TicketPropertiesTab() {
           {/* Options editor */}
           {(form.field_type === 'single_select' || form.field_type === 'multi_select') && (
             <div style={{ marginBottom: 14 }}>
-              <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Options</p>
+              <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: 0, marginBottom: 6 }}>Options</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {form.options.map((opt, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2841,7 +2841,7 @@ function TicketPropertiesTab() {
           <Spinner size="sm" /> Loading…
         </div>
       ) : sortedDefs.length === 0 ? (
-        <div style={{ background: 'white', borderRadius: 12, padding: '48px 20px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.06)' }}>
+        <div style={{ background: 'white', borderRadius: 12, padding: '48px 20px', textAlign: 'center', border: '1px solid rgba(0,0,0,0.08)' }}>
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: 28, height: 28, color: TM, opacity: 0.4, margin: '0 auto 8px' }}>
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
           </svg>
@@ -2858,7 +2858,7 @@ function TicketPropertiesTab() {
       {/* Delete confirmation */}
       {deleteTarget && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(8px)' }}>
-          <div style={{ width: '100%', maxWidth: 380, margin: '0 16px', borderRadius: 16, background: 'white', boxShadow: '0 24px 64px rgba(0,0,0,0.22)', overflow: 'hidden' }}>
+          <div style={{ width: '100%', maxWidth: 380, margin: '0 16px', borderRadius: 16, background: 'white', boxShadow: 'none', overflow: 'hidden' }}>
             <div style={{ padding: '22px 22px 16px' }}>
               <p style={{ fontSize: 14, fontWeight: 600, color: T1, marginBottom: 6 }}>Delete "{deleteTarget.name}"?</p>
               <p style={{ fontSize: 13, color: T2, lineHeight: 1.6 }}>

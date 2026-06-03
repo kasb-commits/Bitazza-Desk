@@ -119,7 +119,7 @@ function ReassignModal({
     >
       <div
         className="rounded-2xl p-5 w-72 space-y-4 animate-scale-in"
-        style={{ background: '#ffffff', boxShadow: '0 20px 60px rgba(0,0,0,0.18)', border: '1px solid #e8ecf2' }}
+        style={{ background: '#ffffff', boxShadow: 'none', border: '1px solid #e8ecf2' }}
       >
         <div>
           <p className="text-sm font-semibold mb-0.5" style={{ color: '#111827' }}>Reassign ticket?</p>
@@ -367,7 +367,7 @@ export default function PropertiesPanel({ ticket, onUpdate, partialDraft = '', o
 
                 {/* Inline agent list */}
                 {showAgentList && (
-                  <div className="mt-1 rounded-lg overflow-hidden animate-slide-in-up" style={{ border: '1px solid #e5e7eb', background: '#ffffff', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
+                  <div className="mt-1 rounded-lg overflow-hidden animate-slide-in-up" style={{ border: '1px solid #e5e7eb', background: '#ffffff', border: '1px solid #EDEDF8' }}>
                     {availableAgents.length === 0 ? (
                       <p className="text-xs px-3 py-2.5" style={{ color: '#9ca3af' }}>No agents available</p>
                     ) : (
@@ -510,7 +510,7 @@ export default function PropertiesPanel({ ticket, onUpdate, partialDraft = '', o
           {/* ── AI Copilot ── */}
           <div
             className="rounded-xl overflow-hidden"
-            style={{ background: '#ffffff', border: '1px solid #e8ecf2', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
+            style={{ background: '#ffffff', border: '1px solid #e8ecf2', border: '1px solid #EDEDF8' }}
           >
             <div className="px-3 py-2.5 flex items-center gap-1.5" style={{ background: '#F0FEF8', borderBottom: '1px solid #ede9fe' }}>
               <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#00CE80' }}>
@@ -545,7 +545,7 @@ function Section({ children }: { children: React.ReactNode }) {
   return (
     <div
       className="rounded-xl p-3 space-y-3"
-      style={{ background: '#ffffff', border: '1px solid #e8ecf2', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
+      style={{ background: '#ffffff', border: '1px solid #e8ecf2', border: '1px solid #EDEDF8' }}
     >
       {children}
     </div>

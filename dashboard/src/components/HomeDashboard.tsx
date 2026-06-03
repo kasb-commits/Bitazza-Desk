@@ -269,7 +269,7 @@ function ChannelPie({ data }: { data: { channel: string; count: number }[] }) {
                 {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
               </Pie>
               <Tooltip
-                contentStyle={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
+                contentStyle={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 10, border: '1px solid #EDEDF8' }}
                 formatter={(v: number, name: string) => [`${v} (${Math.round(v / total * 100)}%)`, name]}
               />
             </PieChart>
@@ -466,7 +466,7 @@ export default function HomeDashboard({ onSelectTicket, onNavigateInbox }: HomeD
         {/* Greeting header */}
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-gray-900" style={{ letterSpacing: '-0.3px' }}>
+            <h2 className="text-xl font-bold text-gray-900" style={{ letterSpacing: 0 }}>
               {getGreeting()}{userName ? `, ${userName.split(' ')[0]}` : ''}.
             </h2>
             {escalatedCount === 0 && (
