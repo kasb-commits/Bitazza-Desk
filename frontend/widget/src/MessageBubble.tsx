@@ -1,5 +1,15 @@
 import { useState } from 'react';
+import DOMPurify from 'dompurify';
 import type { Message } from './types';
+
+const SANITIZE_CONFIG = {
+  ALLOWED_TAGS: ['p','strong','em','u','s','h2','h3','ul','ol','li','a','br','blockquote','code'],
+  ALLOWED_ATTR: ['href', 'target', 'rel'],
+};
+
+function isHtml(str: string): boolean {
+  return /<[a-z][\s\S]*>/i.test(str);
+}
 
 const AGENT_AVATARS: Record<string, string> = {
   Ploy:  'https://i.pravatar.cc/150?img=47',
@@ -92,6 +102,11 @@ export default function MessageBubble({ message, primaryColor = '#00CE80', botNa
               </>
             );
           })()
+        ) : isHtml(message.content) ? (
+          <div
+            className="csbot-rich-text"
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(message.content, SANITIZE_CONFIG) }}
+          />
         ) : (
           <span className="whitespace-pre-wrap">{message.content}</span>
         )}

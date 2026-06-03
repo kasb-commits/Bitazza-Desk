@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -16,7 +18,7 @@ body {
 /* FAB button */
 .csbot-fab {
   transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-  font-family: "FF Mark Pro","Mark Pro","Noto Sans","Inter",system-ui,sans-serif;
+  font-family: "Inter","FF Mark Pro","Mark Pro","Noto Sans",system-ui,sans-serif;
 }
 .csbot-fab:hover { transform: scale(1.1); }
 .csbot-fab:active { transform: scale(0.93); }
@@ -30,7 +32,7 @@ body {
   box-shadow: none;
   animation: csbot-slide-in 0.22s cubic-bezier(.16,1,.3,1);
   transform-origin: bottom right;
-  font-family: "FF Mark Pro","Mark Pro","Noto Sans","Inter",system-ui,sans-serif;
+  font-family: "Inter","FF Mark Pro","Mark Pro","Noto Sans",system-ui,sans-serif;
   letter-spacing: 0;
 }
 
@@ -107,6 +109,23 @@ body {
   box-shadow: none;
 }
 
+/* Rich-text content rendered inside bubbles and announcement cards */
+.csbot-rich-text p              { margin: 0 0 4px 0; }
+.csbot-rich-text p:last-child   { margin-bottom: 0; }
+.csbot-rich-text strong         { font-weight: 600; }
+.csbot-rich-text em             { font-style: italic; }
+.csbot-rich-text u              { text-decoration: underline; }
+.csbot-rich-text s              { text-decoration: line-through; }
+.csbot-rich-text h2             { font-size: 1.05em; font-weight: 700; margin: 6px 0 2px; }
+.csbot-rich-text h3             { font-size: 1em;    font-weight: 600; margin: 4px 0 2px; }
+.csbot-rich-text ul             { list-style: disc;    padding-left: 1.25em; margin: 4px 0; }
+.csbot-rich-text ol             { list-style: decimal; padding-left: 1.25em; margin: 4px 0; }
+.csbot-rich-text li             { margin: 2px 0; }
+.csbot-rich-text a              { color: #6366f1; text-decoration: underline; }
+.csbot-rich-text a:hover        { opacity: 0.8; }
+.csbot-rich-text blockquote     { border-left: 3px solid rgba(255,255,255,0.3); padding-left: 8px; opacity: 0.8; margin: 4px 0; }
+.csbot-rich-text code           { background: rgba(0,0,0,0.08); border-radius: 3px; padding: 1px 4px; font-family: monospace; font-size: 0.9em; }
+
 /* Typing indicator — white, BG/100 stroke, 12px radius, no shadow */
 .csbot-typing {
   background: #ffffff;
@@ -159,6 +178,7 @@ body {
   cursor: pointer;
   text-align: left;
   box-shadow: none;
+  font-family: "Inter","FF Mark Pro","Mark Pro","Noto Sans",system-ui,sans-serif;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
@@ -198,8 +218,8 @@ body {
 }
 
 .csbot-mosaic-label {
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
   color: #1B1A18;
   line-height: 1.3;
   letter-spacing: 0;
@@ -215,7 +235,7 @@ body {
   color: #079755;
   background: #ffffff;
   cursor: pointer;
-  font-family: "FF Mark Pro","Mark Pro","Noto Sans","Inter",system-ui,sans-serif;
+  font-family: "Inter","FF Mark Pro","Mark Pro","Noto Sans",system-ui,sans-serif;
   transition: background 0.15s ease, color 0.15s ease;
   text-align: left;
 }
@@ -256,7 +276,7 @@ body {
   color: #1B1A18;
   transition: border-color 0.2s, background 0.2s;
   font-size: 14px;
-  font-family: "FF Mark Pro","Mark Pro","Noto Sans","Inter",system-ui,sans-serif;
+  font-family: "Inter","FF Mark Pro","Mark Pro","Noto Sans",system-ui,sans-serif;
   letter-spacing: 0;
 }
 .csbot-input::placeholder { color: rgba(27,26,24,0.5); }
@@ -284,7 +304,7 @@ body {
   border-top: 1px solid #EDEDF8;
   padding-bottom: 8px;
   letter-spacing: 0;
-  font-family: "FF Mark Pro","Mark Pro","Noto Sans","Inter",system-ui,sans-serif;
+  font-family: "Inter","FF Mark Pro","Mark Pro","Noto Sans",system-ui,sans-serif;
 }
 .csbot-footer .font-semibold { color: #1B1A18; }
 

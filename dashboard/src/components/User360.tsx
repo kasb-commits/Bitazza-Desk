@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { stripTags } from '../utils/richText';
 import { usePermissions } from '../PermissionContext';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -975,7 +976,7 @@ export default function User360() {
                         <TD muted>{t.category?.replace(/_/g, ' ') ?? '—'}</TD>
                         <TD muted>{t.assigned_to_name ?? 'Unassigned'}</TD>
                         <td style={{ padding: '10px 16px', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11, color: T_MUTED }}>
-                          {t.last_message ?? '—'}
+                          {t.last_message ? stripTags(t.last_message).trim() || '—' : '—'}
                         </td>
                         <TD muted>{fmtDate(t.created_at)}</TD>
                       </TR>

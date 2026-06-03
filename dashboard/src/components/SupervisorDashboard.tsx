@@ -8,6 +8,7 @@ import { Avatar } from './ui/Avatar';
 import { SLATimer } from './ui/SLATimer';
 import { AgentCardSkeleton } from './ui/Skeleton';
 import { EmptyState } from './ui/EmptyState';
+import { stripTags } from '../utils/richText';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 
@@ -634,7 +635,7 @@ function AgentSlideOver({ agent, agents, onClose, onReassign }: {
                     </div>
                     {t.last_message && (
                       <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {t.last_message}
+                        {stripTags(t.last_message).trim() || '—'}
                       </div>
                     )}
                   </button>

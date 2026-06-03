@@ -1,6 +1,18 @@
 // /api/tickets — CRUD + messages + claim + assign + escalate
 const router   = require('express').Router();
 const pool     = require('../db/pg');
+const sanitizeHtml = require('sanitize-html');
+
+const RICH_TEXT_ALLOWED_TAGS = ['p','strong','em','u','s','h2','h3','ul','ol','li','a','br','blockquote','code'];
+const RICH_TEXT_SANITIZE_OPTS = {
+  allowedTags: RICH_TEXT_ALLOWED_TAGS,
+  allowedAttributes: { a: ['href', 'target', 'rel'] },
+};
+
+function sanitizeContent(raw) {
+  if (!raw) return raw;
+  return sanitizeHtml(raw, RICH_TEXT_SANITIZE_OPTS);
+}
 const { authenticate, requireRole, requirePermission } = require('../middleware/auth');
 const { claimTicketLock, releaseTicketLock, pushQueueBack, pushQueueFront, getAgentSession, keys } = require('../lib/redis');
 const { emitToTicket, emitToSupervisors, emitToAgent } = require('../lib/sockets');
@@ -456,10 +468,11 @@ router.post('/:id/messages', requirePermission('inbox.reply'), async (req, res) 
       ...(replyChannel ? { channel: replyChannel } : {}),
       ...(attachments.length ? { attachments } : {}),
     };
+    const safeContent = sanitizeContent((content ?? '').trim());
     const { rows } = await pool.query(
       `INSERT INTO messages (ticket_id, sender_type, sender_id, content, metadata)
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [req.params.id, senderType, req.user.id, (content ?? '').trim(), JSON.stringify(msgMeta)]
+      [req.params.id, senderType, req.user.id, safeContent, JSON.stringify(msgMeta)]
     );
     // Update ticket status to In_Progress on first agent reply
     if (!is_note) {
@@ -496,7 +509,7 @@ router.post('/:id/messages', requirePermission('inbox.reply'), async (req, res) 
               'X-Internal-Token': process.env.INTERNAL_SERVICE_TOKEN || 'internal-dev-token',
             },
             body: JSON.stringify({
-              message: content.trim(),
+              message: safeContent,
               agent_name: req.user.name,
               // Pass resolved attachment metadata so the Python email sender can embed them inline
               attachments: attachments.length ? attachments : undefined,

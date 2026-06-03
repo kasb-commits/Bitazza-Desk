@@ -3,6 +3,7 @@ import type { RelatedTicket } from '../types';
 import { api } from '../api';
 import { Spinner } from './ui/Spinner';
 import { Skeleton } from './ui/Skeleton';
+import { stripTags } from '../utils/richText';
 
 interface Props {
   ticketId: string;
@@ -252,7 +253,7 @@ export default function CopilotPanel({ ticketId, partialDraft = '', onAcceptDraf
               <p className="text-xs font-medium truncate" style={{ color: '#1e1b4b' }}>{t.customer_name}</p>
             )}
             {t.last_message && (
-              <p className="text-[10px] truncate" style={{ color: '#4b5563' }}>{t.last_message}</p>
+              <p className="text-[10px] truncate" style={{ color: '#4b5563' }}>{stripTags(t.last_message).trim() || '—'}</p>
             )}
           </div>
         ))}

@@ -8,6 +8,7 @@ import { Avatar } from './ui/Avatar';
 import { ChannelBadge, PriorityBadge } from './ui/Badge';
 import { KpiCardSkeleton } from './ui/Skeleton';
 import { EmptyState } from './ui/EmptyState';
+import { stripTags } from '../utils/richText';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -130,7 +131,7 @@ function TicketRow({ ticket, onClick }: { ticket: Ticket; onClick: () => void })
       <Avatar name={name} size="sm" className="shrink-0" />
       <div className="min-w-0 flex-1">
         <div className="text-xs font-semibold text-gray-900 truncate">{name}</div>
-        <div className="text-xs text-gray-500 truncate mt-0.5">{ticket.last_message ?? '—'}</div>
+        <div className="text-xs text-gray-500 truncate mt-0.5">{ticket.last_message ? stripTags(ticket.last_message).trim() || '—' : '—'}</div>
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <ChannelBadge channel={ticket.channel as any} size="xs" />

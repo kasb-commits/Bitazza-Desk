@@ -3,6 +3,17 @@ const router = require('express').Router();
 const pool   = require('../db/pg');
 const { authenticate, requirePermission } = require('../middleware/auth');
 const { v4: uuidv4 } = require('uuid');
+const sanitizeHtml = require('sanitize-html');
+
+const RICH_TEXT_SANITIZE_OPTS = {
+  allowedTags: ['p','strong','em','u','s','h2','h3','ul','ol','li','a','br','blockquote','code'],
+  allowedAttributes: { a: ['href', 'target', 'rel'] },
+};
+
+function sanitizeBody(raw) {
+  if (!raw) return raw;
+  return sanitizeHtml(raw, RICH_TEXT_SANITIZE_OPTS);
+}
 
 router.use(authenticate, requirePermission('admin.announcements'));
 
@@ -35,7 +46,7 @@ router.post('/', async (req, res) => {
          (id, title_en, body_en, title_th, body_th, color, active, starts_at, ends_at, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
        RETURNING *`,
-      [id, title_en, body_en, title_th, body_th,
+      [id, title_en, sanitizeBody(body_en), title_th, sanitizeBody(body_th),
        color || null,
        active ?? false,
        starts_at || null,
@@ -67,7 +78,7 @@ router.put('/:id', async (req, res) => {
          updated_at = NOW()
        WHERE id = $9
        RETURNING *`,
-      [title_en, body_en, title_th, body_th,
+      [title_en, sanitizeBody(body_en), title_th, sanitizeBody(body_th),
        active ?? null,
        starts_at !== undefined ? starts_at || null : undefined,
        ends_at   !== undefined ? ends_at   || null : undefined,

@@ -6,6 +6,8 @@ import { api } from '../api';
 import { Avatar } from './ui/Avatar';
 import { Spinner } from './ui/Spinner';
 import { useToast } from './ui/Toast';
+import RichTextEditor from './RichTextEditor';
+import { isHtml, safeHtml } from '../utils/richText';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const BR   = '#6366f1';
@@ -1878,7 +1880,10 @@ function AnnouncementsTab() {
                   {/* Content */}
                   <div style={{ position: 'relative' }}>
                     <p style={{ fontSize: 17, fontWeight: 700, color: 'white', lineHeight: 1.35, marginBottom: 8 }}>{title}</p>
-                    <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.82)', lineHeight: 1.6, maxWidth: 600 }}>{body}</p>
+                    {isHtml(body)
+                      ? <div className="rich-text" style={{ fontSize: 13, color: 'rgba(255,255,255,0.82)', lineHeight: 1.6, maxWidth: 600 }} dangerouslySetInnerHTML={{ __html: safeHtml(body) }} />
+                      : <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.82)', lineHeight: 1.6, maxWidth: 600 }}>{body}</p>
+                    }
                   </div>
                 </div>
 
@@ -1973,28 +1978,22 @@ function AnnouncementsTab() {
             <AdminInput value={form.title_en} onChange={v => setForm(f => ({ ...f, title_en: v }))} placeholder="e.g. Scheduled Maintenance Tonight" />
           </Field>
           <Field label="Body (English)">
-            <textarea
-              value={form.body_en}
-              onChange={e => setForm(f => ({ ...f, body_en: e.target.value }))}
+            <RichTextEditor
+              content={form.body_en}
+              onChange={v => setForm(f => ({ ...f, body_en: v }))}
               placeholder="Brief message shown to customers…"
-              rows={3}
-              style={{ ...ADMIN_INPUT_STYLE, resize: 'vertical' }}
-              onFocus={e => (e.currentTarget.style.borderColor = BR)}
-              onBlur={e => (e.currentTarget.style.borderColor = 'rgba(0,0,0,0.10)')}
+              minHeight={72}
             />
           </Field>
           <Field label="Title (Thai)">
             <AdminInput value={form.title_th} onChange={v => setForm(f => ({ ...f, title_th: v }))} placeholder="e.g. กำหนดการบำรุงรักษาคืนนี้" />
           </Field>
           <Field label="Body (Thai)">
-            <textarea
-              value={form.body_th}
-              onChange={e => setForm(f => ({ ...f, body_th: e.target.value }))}
+            <RichTextEditor
+              content={form.body_th}
+              onChange={v => setForm(f => ({ ...f, body_th: v }))}
               placeholder="ข้อความสั้นๆ ที่แสดงต่อลูกค้า…"
-              rows={3}
-              style={{ ...ADMIN_INPUT_STYLE, resize: 'vertical' }}
-              onFocus={e => (e.currentTarget.style.borderColor = BR)}
-              onBlur={e => (e.currentTarget.style.borderColor = 'rgba(0,0,0,0.10)')}
+              minHeight={72}
             />
           </Field>
           <Field label="Card color (optional — defaults to widget brand color)">

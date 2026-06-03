@@ -1,4 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import DOMPurify from 'dompurify';
+
+const SANITIZE_CONFIG = {
+  ALLOWED_TAGS: ['p','strong','em','u','s','h2','h3','ul','ol','li','a','br','blockquote','code'],
+  ALLOWED_ATTR: ['href', 'target', 'rel'],
+};
+
+function isHtml(str: string): boolean {
+  return /<[a-z][\s\S]*>/i.test(str);
+}
 import type { Message, MessageAttachment, CSBotConfig, IssueCategory } from './types';
 import { ISSUE_CATEGORIES } from './types';
 import { startConversation, sendMessage, uploadAttachment, fetchHistory, setCategoryAgent, getStoredSession, storeSessionLang, storeSessionCategory, storeSessionAgent, storeSessionBotInfo, clearStoredSession, fetchCustomerTickets, fetchOpenTicket, getStoredCustomerId, emergencyEscalate, fetchAnnouncements } from './api';
@@ -883,9 +893,16 @@ export default function ChatWindow({ cfg, onClose }: Props) {
                       </svg>
                     </button>
                   </div>
-                  <p style={{ fontSize: 14, color: 'rgba(27,26,24,0.65)', lineHeight: '20px', margin: 0 }}>
-                    {lang === 'th' ? a.body_th : a.body_en}
-                  </p>
+                  {(() => {
+                    const body = lang === 'th' ? a.body_th : a.body_en;
+                    return isHtml(body)
+                      ? <div
+                          className="csbot-rich-text"
+                          style={{ fontSize: 14, color: 'rgba(27,26,24,0.65)', lineHeight: '20px', margin: 0 }}
+                          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(body, SANITIZE_CONFIG) }}
+                        />
+                      : <p style={{ fontSize: 14, color: 'rgba(27,26,24,0.65)', lineHeight: '20px', margin: 0 }}>{body}</p>;
+                  })()}
                 </div>
               </div>
             );

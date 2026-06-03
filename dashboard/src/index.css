@@ -379,3 +379,45 @@ html {
 .ds-bubble-customer { background: #ffffff;  color: #111827; border: 1px solid rgba(180,195,220,0.35); }
 .ds-bubble-bot      { background: #dbeafe;  color: #1e3a8a; }
 .ds-bubble-agent    { background: #d1fae5;  color: #064e3b; }
+
+/* ── DS: Rich-text content rendering ────────────────────────────────────── */
+/*  Applied to any div that renders sanitized HTML from the rich text editor.  */
+.rich-text p              { margin: 0 0 4px 0; }
+.rich-text p:last-child   { margin-bottom: 0; }
+.rich-text strong         { font-weight: 600; }
+.rich-text em             { font-style: italic; }
+.rich-text u              { text-decoration: underline; }
+.rich-text s              { text-decoration: line-through; }
+.rich-text h2             { font-size: 1.05em; font-weight: 700; margin: 6px 0 2px; }
+.rich-text h3             { font-size: 1em;    font-weight: 600; margin: 4px 0 2px; }
+.rich-text ul             { list-style: disc;    padding-left: 1.25em; margin: 4px 0; }
+.rich-text ol             { list-style: decimal; padding-left: 1.25em; margin: 4px 0; }
+.rich-text li             { margin: 2px 0; }
+.rich-text a              { color: #6366f1; text-decoration: underline; }
+.rich-text a:hover        { opacity: 0.8; }
+.rich-text blockquote     { border-left: 3px solid #e5e7eb; padding-left: 8px; color: rgba(0,0,0,0.5); margin: 4px 0; }
+.rich-text code           { background: rgba(0,0,0,0.06); border-radius: 3px; padding: 1px 4px; font-family: monospace; font-size: 0.9em; }
+
+/* ── DS: TipTap editor area ─────────────────────────────────────────────── */
+.rich-editor-content .ProseMirror { outline: none; }
+.rich-editor-content .ProseMirror p              { margin: 0 0 4px 0; }
+.rich-editor-content .ProseMirror p:last-child   { margin-bottom: 0; }
+.rich-editor-content .ProseMirror ul             { list-style: disc;    padding-left: 1.25em; margin: 4px 0; }
+.rich-editor-content .ProseMirror ol             { list-style: decimal; padding-left: 1.25em; margin: 4px 0; }
+.rich-editor-content .ProseMirror li             { margin: 2px 0; }
+.rich-editor-content .ProseMirror h2             { font-size: 1.05em; font-weight: 700; margin: 6px 0 2px; }
+.rich-editor-content .ProseMirror h3             { font-size: 1em;    font-weight: 600; margin: 4px 0 2px; }
+.rich-editor-content .ProseMirror blockquote     { border-left: 3px solid #e5e7eb; padding-left: 8px; color: rgba(0,0,0,0.5); margin: 4px 0; }
+.rich-editor-content .ProseMirror code           { background: rgba(0,0,0,0.06); border-radius: 3px; padding: 1px 4px; font-family: monospace; font-size: 0.9em; }
+.rich-editor-content .ProseMirror a              { color: #6366f1; text-decoration: underline; }
+.rich-editor-content .ProseMirror .is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: rgba(0,0,0,0.35);
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+
+/* Internal note mode — amber tint on editor text and placeholder */
+.note-editor .rich-editor-content .ProseMirror { color: #78350f; }
+.note-editor .rich-editor-content .ProseMirror .is-editor-empty:first-child::before { color: rgba(180,100,0,0.45); }

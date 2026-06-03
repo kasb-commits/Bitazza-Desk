@@ -5,6 +5,7 @@ import { api } from '../api';
 import { Avatar } from './ui/Avatar';
 import { ConversationRowSkeleton } from './ui/Skeleton';
 import { EmptyState } from './ui/EmptyState';
+import { stripTags } from '../utils/richText';
 
 // ── View options ───────────────────────────────────────────────────────────────
 
@@ -507,7 +508,7 @@ export default function ConversationList({
           const lastTs = ticket.last_message_at ?? ticket.updated_at ?? ticket.created_at;
           const isSelected = selectedId === ticket.id;
           const isChecked = selected.has(ticket.id);
-          const preview = ticket.last_message ?? '—';
+          const preview = ticket.last_message ? stripTags(ticket.last_message).trim() || '—' : '—';
           const catCfg = ticket.category ? CATEGORY_LABEL[ticket.category as TicketCategory] : null;
           const chCfg = ticket.channel ? (CHANNEL_LABEL[ticket.channel.toLowerCase()] ?? CHANNEL_LABEL.web) : null;
 
