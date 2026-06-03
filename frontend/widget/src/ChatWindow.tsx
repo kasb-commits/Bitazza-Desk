@@ -847,7 +847,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
               <div
                 key={a.id}
                 style={{
-                  margin: '4px 0 2px',
+                  margin: '4px 0 40px',
                   borderRadius: 12,
                   background: '#ffffff',
                   border: '1px solid #EDEDF8',
@@ -855,23 +855,18 @@ export default function ChatWindow({ cfg, onClose }: Props) {
                   overflow: 'hidden',
                 }}
               >
-                <div style={{ padding: '10px 8px 11px 8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 14, fontWeight: 600, color: '#1B1A18', marginBottom: 3, lineHeight: '20px', display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
-                          <path d="M22 4 12 8H5a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h1l2 5h2l-1-5h2l10 4V4z"/>
-                        </svg>
-                        {lang === 'th' ? a.title_th : a.title_en}
-                      </p>
-                      <p style={{ fontSize: 14, color: 'rgba(27,26,24,0.65)', lineHeight: '20px', margin: 0 }}>
-                        {lang === 'th' ? a.body_th : a.body_en}
-                      </p>
-                    </div>
+                <div style={{ padding: '10px 12px 11px 11px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 3 }}>
+                    <p style={{ fontSize: 14, fontWeight: 600, color: '#1B1A18', lineHeight: '20px', margin: 0, display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                        <path d="M22 4 12 8H5a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h1l2 5h2l-1-5h2l10 4V4z"/>
+                      </svg>
+                      {lang === 'th' ? a.title_th : a.title_en}
+                    </p>
                     <button
                       onClick={() => setDismissedAnnIds(prev => new Set([...prev, a.id]))}
                       style={{
-                        flexShrink: 0, marginTop: 1,
+                        flexShrink: 0,
                         width: 20, height: 20, borderRadius: 6,
                         background: '#FCFCFE',
                         border: '1px solid #EDEDF8',
@@ -888,6 +883,9 @@ export default function ChatWindow({ cfg, onClose }: Props) {
                       </svg>
                     </button>
                   </div>
+                  <p style={{ fontSize: 14, color: 'rgba(27,26,24,0.65)', lineHeight: '20px', margin: 0 }}>
+                    {lang === 'th' ? a.body_th : a.body_en}
+                  </p>
                 </div>
               </div>
             );
