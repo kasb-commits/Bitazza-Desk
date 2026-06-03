@@ -8,7 +8,7 @@ interface Props {
 
 export default function Widget({ cfg }: Props) {
   const [open, setOpen] = useState(false);
-  const color = cfg.primaryColor ?? '#6366f1';
+  const color = cfg.primaryColor ?? '#00CE80';
 
   return (
     <div className="csbot-widget fixed bottom-6 right-6 z-[9999] flex flex-col items-end gap-4">
@@ -24,14 +24,10 @@ export default function Widget({ cfg }: Props) {
         )}
         <button
           onClick={() => setOpen((v) => !v)}
-          className="csbot-fab relative w-14 h-14 rounded-full flex items-center justify-center text-white"
+          className="csbot-fab relative w-14 h-14 rounded-full flex items-center justify-center"
           style={{
-            background: open
-              ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)'
-              : `linear-gradient(135deg, ${color} 0%, ${color}bb 100%)`,
-            boxShadow: open
-              ? '0 4px 24px rgba(0,0,0,0.4)'
-              : `0 4px 24px ${color}55, 0 1px 3px rgba(0,0,0,0.2)`,
+            background: open ? '#079755' : '#00CE80',
+            color: '#1B1A18',
           }}
           aria-label="Open support chat"
         >

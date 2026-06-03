@@ -127,6 +127,16 @@ export default function ChatWindow({ cfg, onClose }: Props) {
     const existing = getStoredSession();
     if (existing) {
       // Resume: load history from backend
+      // If the stored session is a guest session but we're now authenticated, discard it
+      // so a fresh authenticated conversation starts instead.
+      if (existing.isGuest && !cfg.guestMode) {
+        clearStoredSession();
+        showGreeting();
+        startConversation(cfg)
+          .then((id) => setConvId(id))
+          .catch(() => setError('Could not connect. Please refresh.'));
+        return;
+      }
       setConvId(existing.id);
       if (existing.isGuest) setIsGuest(true);
       // Restore lang selection from session if available
@@ -1142,7 +1152,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
             style={{ background: primaryColor }}
             aria-label={t.send}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1B1A18" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
             </svg>
           </button>

@@ -14,13 +14,14 @@ interface HistoryMsg {
   agentAvatarUrl?: string;
 }
 
-const STATUS_BADGE: Record<string, { label: { en: string; th: string }; color: string }> = {
-  Open_Live:           { label: { en: 'Open',        th: 'เปิด' },             color: 'bg-blue-100 text-blue-700' },
-  In_Progress:         { label: { en: 'In Progress',  th: 'กำลังดำเนินการ' },  color: 'bg-yellow-100 text-yellow-700' },
-  Escalated:           { label: { en: 'Escalated',    th: 'ส่งต่อเจ้าหน้าที่' }, color: 'bg-orange-100 text-orange-700' },
-  Pending_Customer:    { label: { en: 'Pending',      th: 'รอลูกค้า' },         color: 'bg-gray-100 text-gray-500' },
-  Closed_Resolved:     { label: { en: 'Resolved',     th: 'แก้ไขแล้ว' },        color: 'bg-green-100 text-green-700' },
-  Closed_Unresponsive: { label: { en: 'Closed',       th: 'ปิดแล้ว' },          color: 'bg-green-100 text-green-700' },
+// Bitazza semantic palette status badges
+const STATUS_BADGE: Record<string, { label: { en: string; th: string }; bg: string; color: string }> = {
+  Open_Live:           { label: { en: 'Open',        th: 'เปิด' },             bg: '#EEF3FE', color: '#32579D' },
+  In_Progress:         { label: { en: 'In Progress',  th: 'กำลังดำเนินการ' },  bg: '#FEF8EA', color: '#705514' },
+  Escalated:           { label: { en: 'Escalated',    th: 'ส่งต่อเจ้าหน้าที่' }, bg: '#FEF8EA', color: '#705514' },
+  Pending_Customer:    { label: { en: 'Pending',      th: 'รอลูกค้า' },         bg: '#EDEDF8', color: 'rgba(27,26,24,0.5)' },
+  Closed_Resolved:     { label: { en: 'Resolved',     th: 'แก้ไขแล้ว' },        bg: '#F0FEF8', color: '#056639' },
+  Closed_Unresponsive: { label: { en: 'Closed',       th: 'ปิดแล้ว' },          bg: '#F0FEF8', color: '#056639' },
 };
 
 const CATEGORY_LABEL: Record<string, { en: string; th: string }> = {
@@ -47,9 +48,9 @@ function relativeDate(unixTs: number, lang: 'en' | 'th'): string {
 function SkeletonMsg() {
   return (
     <div data-testid="history-skeleton" className="flex flex-col gap-2 py-2 animate-pulse">
-      <div className="h-3 bg-gray-200 rounded w-3/4" />
-      <div className="h-3 bg-gray-200 rounded w-1/2 self-end" />
-      <div className="h-3 bg-gray-200 rounded w-2/3" />
+      <div className="h-3 rounded w-3/4" style={{ background: '#EDEDF8' }} />
+      <div className="h-3 rounded w-1/2 self-end" style={{ background: '#EDEDF8' }} />
+      <div className="h-3 rounded w-2/3" style={{ background: '#EDEDF8' }} />
     </div>
   );
 }
@@ -106,9 +107,6 @@ function TicketThread({ ticket, cfg, lang, primaryColor }: TicketThreadProps) {
   }, [expanded, loadPage]);
 
   // Scroll-up to load older messages (oldest shown at top, newest at bottom)
-  // Uses refs so the listener is registered once and always reads current values,
-  // avoiding the stale-closure race where loading/hasMore/page are captured at
-  // registration time and lag behind state updates.
   useEffect(() => {
     const el = messagesRef.current;
     if (!el) return;
@@ -129,29 +127,35 @@ function TicketThread({ ticket, cfg, lang, primaryColor }: TicketThreadProps) {
   const dateLabel = relativeDate(ticket.created_at, lang);
 
   return (
-    <div className="border border-gray-100 rounded-xl overflow-hidden mb-2">
+    <div className="overflow-hidden mb-2" style={{ border: '1px solid #EDEDF8', borderRadius: 12 }}>
       {/* Ticket header — click to expand */}
       <button
         data-testid="prev-ticket-header"
         onClick={handleExpand}
-        className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+        className="w-full flex items-center justify-between px-3 py-2.5 transition-colors text-left"
+        style={{ background: '#FCFCFE' }}
+        onMouseEnter={e => (e.currentTarget.style.background = '#EDEDF8')}
+        onMouseLeave={e => (e.currentTarget.style.background = '#FCFCFE')}
       >
         <div className="flex flex-col gap-0.5">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-semibold text-gray-700">{catLabel}</span>
+            <span className="text-xs font-semibold" style={{ color: '#1B1A18' }}>{catLabel}</span>
             {(() => {
               const badge = STATUS_BADGE[ticket.status];
               if (!badge) return null;
               return (
-                <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${badge.color}`}>
+                <span
+                  className="text-[9px] font-semibold px-2 py-0.5 rounded-full"
+                  style={{ background: badge.bg, color: badge.color }}
+                >
                   {badge.label[lang]}
                 </span>
               );
             })()}
           </div>
-          <span className="text-[10px] text-gray-400">{dateLabel}</span>
+          <span className="text-[10px]" style={{ color: 'rgba(27,26,24,0.5)' }}>{dateLabel}</span>
           {ticket.last_message && (
-            <span className="text-[11px] text-gray-500 truncate max-w-[240px]">
+            <span className="text-[11px] truncate max-w-[240px]" style={{ color: 'rgba(27,26,24,0.75)' }}>
               {ticket.last_message}
             </span>
           )}
@@ -159,7 +163,8 @@ function TicketThread({ ticket, cfg, lang, primaryColor }: TicketThreadProps) {
         <svg
           width="12" height="12" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" strokeWidth={2.5}
-          className={`text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
+          className={`transition-transform ${expanded ? 'rotate-180' : ''}`}
+          style={{ color: 'rgba(27,26,24,0.5)' }}
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
@@ -179,12 +184,12 @@ function TicketThread({ ticket, cfg, lang, primaryColor }: TicketThreadProps) {
             </div>
           )}
           {!loading && messages.length === 0 && (
-            <p className="text-xs text-gray-400 text-center py-2">
+            <p className="text-xs text-center py-2" style={{ color: 'rgba(27,26,24,0.5)' }}>
               {lang === 'th' ? 'ไม่มีข้อความ' : 'No messages'}
             </p>
           )}
           {!hasMore && messages.length > 0 && (
-            <p className="text-[10px] text-gray-300 text-center py-1">
+            <p className="text-[10px] text-center py-1" style={{ color: 'rgba(27,26,24,0.4)' }}>
               {lang === 'th' ? '— เริ่มต้นการสนทนา —' : '— Start of conversation —'}
             </p>
           )}
@@ -219,19 +224,19 @@ export default function PrevConversations({ tickets, cfg, lang, primaryColor }: 
   return (
     <div data-testid="prev-conversations" className="mb-3">
       <div className="flex items-center gap-2 mb-2">
-        <div className="flex-1 h-px bg-gray-100" />
-        <span className="text-[10px] text-gray-400 font-medium">{label}</span>
-        <div className="flex-1 h-px bg-gray-100" />
+        <div className="flex-1 h-px" style={{ background: '#EDEDF8' }} />
+        <span className="text-[10px] font-medium" style={{ color: 'rgba(27,26,24,0.5)' }}>{label}</span>
+        <div className="flex-1 h-px" style={{ background: '#EDEDF8' }} />
       </div>
       {[...tickets].reverse().map((t) => (
         <TicketThread key={t.id} ticket={t} cfg={cfg} lang={lang} primaryColor={primaryColor} />
       ))}
       <div className="flex items-center gap-2 mt-2 mb-3">
-        <div className="flex-1 h-px bg-gray-100" />
-        <span className="text-[10px] text-gray-400 font-medium">
+        <div className="flex-1 h-px" style={{ background: '#EDEDF8' }} />
+        <span className="text-[10px] font-medium" style={{ color: 'rgba(27,26,24,0.5)' }}>
           {lang === 'th' ? 'การสนทนาใหม่' : 'New conversation'}
         </span>
-        <div className="flex-1 h-px bg-gray-100" />
+        <div className="flex-1 h-px" style={{ background: '#EDEDF8' }} />
       </div>
     </div>
   );

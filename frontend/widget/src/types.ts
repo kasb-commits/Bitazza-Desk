@@ -1,4 +1,4 @@
-export type MessageRole = 'user' | 'assistant' | 'agent';
+export type MessageRole = 'user' | 'assistant' | 'agent' | 'system';
 
 export type IssueCategory =
   | 'kyc_verification'
@@ -82,7 +82,7 @@ export interface CSBotConfig {
   platform: 'freedom' | 'bitazza' | 'web';
   apiUrl: string;
   token?: string;        // JWT from host app, optional
-  primaryColor?: string; // hex, default #1a56db
+  primaryColor?: string; // hex, default #00CE80 (Primary/GL/700)
   lang?: 'en' | 'th';   // override auto-detect
   guestMode?: boolean;   // true = skip token fetch, show GuestIdentityForm
 }
