@@ -12,7 +12,7 @@ from db.conversation_store import (
     get_customer_id_for_user, get_customer_tickets, get_open_ticket_for_customer,
     get_ticket_by_id, update_ticket_status, get_ticket_id_by_conversation,
     get_info_collection_phase, set_info_collection_phase, count_collection_turns,
-    create_emergency_ticket,
+    create_emergency_ticket, get_system_signals,
 )
 from engine.assignment_client import trigger_auto_assign, emit_ticket_event
 from workflow_engine.interceptor import workflow_interceptor as chat
@@ -521,8 +521,10 @@ def get_conversation_history(
         history = get_paginated_history(conversation_id, page=page, limit=limit)
     else:
         history = get_history(conversation_id, limit=50)
+    signals = get_system_signals(conversation_id)
+    combined = sorted(history + signals, key=lambda m: m["created_at"])
     return {
-        "history": history,
+        "history": combined,
         "human_handling": is_human_handling(conversation_id),
     }
 

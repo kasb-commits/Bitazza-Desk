@@ -20,19 +20,19 @@ export const ISSUE_CATEGORIES: IssueCategoryDef[] = [
   {
     key: 'kyc_verification',
     icon: '🪪',
-    label: { en: 'KYC / Verification', th: 'ยืนยันตัวตน (KYC)' },
+    label: { en: 'KYC verification', th: 'ยืนยันตัวตน (KYC)' },
     openingMessage: { en: 'I need help with my KYC verification.', th: 'ฉันต้องการความช่วยเหลือเกี่ยวกับการยืนยันตัวตน KYC' },
   },
   {
     key: 'account_restriction',
     icon: '🔒',
-    label: { en: 'Account Restricted', th: 'บัญชีถูกระงับ' },
+    label: { en: 'Account restriction', th: 'บัญชีถูกระงับ' },
     openingMessage: { en: 'I need help with my account access.', th: 'ฉันต้องการความช่วยเหลือเกี่ยวกับการเข้าถึงบัญชี' },
   },
   {
     key: 'password_2fa_reset',
     icon: '🔑',
-    label: { en: 'Password / 2FA Reset', th: 'รีเซ็ตรหัสผ่าน / 2FA' },
+    label: { en: 'Password / 2FA reset', th: 'รีเซ็ตรหัสผ่าน / 2FA' },
     openingMessage: { en: 'I need to reset my password or 2FA.', th: 'ฉันต้องการรีเซ็ตรหัสผ่านหรือ 2FA' },
   },
   {
@@ -44,7 +44,7 @@ export const ISSUE_CATEGORIES: IssueCategoryDef[] = [
   {
     key: 'withdrawal_issue',
     icon: '💸',
-    label: { en: 'Withdrawal Issue', th: 'ปัญหาการถอนเงิน' },
+    label: { en: 'Withdrawal issue', th: 'ปัญหาการถอนเงิน' },
     openingMessage: { en: 'I have a problem with a withdrawal.', th: 'ฉันมีปัญหาเกี่ยวกับการถอนเงิน' },
   },
   {

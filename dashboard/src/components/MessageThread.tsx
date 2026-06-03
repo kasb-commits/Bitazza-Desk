@@ -563,7 +563,14 @@ export default function MessageThread({ ticketId, ws, onStatusChange, pendingDra
         if (evId && evId !== ticketId) return;
 
         if (event.type === 'new_message') {
-          setTicket(prev => prev ? { ...prev, history: [...prev.history, event.message as Message] } : prev);
+          const newMsg = event.message as Message;
+          setTicket(prev => {
+            if (!prev) return prev;
+            // Deduplicate by ID — system messages emitted via WS may already be
+            // present after load() re-fetches the thread from the DB.
+            if (newMsg.id && prev.history.some(m => m.id === newMsg.id)) return prev;
+            return { ...prev, history: [...prev.history, newMsg] };
+          });
         } else if (event.type === 'agent_typing') {
           const name = event.agent_name as string;
           setTypingAgents(prev => prev.includes(name) ? prev : [...prev, name]);

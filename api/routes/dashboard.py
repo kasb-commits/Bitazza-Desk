@@ -417,6 +417,20 @@ async def pending_internal_endpoint(ticket_id: str, body: PendingInternalRequest
     return {"status": "pending_internal", "blocked_on": body.blocked_on}
 
 
+@router.post("/tickets/{ticket_id}/resolve-request")
+async def resolve_request_endpoint(ticket_id: str, user_id: str = Depends(get_user_id)):
+    ticket = get_ticket_with_history(ticket_id)
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    add_message(ticket_id, "system", "__resolve_request__", {"agent_id": user_id})
+    update_ticket_status(ticket_id, "resolved", agent_id=user_id)
+    await manager.broadcast(ticket_id, {
+        "type": "ticket:resolve_request",
+        "conversation_id": ticket_id,
+    })
+    return {"status": "resolve_request_sent"}
+
+
 # ---------------------------------------------------------------------------
 # Bulk actions
 # ---------------------------------------------------------------------------

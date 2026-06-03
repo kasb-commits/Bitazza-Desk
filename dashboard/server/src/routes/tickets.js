@@ -18,6 +18,43 @@ const { claimTicketLock, releaseTicketLock, pushQueueBack, pushQueueFront, getAg
 const { emitToTicket, emitToSupervisors, emitToAgent } = require('../lib/sockets');
 const { v4: uuidv4 } = require('uuid');
 
+// ── Inline system message helper ─────────────────────────────────────────────
+// Inserts a system message row and broadcasts it as a new_message WS event so
+// all agents viewing the thread see it in real-time without a manual refresh.
+async function insertSystemMsg(ticketId, actorId, content) {
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO messages (ticket_id, sender_type, sender_id, content)
+       VALUES ($1, 'system', $2, $3) RETURNING *`,
+      [ticketId, actorId || null, content]
+    );
+    const msg = rows[0];
+    emitToTicket(ticketId, 'new_message', {
+      message: {
+        id: msg.id,
+        role: 'system',
+        sender_type: 'system',
+        content: msg.content,
+        created_at: Math.floor(new Date(msg.created_at).getTime() / 1000),
+      },
+    });
+  } catch (err) {
+    console.error('[system-msg] failed to insert:', err.message);
+  }
+}
+
+const STATUS_LABELS = {
+  Open_Live: 'Open (Live)',
+  In_Progress: 'In Progress',
+  Pending_Customer: 'Pending Customer',
+  Closed_Resolved: 'Closed (Resolved)',
+  Closed_Unresponsive: 'Closed (Unresponsive)',
+  Escalated: 'Escalated',
+  Orphaned: 'Orphaned',
+};
+
+const PRIORITY_LABELS = { 1: 'VIP', 2: 'EA', 3: 'Standard' };
+
 // ── FR-02 Push routing | FR-04 Sticky routing | FR-05 VIP override ────────────
 // Returns assigned agent ID or null (queued).
 async function routeTicket(ticketId, customerId, priority, team = 'default') {
@@ -85,6 +122,8 @@ async function routeTicket(ticketId, customerId, priority, team = 'default') {
     const { rows: agentInfo } = await pool.query(
       'SELECT name, avatar_url FROM users WHERE id=$1', [assignedTo]
     );
+    await insertSystemMsg(ticketId, null,
+      `Auto-assigned to ${agentInfo[0]?.name ?? 'an agent'}`);
     emitToAgent(assignedTo, 'ticket:assigned', {
       ticketId,
       agentId: assignedTo,
@@ -319,6 +358,8 @@ router.patch('/:id/status', requirePermission('inbox.close'), async (req, res) =
   if (!valid.includes(status)) return res.status(400).json({ error: 'Invalid status' });
   try {
     await pool.query('UPDATE tickets SET status=$1, updated_at=NOW() WHERE id=$2', [status, req.params.id]);
+    await insertSystemMsg(req.params.id, req.user.id,
+      `${req.user.name} changed status to ${STATUS_LABELS[status] || status}`);
     emitToTicket(req.params.id, 'ticket:updated', { ticketId: req.params.id, changes: { status } });
     res.json({ ok: true });
   } catch (err) {
@@ -332,6 +373,8 @@ router.patch('/:id/priority', async (req, res) => {
   if (![1,2,3].includes(Number(priority))) return res.status(400).json({ error: 'Invalid priority' });
   try {
     await pool.query('UPDATE tickets SET priority=$1, updated_at=NOW() WHERE id=$2', [priority, req.params.id]);
+    await insertSystemMsg(req.params.id, req.user.id,
+      `${req.user.name} changed priority to ${PRIORITY_LABELS[Number(priority)] || priority}`);
     emitToTicket(req.params.id, 'ticket:updated', { ticketId: req.params.id, changes: { priority } });
     res.json({ ok: true });
   } catch (err) {
@@ -366,18 +409,17 @@ router.patch('/:id/assign', requirePermission('inbox.assign'), async (req, res) 
         `UPDATE users SET active_chats = active_chats + 1 WHERE id=$1`, [assigned_to]
       );
     }
-    if (handoff_note) {
-      await pool.query(
-        'INSERT INTO messages (ticket_id, sender_type, sender_id, content) VALUES ($1,$2,$3,$4)',
-        [req.params.id, 'system', req.user.id, `Assigned to ${team || 'agent'}: ${handoff_note}`]
-      );
-    }
     let agentName = null, agentAvatarUrl = null;
     if (assigned_to) {
       const { rows: ai } = await pool.query('SELECT name, avatar_url FROM users WHERE id=$1', [assigned_to]);
       agentName = ai[0]?.name ?? null;
       agentAvatarUrl = ai[0]?.avatar_url ?? null;
     }
+    let assignMsg = assigned_to
+      ? `${req.user.name} assigned this ticket to ${agentName || 'an agent'}`
+      : `${req.user.name} unassigned this ticket`;
+    if (handoff_note) assignMsg += ` — ${handoff_note}`;
+    await insertSystemMsg(req.params.id, req.user.id, assignMsg);
     emitToTicket(req.params.id, 'ticket:assigned', {
       ticketId: req.params.id,
       agentId: assigned_to,
@@ -545,6 +587,8 @@ router.post('/:id/claim', requirePermission('inbox.claim'), async (req, res) => 
     );
     await releaseTicketLock(ticketId);
     const { rows: ai } = await pool.query('SELECT name, avatar_url FROM users WHERE id=$1', [req.user.id]);
+    await insertSystemMsg(ticketId, req.user.id,
+      `${ai[0]?.name ?? 'An agent'} took over this conversation`);
     emitToTicket(ticketId, 'ticket:assigned', {
       ticketId,
       agentId: req.user.id,

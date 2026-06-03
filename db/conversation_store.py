@@ -693,6 +693,28 @@ def get_history(conversation_id: str, limit: int = 10) -> list[dict]:
     return result
 
 
+def get_system_signals(conversation_id: str) -> list[dict]:
+    """Return system-role signal messages (e.g. __resolve_request__) for the widget.
+    Kept separate from get_history so the AI engine never sees these."""
+    with _conn() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT content, created_at
+            FROM messages
+            WHERE ticket_id = %s AND sender_type = 'system'
+            ORDER BY created_at ASC
+        """, (conversation_id,))
+        rows = cur.fetchall()
+    return [
+        {
+            "role": "system",
+            "content": r["content"],
+            "created_at": int(r["created_at"].timestamp()) if r["created_at"] else 0,
+        }
+        for r in rows
+    ]
+
+
 def has_successful_bot_reply(conversation_id: str) -> bool:
     """
     Returns True if at least one bot message in this conversation was NOT an escalation
