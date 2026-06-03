@@ -22,16 +22,16 @@ module.exports = {
         },
         // ── Brand ──
         brand: {
-          DEFAULT: 'rgb(230 57 70)',
-          dim:     'rgb(193 48 59)',
-          subtle:  'rgba(230,57,70,0.08)',
+          DEFAULT: '#00CE80',
+          dim:     '#079755',
+          subtle:  'rgba(0,206,128,0.08)',
         },
         // ── Status / Accent ──
         accent: {
-          blue:  'rgb(59 130 246)',
-          green: 'rgb(34 197 94)',
-          amber: 'rgb(245 158 11)',
-          red:   'rgb(230 57 70)',
+          blue:  '#528AF1',
+          green: '#00CE80',
+          amber: '#F4B72A',
+          red:   '#EF4150',
         },
       },
       fontFamily: {

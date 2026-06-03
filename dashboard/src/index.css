@@ -5,30 +5,30 @@
 /* ── Design Tokens: Dark Theme (default) ─────────────────────────────────── */
 :root,
 [data-theme="dark"] {
-  --surface-0: #080A0C;
-  --surface-1: #0F1115;
-  --surface-2: #14171D;
-  --surface-3: #1C2028;
-  --surface-4: #252A34;
-  --surface-5: #2E3441;
+  --surface-0: #090916;
+  --surface-1: #13132C;
+  --surface-2: #1C1C40;
+  --surface-3: #2C2C53;
+  --surface-4: #3A3A6A;
+  --surface-5: #4A4A80;
 
-  --text-primary:   #F0F2F5;
-  --text-secondary: #8B92A5;
-  --text-muted:     #4A5166;
+  --text-primary:   rgba(255,255,255,1.00);
+  --text-secondary: rgba(255,255,255,0.75);
+  --text-muted:     rgba(255,255,255,0.50);
 }
 
 /* ── Design Tokens: Light Theme ──────────────────────────────────────────── */
 [data-theme="light"] {
-  --surface-0: #FFFFFF;
-  --surface-1: #F4F6F9;
+  --surface-0: #FCFCFE;
+  --surface-1: #FFFFFF;
   --surface-2: #FFFFFF;
-  --surface-3: #F4F6F9;
-  --surface-4: #EEF0F4;
-  --surface-5: #DDE1E9;
+  --surface-3: #FFFFFF;
+  --surface-4: #EDEDF8;
+  --surface-5: #DEDEED;
 
-  --text-primary:   #0D0F12;
-  --text-secondary: #6B7280;
-  --text-muted:     #9CA3AF;
+  --text-primary:   rgba(27,26,24,1.00);
+  --text-secondary: rgba(27,26,24,0.75);
+  --text-muted:     rgba(27,26,24,0.50);
 }
 
 /* ── Global Resets ───────────────────────────────────────────────────────── */
@@ -45,7 +45,7 @@ body {
   height: 100%;
   background-color: var(--surface-0);
   color: var(--text-primary);
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'FF Mark Pro','Mark Pro','Noto Sans','Inter',system-ui,sans-serif;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -57,8 +57,8 @@ body {
 
 /* ── Focus Visible ───────────────────────────────────────────────────────── */
 :focus-visible {
-  outline: 2px solid #E63946;
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.08);
 }
 
 button:focus:not(:focus-visible),
