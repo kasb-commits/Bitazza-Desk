@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Message, MessageAttachment, CSBotConfig, IssueCategory } from './types';
 import { ISSUE_CATEGORIES } from './types';
-import { startConversation, sendMessage, uploadAttachment, fetchHistory, setCategoryAgent, getStoredSession, storeSessionLang, storeSessionCategory, storeSessionAgent, clearStoredSession, fetchCustomerTickets, fetchOpenTicket, getStoredCustomerId, emergencyEscalate, fetchAnnouncements } from './api';
+import { startConversation, sendMessage, uploadAttachment, fetchHistory, setCategoryAgent, getStoredSession, storeSessionLang, storeSessionCategory, storeSessionAgent, storeSessionBotInfo, clearStoredSession, fetchCustomerTickets, fetchOpenTicket, getStoredCustomerId, emergencyEscalate, fetchAnnouncements } from './api';
 import type { PastTicket, Announcement } from './api';
 import MessageBubble from './MessageBubble';
 import TypingIndicator from './TypingIndicator';
@@ -143,10 +143,16 @@ export default function ChatWindow({ cfg, onClose }: Props) {
       if (existing.lang) {
         setLang(existing.lang);
         setLangSelected(true);
+        fetchAnnouncements(cfg).then(setAnnouncements).catch(() => {});
       }
       // Restore category from session if available
       if (existing.category) {
         setSelectedCategory(existing.category as IssueCategory);
+      }
+      // Restore AI bot persona so message bubbles show the correct name instead of "Bitazza Support"
+      if (existing.botName) {
+        setBotName(existing.botName);
+        setBotAvatarUrl(existing.botAvatarUrl ?? null);
       }
       fetchHistory(cfg, existing.id).then(({ messages: history, humanHandling }) => {
         if (history.length === 0) {
@@ -239,6 +245,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
           const resolvedName = agentName ?? 'Ploy';
           setBotName(resolvedName);
           setBotAvatarUrl(agentAvatarUrl || null);
+          storeSessionBotInfo(resolvedName, agentAvatarUrl || null);
           setTimeout(() => {
             const greeting = lang === 'th'
               ? `สวัสดีค่ะ ฉันชื่อ${resolvedName}! 😊 มีอะไรให้ช่วยได้บ้างคะ?`
@@ -340,6 +347,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
         const resolvedName = agentName ?? 'Support Agent';
         setBotName(resolvedName);
         setBotAvatarUrl(agentAvatarUrl || null);
+        storeSessionBotInfo(resolvedName, agentAvatarUrl || null);
 
         // 2. After a short human-feel delay, show the agent's intro message
         //    Skip for "other" — the AI's first response will ask what they need.
@@ -560,6 +568,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
           if (result.agentName) {
             setBotName(incomingName);
             setBotAvatarUrl(incomingAvatarUrl);
+            storeSessionBotInfo(incomingName!, incomingAvatarUrl);
           }
 
           // 3. Brief pause, then specialist's reply — pinned to specialist's identity
@@ -846,23 +855,16 @@ export default function ChatWindow({ cfg, onClose }: Props) {
                   overflow: 'hidden',
                 }}
               >
-                <div style={{ padding: '10px 12px 11px' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
-                    <div style={{
-                      flexShrink: 0, width: 28, height: 28, borderRadius: 8,
-                      background: '#FCFCFE',
-                      boxShadow: 'inset 0 0 0 1px #EDEDF8',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 1,
-                    }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M22 8.01c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h1v4l4-4h10c1.1 0 2-.9 2-2V8.01z"/>
-                      </svg>
-                    </div>
+                <div style={{ padding: '10px 8px 11px 8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 12, fontWeight: 600, color: '#1B1A18', marginBottom: 3, lineHeight: 1.3 }}>
+                      <p style={{ fontSize: 14, fontWeight: 600, color: '#1B1A18', marginBottom: 3, lineHeight: '20px', display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
+                          <path d="M22 4 12 8H5a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h1l2 5h2l-1-5h2l10 4V4z"/>
+                        </svg>
                         {lang === 'th' ? a.title_th : a.title_en}
                       </p>
-                      <p style={{ fontSize: 12, color: 'rgba(27,26,24,0.65)', lineHeight: 1.55, margin: 0 }}>
+                      <p style={{ fontSize: 14, color: 'rgba(27,26,24,0.65)', lineHeight: '20px', margin: 0 }}>
                         {lang === 'th' ? a.body_th : a.body_en}
                       </p>
                     </div>
