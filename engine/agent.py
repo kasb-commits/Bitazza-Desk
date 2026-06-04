@@ -455,73 +455,57 @@ def chat(
         )
 
     # 7. Call Gemini Flash with account tools
-    # For categories that require live account data, force a tool call on the first turn
-    # so Gemini cannot reply with a holding message before fetching the user's data.
-    # "other" category: never call account tools — answer from RAG only.
-    # Always start with get_user_profile for every account-specific category.
-    # KYC status, account tier, and profile flags are cross-cutting — a withdrawal
-    # block may be caused by a KYC rejection, and a restriction may stem from a
-    # suspicious withdrawal pattern. Starting from the profile lets Gemini see the
-    # full picture and connect root causes before calling any secondary tools.
-    _FORCE_TOOL_CATEGORIES = {"kyc_verification", "account_restriction", "withdrawal_issue", "deposit_issue", "trade_issue", "password_2fa_reset"}
-    _FORCE_TOOL_NAMES = {
-        "kyc_verification": "get_user_profile",
-        "account_restriction": "get_user_profile",
-        "withdrawal_issue": "get_user_profile",
-        "deposit_issue": "get_user_profile",
-        "trade_issue": "get_user_profile",
-        "password_2fa_reset": "get_user_profile",
-    }
-    # For guests (user_id=None), skip all tool-forcing — no account data available.
-    # For authenticated users, force tool call if the category requires account data AND
-    # no successful (non-escalated) bot reply exists yet.
+    # All account categories now use the PHASE system (PHASE 1: triage/answer, PHASE 2: collect,
+    # PHASE 3: resolve with injected data). Forcing get_user_profile on turn 1 conflicts with
+    # PHASE 1 — it causes Gemini to reference account data when answering informational questions
+    # or before triage context has been gathered.
+    #
+    # Tool forcing is retained ONLY for mid-conversation TX ID lookups (lines below), which
+    # are always account-specific by nature. Profile/restriction data for PHASE 3 is injected
+    # by the workflow via the injected_account_data parameter.
     is_guest_session = user_id is None
     force_tool_name = None
+    prior_successful_reply = False
     if not is_guest_session:
         from db.conversation_store import has_successful_bot_reply
         prior_successful_reply = has_successful_bot_reply(conversation_id) if history else False
-        # When called from inside a workflow (suppress_handoff=True), the workflow's
-        # account_lookup node already fetched the profile. Don't force a redundant
-        # get_user_profile — let Gemini decide based on the conversation context.
-        # Transaction-specific tool forcing (TX IDs, order IDs) still applies below.
-        force_tool_name = (
-            _FORCE_TOOL_NAMES.get(category)
-            if category in _FORCE_TOOL_CATEGORIES and not prior_successful_reply and not suppress_handoff
-            else None
-        )
 
-        # If the user mentions a transaction ID at any turn, force the relevant status tool
-        # so Gemini is guaranteed to look it up regardless of prior replies.
-        if (
-            not force_tool_name
-            and category == "withdrawal_issue"
-            and _TX_ID_RE.search(user_message)
-        ):
-            force_tool_name = "get_withdrawal_status"
-        if (
-            not force_tool_name
-            and category == "deposit_issue"
-            and _TX_ID_RE.search(user_message)
-        ):
-            force_tool_name = "get_deposit_status"
-        if (
-            not force_tool_name
-            and category == "trade_issue"
-            and _SPOT_ORDER_RE.search(user_message)
-        ):
-            force_tool_name = "get_spot_orders"
-        if (
-            not force_tool_name
-            and category == "trade_issue"
-            and _FUTURES_POS_RE.search(user_message)
-        ):
-            force_tool_name = "get_futures_positions"
+        # TX-ID / order-ID tool forcing — only applies OUTSIDE workflows.
+        # Inside a workflow (suppress_handoff=True), all data fetching is handled by
+        # account_lookup nodes. The ai_reply node must never call tools independently.
+        if not suppress_handoff:
+            if (
+                not force_tool_name
+                and category == "withdrawal_issue"
+                and _TX_ID_RE.search(user_message)
+            ):
+                force_tool_name = "get_withdrawal_status"
+            if (
+                not force_tool_name
+                and category == "deposit_issue"
+                and _TX_ID_RE.search(user_message)
+            ):
+                force_tool_name = "get_deposit_status"
+            if (
+                not force_tool_name
+                and category == "trade_issue"
+                and _SPOT_ORDER_RE.search(user_message)
+            ):
+                force_tool_name = "get_spot_orders"
+            if (
+                not force_tool_name
+                and category == "trade_issue"
+                and _FUTURES_POS_RE.search(user_message)
+            ):
+                force_tool_name = "get_futures_positions"
 
-    # For "other" category or guest sessions, omit account tools entirely.
-    # For all authenticated account categories, tools are always available — the overlay
-    # STEP 0 instructs Gemini whether to USE them based on question type.
-    is_other_category = category == "other"
-    if is_other_category or is_guest_session:
+    # For "other" / "fraud_security" categories, guest sessions, or workflow-managed
+    # ai_reply nodes (suppress_handoff=True): omit account tools entirely.
+    # In workflow mode, account_lookup nodes are the sole data-fetching mechanism —
+    # allowing ai_reply to call tools independently creates double-lookups and lets the
+    # model call tools during PHASE 1/2 when the overlay explicitly prohibits it.
+    is_no_tool_category = category in ("other", "fraud_security")
+    if suppress_handoff or is_no_tool_category or is_guest_session:
         active_tool_defs = []
     elif prior_successful_reply:
         # After the first successful reply, remove get_user_profile from the tool list.

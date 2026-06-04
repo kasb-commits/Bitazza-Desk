@@ -87,10 +87,24 @@ class AiReplyNode:
         # ── Compliance post-filter (mandatory, not bypassable) ────────────────
         reply_text = post_filter(response.text)
 
+        # ── Fraud/security: block premature escalation ────────────────────────
+        # For fraud_security the prompt requires at least one collection turn before
+        # escalating. Gemini sometimes sets needs_human=True on the very first turn
+        # for a vague opener ("I have a fraud concern") despite the instruction.
+        # Guard: if this is the first bot reply (no prior assistant messages in
+        # history), override escalated=False so the workflow stays in collection.
+        escalated = response.escalated
+        if escalated and category == "fraud_security":
+            from db.conversation_store import has_successful_bot_reply
+            if not ctx.dry_run and not has_successful_bot_reply(ctx.conversation_id):
+                logger.info("ai_reply: suppressing premature escalation on fraud T1 for conv %s",
+                            ctx.conversation_id)
+                escalated = False
+
         output: dict = {
             "reply":    reply_text,
             "language": response.language,
-            "escalated": response.escalated,
+            "escalated": escalated,
             "resolved":  response.resolved,
             "confidence": response.confidence,
             "profile_fetched": getattr(response, "profile_fetched", False),
@@ -98,7 +112,7 @@ class AiReplyNode:
 
         if response.upgraded_category:
             output["upgraded_category"] = response.upgraded_category
-        if response.escalated:
+        if escalated:
             output["escalation_reason"] = getattr(response, "escalation_reason", "")
 
         return NodeResult(
