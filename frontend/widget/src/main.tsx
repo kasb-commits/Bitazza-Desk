@@ -32,7 +32,7 @@ async function getDevToken(apiUrl: string): Promise<string> {
     localStorage.removeItem('csbot_session');
   }
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 3000);
+  const timeout = setTimeout(() => controller.abort(), 15000);
   try {
     const res = await fetch(`${apiUrl}/mock/auth/token`, {
       method: 'POST',

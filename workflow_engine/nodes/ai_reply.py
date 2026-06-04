@@ -62,6 +62,14 @@ class AiReplyNode:
             if agent:
                 assign_ai_persona(ctx.conversation_id, agent["name"], agent["avatar"], agent["avatar_url"])
 
+        # ── Inject workflow account data ──────────────────────────────────────
+        # account_lookup nodes store fetched data in execution.variables under keys
+        # like 'kyc', 'account', 'profile', etc. Pass these to the agent so Gemini
+        # can answer account-specific follow-ups without re-calling tools or escalating.
+        _ACCOUNT_KEYS = ("kyc", "account", "profile", "restrictions",
+                         "transactions", "deposits", "trading")
+        injected = {k: ctx.variables[k] for k in _ACCOUNT_KEYS if k in ctx.variables}
+
         # ── Delegate to engine ────────────────────────────────────────────────
         response = engine_chat(
             conversation_id=ctx.conversation_id,
@@ -73,6 +81,7 @@ class AiReplyNode:
             # Workflow owns escalation routing — suppress the "connecting you with a specialist"
             # sentence so the Escalate node sends it instead of the AI reply.
             suppress_handoff=True,
+            injected_account_data=injected or None,
         )
 
         # ── Compliance post-filter (mandatory, not bypassable) ────────────────
