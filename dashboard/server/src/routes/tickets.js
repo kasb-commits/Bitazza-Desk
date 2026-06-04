@@ -176,7 +176,7 @@ router.get('/stats', async (req, res) => {
 
 // ── GET /api/tickets ─────────────────────────────────────────────────────────
 router.get('/', async (req, res) => {
-  const { view = 'all_open', search = '', limit = 50, offset = 0, status_filter = 'all' } = req.query;
+  const { view = 'all_open', search = '', limit = 50, offset = 0, status_filter = 'all', channel_filter = 'all' } = req.query;
   const agentId = req.user.id;
 
   let whereClauses = [];
@@ -215,6 +215,14 @@ router.get('/', async (req, res) => {
 
   if (hasStatusFilter) {
     whereClauses.push(`t.status = ${addParam(status_filter)}`);
+  }
+
+  if (channel_filter === 'email') {
+    whereClauses.push(`t.channel = ${addParam('email')}`);
+  } else if (channel_filter === 'web') {
+    whereClauses.push(`t.channel = ${addParam('web')}`);
+  } else if (channel_filter === 'app') {
+    whereClauses.push(`t.channel IN ('line', 'facebook')`);
   }
 
   // Team scoping: agents only see tickets belonging to their team.

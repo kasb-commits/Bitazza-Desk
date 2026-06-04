@@ -45,6 +45,8 @@ export type StatusFilter =
   | 'Closed_Resolved'
   | 'Closed_Unresponsive';
 
+export type ChannelFilter = 'all' | 'email' | 'web' | 'app';
+
 export type SenderType =
   | 'customer'
   | 'agent'

@@ -1,7 +1,7 @@
 import { io, type Socket } from 'socket.io-client';
 import type {
   Ticket, TicketDetail, TicketStatus, Priority, Agent, AgentRole,
-  AgentStatus, InboxView, StatusFilter, SupervisorStats, QueueItem, SLARiskTicket,
+  AgentStatus, InboxView, StatusFilter, ChannelFilter, SupervisorStats, QueueItem, SLARiskTicket,
   ChannelHealth, PendingStale,
   AnalyticsFilters, RelatedTicket, KnowledgeItem, NotificationChannelConfig,
   Notification,
@@ -70,8 +70,8 @@ export const api = {
     ),
 
   // Tickets
-  getTickets: (view: InboxView = 'all_open', search = '', statusFilter: StatusFilter = 'all') =>
-    req<Ticket[]>(`/api/tickets?view=${view}&search=${encodeURIComponent(search)}&status_filter=${statusFilter}`),
+  getTickets: (view: InboxView = 'all_open', search = '', statusFilter: StatusFilter = 'all', channelFilter: ChannelFilter = 'all') =>
+    req<Ticket[]>(`/api/tickets?view=${view}&search=${encodeURIComponent(search)}&status_filter=${statusFilter}&channel_filter=${channelFilter}`),
 
   getTicketStats: () =>
     req<{ open: number; active: number; escalated: number; pending: number; resolved: number; closed: number }>('/api/tickets/stats'),

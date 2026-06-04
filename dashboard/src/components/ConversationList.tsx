@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import type { Ticket, InboxView, StatusFilter, TicketStatus, TicketCategory } from '../types';
+import type { Ticket, InboxView, StatusFilter, ChannelFilter, TicketStatus, TicketCategory } from '../types';
 import { api } from '../api';
 import { Avatar } from './ui/Avatar';
 import { ConversationRowSkeleton } from './ui/Skeleton';
@@ -27,6 +27,14 @@ const STATUS_FILTERS: { id: StatusFilter; label: string; dot: string }[] = [
   { id: 'Escalated',            label: 'Escalated',   dot: '#EF4150' },
   { id: 'Closed_Resolved',      label: 'Resolved',    dot: '#9CA3AF' },
   { id: 'Closed_Unresponsive',  label: 'Closed',      dot: '#EDEDF8' },
+];
+
+// Channel filter options
+const CHANNEL_FILTERS: { id: ChannelFilter; label: string; icon: string }[] = [
+  { id: 'all',   label: 'All Sources', icon: '⊙' },
+  { id: 'email', label: 'Email',       icon: '✉' },
+  { id: 'web',   label: 'Web',         icon: '⬡' },
+  { id: 'app',   label: 'App',         icon: '⊡' },
 ];
 
 type SortOption = 'newest' | 'oldest' | 'priority' | 'sla';
@@ -175,18 +183,20 @@ interface Props {
   view: InboxView;
   search: string;
   statusFilter: StatusFilter;
+  channelFilter: ChannelFilter;
   onSelect: (id: string) => void;
   onViewChange: (v: InboxView) => void;
   onSearchChange: (s: string) => void;
   onStatusFilterChange: (f: StatusFilter) => void;
+  onChannelFilterChange: (f: ChannelFilter) => void;
   onRefresh: () => void;
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export default function ConversationList({
-  tickets, ticketStats, selectedId, view, search, statusFilter,
-  onSelect, onViewChange, onSearchChange, onStatusFilterChange, onRefresh,
+  tickets, ticketStats, selectedId, view, search, statusFilter, channelFilter,
+  onSelect, onViewChange, onSearchChange, onStatusFilterChange, onChannelFilterChange, onRefresh,
 }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
@@ -381,6 +391,24 @@ export default function ConversationList({
           />
 
         </div>
+
+        {/* Row 3: Source filter chips */}
+        <div className="flex items-center gap-1 mt-2">
+          {CHANNEL_FILTERS.map(f => (
+            <button
+              key={f.id}
+              onClick={() => onChannelFilterChange(f.id)}
+              className="flex-1 text-[10px] font-medium py-1 rounded-md transition-all"
+              style={channelFilter === f.id
+                ? { background: '#1a1d2e', color: '#ffffff', border: '1px solid #1a1d2e' }
+                : { background: 'transparent', color: '#6b7280', border: '1px solid rgba(180,195,220,0.35)' }
+              }
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
       </div>
 
       {/* ── Search ── */}

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import logoImg from './assets/logo.png';
 import { Routes, Route, NavLink, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { PermissionProvider } from './PermissionContext';
-import type { Ticket, InboxView, StatusFilter, AgentStatus, WSEvent, Role, Notification } from './types';
+import type { Ticket, InboxView, StatusFilter, ChannelFilter, AgentStatus, WSEvent, Role, Notification } from './types';
 import { api, createWS } from './api';
 import { NotificationPanel } from './components/NotificationPanel';
 import { ToastContainer } from './components/ToastContainer';
@@ -775,14 +775,16 @@ interface WorkspaceProps {
   view: InboxView;
   search: string;
   statusFilter: StatusFilter;
+  channelFilter: ChannelFilter;
   onSelect: (id: string) => void;
   onViewChange: (v: InboxView) => void;
   onSearchChange: (s: string) => void;
   onStatusFilterChange: (f: StatusFilter) => void;
+  onChannelFilterChange: (f: ChannelFilter) => void;
   onRefresh: () => void;
 }
 
-function Workspace({ ws, tickets, ticketStats, selectedId, view, search, statusFilter, onSelect, onViewChange, onSearchChange, onStatusFilterChange, onRefresh }: WorkspaceProps) {
+function Workspace({ ws, tickets, ticketStats, selectedId, view, search, statusFilter, channelFilter, onSelect, onViewChange, onSearchChange, onStatusFilterChange, onChannelFilterChange, onRefresh }: WorkspaceProps) {
   const selectedTicket = tickets.find(t => t.id === selectedId) ?? null;
   const [pendingDraft, setPendingDraft] = useState<string | null>(null);
   const [composeReply, setComposeReply] = useState('');
@@ -795,9 +797,10 @@ function Workspace({ ws, tickets, ticketStats, selectedId, view, search, statusF
 
       <ConversationList
         tickets={tickets} ticketStats={ticketStats} selectedId={selectedId} view={view} search={search}
-        statusFilter={statusFilter}
+        statusFilter={statusFilter} channelFilter={channelFilter}
         onSelect={onSelect} onViewChange={onViewChange}
-        onSearchChange={onSearchChange} onStatusFilterChange={onStatusFilterChange} onRefresh={onRefresh}
+        onSearchChange={onSearchChange} onStatusFilterChange={onStatusFilterChange}
+        onChannelFilterChange={onChannelFilterChange} onRefresh={onRefresh}
       />
       <div className="flex-1 overflow-hidden" style={{ position: 'relative', zIndex: 1 }}>
         {selectedId
@@ -847,6 +850,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(() => sessionStorage.getItem('selectedId'));
   const [view, setView] = useState<InboxView>(() => (sessionStorage.getItem('inboxView') as InboxView) ?? 'all_open');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(() => (sessionStorage.getItem('inboxStatusFilter') as StatusFilter) ?? 'all');
+  const [channelFilter, setChannelFilter] = useState<ChannelFilter>(() => (sessionStorage.getItem('inboxChannelFilter') as ChannelFilter) ?? 'all');
   const [search, setSearch] = useState(() => sessionStorage.getItem('inboxSearch') ?? '');
   const [myStatus, setMyStatus] = useState<AgentStatus>('Available');
   const [activeChats, setActiveChats] = useState(0);
@@ -907,7 +911,7 @@ export default function App() {
 
   const loadTickets = async () => {
     try {
-      const raw = await api.getTickets(search ? 'all' : view, search, statusFilter);
+      const raw = await api.getTickets(search ? 'all' : view, search, statusFilter, channelFilter);
       // Backend wraps the list: { tickets: [...] } — unwrap if needed
       const data: Ticket[] = Array.isArray(raw) ? raw : (raw as { tickets: Ticket[] }).tickets ?? [];
       setTickets(data);
@@ -921,7 +925,7 @@ export default function App() {
   };
   loadTicketsRef.current = loadTickets;
 
-  useEffect(() => { if (user) loadTickets(); }, [view, search, statusFilter, user]);
+  useEffect(() => { if (user) loadTickets(); }, [view, search, statusFilter, channelFilter, user]);
 
   useEffect(() => {
     if (!user) return;
@@ -973,7 +977,10 @@ export default function App() {
 
         if (e.type === 'notification:new') {
           const n = e.notification;
-          setNotifications(prev => [n, ...prev]);
+          setNotifications(prev => {
+            if (prev.some(existing => existing.id === n.id)) return prev;
+            return [n, ...prev];
+          });
           // Play alert sound for all new notifications
           try {
             const ctx = new AudioContext();
@@ -1043,6 +1050,7 @@ export default function App() {
   const handleSelectAndNavigate = (id: string) => { handleSelect(id); navigate('/inbox'); };
   const handleViewChange = (v: InboxView) => { sessionStorage.setItem('inboxView', v); setView(v); };
   const handleStatusFilterChange = (f: StatusFilter) => { sessionStorage.setItem('inboxStatusFilter', f); setStatusFilter(f); };
+  const handleChannelFilterChange = (f: ChannelFilter) => { sessionStorage.setItem('inboxChannelFilter', f); setChannelFilter(f); };
   const handleNavigateInbox = (v: InboxView, f: StatusFilter) => { handleViewChange(v); handleStatusFilterChange(f); navigate('/inbox'); };
   const handleSearchChange = (s: string) => { sessionStorage.setItem('inboxSearch', s); setSearch(s); };
   const handleLogin = (u: AuthUser) => { setAuthUser(u); setUser(u); };
@@ -1107,9 +1115,10 @@ export default function App() {
                 <Workspace
                   ws={wsSocket}
                   tickets={tickets} ticketStats={ticketStats} selectedId={selectedId} view={view} search={search}
-                  statusFilter={statusFilter}
+                  statusFilter={statusFilter} channelFilter={channelFilter}
                   onSelect={handleSelect} onViewChange={handleViewChange}
-                  onSearchChange={handleSearchChange} onStatusFilterChange={handleStatusFilterChange} onRefresh={loadTickets}
+                  onSearchChange={handleSearchChange} onStatusFilterChange={handleStatusFilterChange}
+                  onChannelFilterChange={handleChannelFilterChange} onRefresh={loadTickets}
                 />
               } />
               <Route path="/supervisor" element={
