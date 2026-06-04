@@ -659,8 +659,12 @@ export default function ChatWindow({ cfg, onClose }: Props) {
   useEffect(() => { sendRef.current = send; }, [send]);
 
   const handleTalkToAgent = useCallback(() => {
+    if (!selectedCategory) {
+      setSelectedCategory('other' as IssueCategory);
+      storeSessionCategory('other');
+    }
     send(lang === 'th' ? 'ขอติดต่อเจ้าหน้าที่' : 'I need to speak to a human agent');
-  }, [send, lang]);
+  }, [send, lang, selectedCategory]);
 
   const handleGoBack = useCallback(() => {
     prevCategoryRef.current = selectedCategory;
