@@ -856,79 +856,84 @@ export default function ChatWindow({ cfg, onClose }: Props) {
           />
         )}
         {/* Messages + announcement cards interleaved:
-            Render all messages before the category-prompt, then announcement cards,
-            then the category-prompt message (if it's the last one) so announcements
-            appear above "Please select the type of issue…" not above the greeting. */}
+            Find the category-prompt message by ID and splice announcement cards
+            immediately before it — so they stay pinned at that position for the
+            entire conversation, even after the user has selected a category. */}
         {!showGuestForm && (() => {
-          const lastMsg = messages[messages.length - 1];
-          const hasCategoryPromptLast = lastMsg?.id === 'category-prompt';
-          const mainMessages = hasCategoryPromptLast ? messages.slice(0, -1) : messages;
-          const categoryPromptMsg = hasCategoryPromptLast ? lastMsg : null;
           const visibleAnnouncements = langSelected
             ? announcements.filter(a => !dismissedAnnIds.has(a.id))
             : [];
+          const annCards = visibleAnnouncements.map((a, idx) => {
+            const accentColor = a.color || primaryColor;
+            return (
+              <div
+                key={a.id}
+                ref={idx === 0 ? annRef : undefined}
+                style={{
+                  margin: '4px 0 40px',
+                  borderRadius: 12,
+                  background: '#ffffff',
+                  border: '1px solid #EDEDF8',
+                  borderLeft: `3px solid ${accentColor}`,
+                  overflow: 'hidden',
+                }}
+              >
+                <div style={{ padding: '10px 12px 11px 11px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 3 }}>
+                    <p style={{ fontSize: 14, fontWeight: 600, color: '#1B1A18', lineHeight: '20px', margin: 0, display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                        <path d="M22 4 12 8H5a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h1l2 5h2l-1-5h2l10 4V4z"/>
+                      </svg>
+                      {lang === 'th' ? a.title_th : a.title_en}
+                    </p>
+                    <button
+                      onClick={() => setDismissedAnnIds(prev => new Set([...prev, a.id]))}
+                      style={{
+                        flexShrink: 0,
+                        width: 20, height: 20, borderRadius: 6,
+                        background: '#FCFCFE',
+                        border: '1px solid #EDEDF8',
+                        cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: 'rgba(27,26,24,0.4)', transition: 'background 0.15s, border-color 0.15s',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = '#EDEDF8'; e.currentTarget.style.borderColor = '#D8D8EC'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = '#FCFCFE'; e.currentTarget.style.borderColor = '#EDEDF8'; }}
+                      aria-label="Dismiss"
+                    >
+                      <svg width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                        <path d="M1 1l10 10M11 1L1 11"/>
+                      </svg>
+                    </button>
+                  </div>
+                  {(() => {
+                    const body = lang === 'th' ? a.body_th : a.body_en;
+                    return isHtml(body)
+                      ? <div
+                          className="csbot-rich-text"
+                          style={{ fontSize: 14, color: 'rgba(27,26,24,0.65)', lineHeight: '20px', margin: 0 }}
+                          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(body, SANITIZE_CONFIG) }}
+                        />
+                      : <p style={{ fontSize: 14, color: 'rgba(27,26,24,0.65)', lineHeight: '20px', margin: 0 }}>{body}</p>;
+                  })()}
+                </div>
+              </div>
+            );
+          });
+
+          // Splice announcements immediately before the category-prompt message so
+          // they stay pinned there for the whole conversation.
+          const categoryPromptIdx = messages.findIndex(m => m.id === 'category-prompt');
+          if (visibleAnnouncements.length === 0 || categoryPromptIdx === -1) {
+            return messages.map((m) => <MessageBubble key={m.id} message={m} primaryColor={primaryColor} botName={botName} botAvatarUrl={botAvatarUrl} escalatedAgent={escalatedAgent} />);
+          }
+          const before = messages.slice(0, categoryPromptIdx);
+          const after = messages.slice(categoryPromptIdx);
           return (
             <>
-              {mainMessages.map((m) => <MessageBubble key={m.id} message={m} primaryColor={primaryColor} botName={botName} botAvatarUrl={botAvatarUrl} escalatedAgent={escalatedAgent} />)}
-              {/* Announcement cards — shown above the category picker prompt */}
-              {visibleAnnouncements.map((a, idx) => {
-                const accentColor = a.color || primaryColor;
-                return (
-                  <div
-                    key={a.id}
-                    ref={idx === 0 ? annRef : undefined}
-                    style={{
-                      margin: '4px 0 40px',
-                      borderRadius: 12,
-                      background: '#ffffff',
-                      border: '1px solid #EDEDF8',
-                      borderLeft: `3px solid ${accentColor}`,
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <div style={{ padding: '10px 12px 11px 11px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 3 }}>
-                        <p style={{ fontSize: 14, fontWeight: 600, color: '#1B1A18', lineHeight: '20px', margin: 0, display: 'flex', alignItems: 'center', gap: 5 }}>
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                            <path d="M22 4 12 8H5a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h1l2 5h2l-1-5h2l10 4V4z"/>
-                          </svg>
-                          {lang === 'th' ? a.title_th : a.title_en}
-                        </p>
-                        <button
-                          onClick={() => setDismissedAnnIds(prev => new Set([...prev, a.id]))}
-                          style={{
-                            flexShrink: 0,
-                            width: 20, height: 20, borderRadius: 6,
-                            background: '#FCFCFE',
-                            border: '1px solid #EDEDF8',
-                            cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: 'rgba(27,26,24,0.4)', transition: 'background 0.15s, border-color 0.15s',
-                          }}
-                          onMouseEnter={e => { e.currentTarget.style.background = '#EDEDF8'; e.currentTarget.style.borderColor = '#D8D8EC'; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = '#FCFCFE'; e.currentTarget.style.borderColor = '#EDEDF8'; }}
-                          aria-label="Dismiss"
-                        >
-                          <svg width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                            <path d="M1 1l10 10M11 1L1 11"/>
-                          </svg>
-                        </button>
-                      </div>
-                      {(() => {
-                        const body = lang === 'th' ? a.body_th : a.body_en;
-                        return isHtml(body)
-                          ? <div
-                              className="csbot-rich-text"
-                              style={{ fontSize: 14, color: 'rgba(27,26,24,0.65)', lineHeight: '20px', margin: 0 }}
-                              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(body, SANITIZE_CONFIG) }}
-                            />
-                          : <p style={{ fontSize: 14, color: 'rgba(27,26,24,0.65)', lineHeight: '20px', margin: 0 }}>{body}</p>;
-                      })()}
-                    </div>
-                  </div>
-                );
-              })}
-              {categoryPromptMsg && <MessageBubble key={categoryPromptMsg.id} message={categoryPromptMsg} primaryColor={primaryColor} botName={botName} botAvatarUrl={botAvatarUrl} escalatedAgent={escalatedAgent} />}
+              {before.map((m) => <MessageBubble key={m.id} message={m} primaryColor={primaryColor} botName={botName} botAvatarUrl={botAvatarUrl} escalatedAgent={escalatedAgent} />)}
+              {annCards}
+              {after.map((m) => <MessageBubble key={m.id} message={m} primaryColor={primaryColor} botName={botName} botAvatarUrl={botAvatarUrl} escalatedAgent={escalatedAgent} />)}
             </>
           );
         })()}
