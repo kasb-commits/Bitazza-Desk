@@ -38,6 +38,11 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
         runtimeCaching: [
           {
+            // Individual ticket detail — must always be fresh (used for real-time polling)
+            urlPattern: /^\/api\/tickets\/[^?]+$/,
+            handler: 'NetworkOnly',
+          },
+          {
             urlPattern: /^\/api\/supervisor\//,
             handler: 'NetworkOnly',
           },
