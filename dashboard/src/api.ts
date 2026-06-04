@@ -242,6 +242,9 @@ export const api = {
   createCannedResponse: (data: { title: string; shortcut: string; body: string; scope: string }) =>
     req('/api/canned-responses', { method: 'POST', body: JSON.stringify(data) }),
 
+  updateCannedResponse: (id: string, data: { title: string; shortcut: string; body: string; scope: string }) =>
+    req(`/api/canned-responses/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+
   deleteCannedResponse: (id: string) =>
     req(`/api/canned-responses/${id}`, { method: 'DELETE' }),
 

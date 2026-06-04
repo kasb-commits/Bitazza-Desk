@@ -34,6 +34,23 @@ router.post('/', async (req, res) => {
   }
 });
 
+router.put('/:id', async (req, res) => {
+  const { shortcut, title, body, scope } = req.body;
+  if (!shortcut || !title || !body || !scope) return res.status(400).json({ error: 'shortcut, title, body, scope required' });
+  try {
+    const { rows } = await pool.query(
+      `UPDATE canned_responses SET shortcut=$1, title=$2, body=$3, scope=$4::text,
+       owner_id=CASE WHEN $4::text='personal' THEN $5::uuid ELSE NULL END
+       WHERE id=$6 RETURNING *`,
+      [shortcut, title, body, scope, req.user.id, req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.delete('/:id', async (req, res) => {
   try {
     await pool.query('DELETE FROM canned_responses WHERE id=$1', [req.params.id]);

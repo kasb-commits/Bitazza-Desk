@@ -1095,6 +1095,9 @@ function CannedResponsesTab() {
   const [form, setForm]             = useState({ title: '', shortcut: '', body: '', scope: 'shared' });
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId]   = useState<string | null>(null);
+  const [editingId, setEditingId]   = useState<string | null>(null);
+  const [editForm, setEditForm]     = useState({ title: '', shortcut: '', body: '', scope: 'shared' });
+  const [updating, setUpdating]     = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -1117,6 +1120,31 @@ function CannedResponsesTab() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed');
     } finally { setSaving(false); }
+  };
+
+  const startEdit = (item: CannedItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingId(item.id);
+    setEditForm({ title: item.title, shortcut: item.shortcut, body: item.body, scope: item.scope });
+    setExpandedId(item.id);
+  };
+
+  const cancelEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingId(null);
+  };
+
+  const update = async () => {
+    if (!editForm.title.trim() || !editForm.shortcut.trim() || !editForm.body.trim()) { setError('Title, shortcut and body are all required'); return; }
+    if (!editingId) return;
+    setUpdating(true); setError('');
+    try {
+      const updated = await api.updateCannedResponse(editingId, editForm) as CannedItem;
+      setItems(prev => prev.map(i => i.id === editingId ? updated : i));
+      setEditingId(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Update failed');
+    } finally { setUpdating(false); }
   };
 
   const remove = async (id: string) => {
@@ -1258,6 +1286,18 @@ function CannedResponsesTab() {
                 }}>
                   {item.scope}
                 </span>
+                {/* Edit */}
+                <button
+                  onClick={e => startEdit(item, e)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: TM, flexShrink: 0, opacity: hoveredId === item.id ? 1 : 0, transition: 'opacity 0.15s' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = BR)}
+                  onMouseLeave={e => (e.currentTarget.style.color = TM)}
+                  title="Edit"
+                >
+                  <svg width={13} height={13} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                  </svg>
+                </button>
                 {/* Delete */}
                 <button
                   onClick={e => { e.stopPropagation(); remove(item.id); }}
@@ -1275,11 +1315,79 @@ function CannedResponsesTab() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
                 </svg>
               </div>
-              {/* Expanded body */}
+              {/* Expanded body / edit form */}
               {expandedId === item.id && (
                 <div style={{ padding: '12px 16px 16px', background: '#f9f9fb', borderTop: '0.5px solid rgba(0,0,0,0.07)' }}>
-                  <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: 0, marginBottom: 6 }}>Full body</p>
-                  <p style={{ fontSize: 13, color: T2, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{item.body}</p>
+                  {editingId === item.id ? (
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                        <div>
+                          <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: 0, marginBottom: 5 }}>Title</p>
+                          <input
+                            value={editForm.title}
+                            onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))}
+                            style={INP}
+                            onFocus={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.boxShadow = `0 0 0 2px ${BR}40`; }}
+                            onBlur={e => { e.currentTarget.style.background = '#f5f5f7'; e.currentTarget.style.boxShadow = 'none'; }}
+                          />
+                        </div>
+                        <div>
+                          <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: 0, marginBottom: 5 }}>Shortcut</p>
+                          <input
+                            value={editForm.shortcut}
+                            onChange={e => setEditForm(f => ({ ...f, shortcut: e.target.value.replace(/\s/g, '-') }))}
+                            style={{ ...INP, fontFamily: 'monospace' }}
+                            onFocus={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.boxShadow = `0 0 0 2px ${BR}40`; }}
+                            onBlur={e => { e.currentTarget.style.background = '#f5f5f7'; e.currentTarget.style.boxShadow = 'none'; }}
+                          />
+                        </div>
+                      </div>
+                      <div style={{ marginBottom: 12 }}>
+                        <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: 0, marginBottom: 5 }}>Body</p>
+                        <textarea
+                          value={editForm.body}
+                          onChange={e => setEditForm(f => ({ ...f, body: e.target.value }))}
+                          rows={4}
+                          style={{ ...INP, resize: 'vertical', lineHeight: 1.6 }}
+                          onFocus={e => { e.currentTarget.style.background = 'white'; e.currentTarget.style.boxShadow = `0 0 0 2px ${BR}40`; }}
+                          onBlur={e => { e.currentTarget.style.background = '#f5f5f7'; e.currentTarget.style.boxShadow = 'none'; }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <select
+                          value={editForm.scope}
+                          onChange={e => setEditForm(f => ({ ...f, scope: e.target.value }))}
+                          style={{ fontSize: 12, fontWeight: 500, color: T1, background: '#f5f5f7', border: 'none', borderRadius: 7, padding: '6px 10px', outline: 'none', cursor: 'pointer' }}
+                        >
+                          <option value="shared">Shared — team-wide</option>
+                          <option value="personal">Personal</option>
+                        </select>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button
+                            onClick={cancelEdit}
+                            style={{ fontSize: 12, fontWeight: 600, padding: '7px 14px', borderRadius: 8, border: 'none', background: '#f5f5f7', color: T2, cursor: 'pointer' }}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={update}
+                            disabled={updating}
+                            style={{ fontSize: 12, fontWeight: 600, padding: '7px 18px', borderRadius: 8, border: 'none', background: BR, color: 'white', cursor: updating ? 'not-allowed' : 'pointer', opacity: updating ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
+                            onMouseEnter={e => (e.currentTarget.style.opacity = updating ? '0.6' : '0.85')}
+                            onMouseLeave={e => (e.currentTarget.style.opacity = updating ? '0.6' : '1')}
+                          >
+                            {updating && <Spinner size="sm" />}
+                            Save Changes
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p style={{ fontSize: 10, fontWeight: 600, color: TM, textTransform: 'uppercase', letterSpacing: 0, marginBottom: 6 }}>Full body</p>
+                      <p style={{ fontSize: 13, color: T2, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{item.body}</p>
+                    </>
+                  )}
                 </div>
               )}
               {i < items.length - 1 && !expandedId && <HR />}
