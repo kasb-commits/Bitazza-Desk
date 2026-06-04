@@ -526,6 +526,31 @@ export default function MessageThread({ ticketId, ws, onStatusChange, pendingDra
   }, [ticketId]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Polling fallback — re-fetch the thread every 4 seconds for active tickets.
+  // Socket.io delivers events instantly when it works; this guarantees updates
+  // on hosts where persistent Socket.io connections are unreliable (e.g. Vercel).
+  useEffect(() => {
+    const CLOSED = ['Closed_Resolved', 'Closed_Unresponsive', 'Orphaned'];
+    if (!ticketId) return;
+    const interval = setInterval(() => {
+      // Skip if ticket is closed — no new messages expected
+      setTicket(prev => {
+        if (prev && CLOSED.includes(prev.status as string)) return prev;
+        return prev; // trigger load outside setter to avoid stale closure
+      });
+      api.getTicket(ticketId).then(data => {
+        setTicket(prev => {
+          if (!prev) return data;
+          // Only update if message count changed to avoid clobbering optimistic UI
+          if (data.history.length !== prev.history.length) return data;
+          return prev;
+        });
+      }).catch(() => {});
+    }, 4_000);
+    return () => clearInterval(interval);
+  }, [ticketId]);
+
   useEffect(() => { api.getCannedResponses().then(setAllCanned).catch(() => {}); }, []);
 
   useEffect(() => {
