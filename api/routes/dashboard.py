@@ -1,4 +1,5 @@
 """CS Dashboard API routes — internal agent-facing endpoints."""
+import asyncio
 import logging
 import time
 import uuid
@@ -27,6 +28,7 @@ from db.conversation_store import (
 from api.ws_manager import manager
 from engine.notifications import create_notification, fan_out_to_supervisors
 from engine.notification_scanner import _SLA_TARGETS, _SLA_WARNING_PCT
+from engine.assignment_client import emit_ticket_event
 # USERS_BY_ID is kept for legacy imports but is always empty; agent info is fetched from DB instead
 # from api.routes.auth import USERS_BY_ID  # reverted if needed
 
@@ -142,21 +144,26 @@ async def reply_to_conversation(conversation_id: str, body: ReplyRequest, user_i
     # Mark as human-handled so the AI bot stops replying
     if not body.is_internal_note:
         update_ticket_status(conversation_id, "in_progress", agent_id=user_id)
+    _now = int(time.time())
+    _msg_payload = {
+        "id": mid,
+        "role": "agent",
+        "sender_type": "agent",
+        "content": body.message,
+        "agent_name": agent_display_name,
+        "agent_avatar": agent_display_name[0].upper(),
+        "agent_avatar_url": agent_avatar_url,
+        "created_at": _now,
+        "is_internal_note": body.is_internal_note,
+        "mentions": [],
+    }
     await manager.broadcast(conversation_id, {
         "type": "new_message",
         "conversation_id": conversation_id,
-        "message": {
-            "id": mid,
-            "role": "agent",
-            "content": body.message,
-            "agent_name": agent_display_name,
-            "agent_avatar": agent_display_name[0].upper(),
-            "agent_avatar_url": agent_avatar_url,
-            "created_at": int(time.time()),
-            "is_internal_note": body.is_internal_note,
-            "mentions": [],
-        },
+        "message": _msg_payload,
     }, dashboard_only=body.is_internal_note)
+    # Push to Node Socket.io so dashboard agents see the message in real-time
+    asyncio.create_task(emit_ticket_event(conversation_id, "new_message", {"message": _msg_payload}))
     return {"status": "sent"}
 
 
@@ -203,21 +210,26 @@ async def reply_to_ticket(ticket_id: str, body: ReplyRequest, user_id: str = Dep
     )
     if not body.is_internal_note:
         update_ticket_status(ticket_id, "in_progress", agent_id=user_id)
+    _now = int(time.time())
+    _msg_payload = {
+        "id": mid,
+        "role": "agent",
+        "sender_type": "agent",
+        "content": body.message,
+        "agent_name": agent_display_name,
+        "agent_avatar": agent_display_name[0].upper(),
+        "agent_avatar_url": agent_avatar_url,
+        "created_at": _now,
+        "is_internal_note": body.is_internal_note,
+        "mentions": [],
+    }
     await manager.broadcast(ticket_id, {
         "type": "new_message",
         "conversation_id": ticket_id,
-        "message": {
-            "id": mid,
-            "role": "agent",
-            "content": body.message,
-            "agent_name": agent_display_name,
-            "agent_avatar": agent_display_name[0].upper(),
-            "agent_avatar_url": agent_avatar_url,
-            "created_at": int(time.time()),
-            "is_internal_note": body.is_internal_note,
-            "mentions": [],
-        },
+        "message": _msg_payload,
     }, dashboard_only=body.is_internal_note)
+    # Push to Node Socket.io so dashboard agents see the message in real-time
+    asyncio.create_task(emit_ticket_event(ticket_id, "new_message", {"message": _msg_payload}))
     return {"status": "sent"}
 
 
@@ -252,23 +264,27 @@ async def post_ticket_message(ticket_id: str, body: MessagesRequest, user_id: st
     )
     if not body.is_note:
         update_ticket_status(ticket_id, "in_progress", agent_id=user_id)
+    _now = int(time.time())
+    _msg_payload = {
+        "id": mid,
+        "role": sender_type,
+        "sender_type": sender_type,
+        "content": body.content,
+        "agent_name": agent_display_name,
+        "agent_avatar": agent_display_name[0].upper(),
+        "agent_avatar_url": agent_avatar_url,
+        "created_at": _now,
+        "is_internal_note": body.is_note,
+        "mentions": [],
+    }
     await manager.broadcast(ticket_id, {
         "type": "new_message",
         "conversation_id": ticket_id,
-        "message": {
-            "id": mid,
-            "role": sender_type,
-            "sender_type": sender_type,
-            "content": body.content,
-            "agent_name": agent_display_name,
-            "agent_avatar": agent_display_name[0].upper(),
-            "agent_avatar_url": agent_avatar_url,
-            "created_at": int(time.time()),
-            "is_internal_note": body.is_note,
-            "mentions": [],
-        },
+        "message": _msg_payload,
     }, dashboard_only=body.is_note)
-    return {"status": "sent"}
+    # Push to Node Socket.io so dashboard agents see the message in real-time
+    asyncio.create_task(emit_ticket_event(ticket_id, "new_message", {"message": _msg_payload}))
+    return {"ok": True, "message": _msg_payload}
 
 
 @router.patch("/tickets/{ticket_id}/status")

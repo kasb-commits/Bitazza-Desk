@@ -14,9 +14,16 @@ let io; // set by init()
 
 function init(httpServer) {
   const { Server } = require('socket.io');
+  // When FRONTEND_URL is set (multi-service deployment), restrict to those origins.
+  // When unset (same-origin deployment like Vercel), reflect the request origin
+  // so Socket.io doesn't block itself — JWT auth in the handshake is the real gate.
+  const corsOrigin = process.env.FRONTEND_URL
+    ? process.env.FRONTEND_URL.split(',').map(s => s.trim())
+    : true;
+
   io = new Server(httpServer, {
     cors: {
-      origin: (process.env.FRONTEND_URL || 'http://localhost:3001').split(',').map(s => s.trim()),
+      origin: corsOrigin,
       credentials: true,
     },
     pingInterval: 10_000,
