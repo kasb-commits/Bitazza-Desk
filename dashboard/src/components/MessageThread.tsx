@@ -447,6 +447,7 @@ function MessageBubble({ msg, showTs }: BubbleProps) {
         {lightbox && <ImageLightbox url={lightbox} onClose={() => setLightbox(null)} />}
         {fileModal && <FileAttachmentModal url={fileModal.url} name={fileModal.name} mimeType={fileModal.mimeType} onClose={() => setFileModal(null)} />}
       </div>
+      <span className="text-[10px] text-text-muted mt-0.5 mx-1">{ts}</span>
     </div>
   );
 }
