@@ -86,7 +86,17 @@ function start() {
     }
   }, 15 * 60_000);
 
-  console.log('[crons] started (sla:30s, nudge:15m, auto-close:15m)');
+  // ── Python API keepalive — every 5min ────────────────────────────────────
+  // Prevents Railway from sleeping the Python service, which causes 10-20s
+  // cold-start delays on the first ticket poll after a period of inactivity.
+  const PYTHON_URL = process.env.PYTHON_API_URL || 'http://localhost:8000';
+  setInterval(async () => {
+    try {
+      await fetch(`${PYTHON_URL}/health`, { signal: AbortSignal.timeout(5000) });
+    } catch { /* non-fatal — just a keepalive ping */ }
+  }, 5 * 60_000);
+
+  console.log('[crons] started (sla:30s, nudge:15m, auto-close:15m, keepalive:5m)');
 }
 
 module.exports = { start };
