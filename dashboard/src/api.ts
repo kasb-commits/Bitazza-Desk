@@ -404,12 +404,14 @@ export const api = {
 // createWS kept for backwards compat with App.tsx (returns WebSocket-like object).
 // New code should use createSocket() instead.
 
+// Socket.io lives on the Node/Express server (VITE_SERVER_URL).
+// VITE_API_URL points to the Railway Python API which has no Socket.io.
+const SOCKET_URL = (import.meta.env.VITE_SERVER_URL as string | undefined) ?? API;
+
 export function createSocket(): Socket {
   const token = getToken();
-  return io(API, {
+  return io(SOCKET_URL, {
     auth: { token: token ?? '' },
-    // Try WebSocket first (zero latency); fall back to HTTP long-polling if
-    // the host's edge layer doesn't pass WebSocket upgrades (e.g. Vercel).
     transports: ['websocket', 'polling'],
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
