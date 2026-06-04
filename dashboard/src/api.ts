@@ -408,7 +408,9 @@ export function createSocket(): Socket {
   const token = getToken();
   return io(API, {
     auth: { token: token ?? '' },
-    transports: ['websocket'],
+    // Try WebSocket first (zero latency); fall back to HTTP long-polling if
+    // the host's edge layer doesn't pass WebSocket upgrades (e.g. Vercel).
+    transports: ['websocket', 'polling'],
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
   });

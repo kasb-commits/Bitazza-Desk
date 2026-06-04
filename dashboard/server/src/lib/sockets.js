@@ -26,8 +26,11 @@ function init(httpServer) {
       origin: corsOrigin,
       credentials: true,
     },
-    pingInterval: 10_000,
-    pingTimeout: 5_000,
+    // Short ping interval keeps WebSocket alive through Vercel's edge layer.
+    // Also controls how often long-polling clients check for new events —
+    // 2 s interval + 3 s timeout means polling latency ≤ 2 s.
+    pingInterval: 2_000,
+    pingTimeout: 3_000,
   });
 
   // Auth handshake — validate JWT before connection
