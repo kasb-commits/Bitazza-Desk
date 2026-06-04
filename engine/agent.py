@@ -288,6 +288,7 @@ def chat(
     suppress_handoff: bool = False,
     _skip_upgrade: bool = False,
     override_language: str | None = None,
+    injected_account_data: dict | None = None,
 ) -> AgentResponse:
     """
     Process a user message and return an AgentResponse.
@@ -434,7 +435,7 @@ def chat(
         )
         system_prompt = system_prompt + _post_escalation_note
 
-    augmented_message = build_user_message(user_message, rag_chunks, {})
+    augmented_message = build_user_message(user_message, rag_chunks, injected_account_data or {})
 
     # Convert history to Gemini format.
     # chat.py calls add_message() before calling this function, so get_history() already
@@ -462,14 +463,13 @@ def chat(
     # block may be caused by a KYC rejection, and a restriction may stem from a
     # suspicious withdrawal pattern. Starting from the profile lets Gemini see the
     # full picture and connect root causes before calling any secondary tools.
-    _FORCE_TOOL_CATEGORIES = {"kyc_verification", "account_restriction", "withdrawal_issue", "deposit_issue", "trade_issue", "fraud_security", "password_2fa_reset"}
+    _FORCE_TOOL_CATEGORIES = {"kyc_verification", "account_restriction", "withdrawal_issue", "deposit_issue", "trade_issue", "password_2fa_reset"}
     _FORCE_TOOL_NAMES = {
         "kyc_verification": "get_user_profile",
         "account_restriction": "get_user_profile",
         "withdrawal_issue": "get_user_profile",
         "deposit_issue": "get_user_profile",
         "trade_issue": "get_user_profile",
-        "fraud_security": "get_user_profile",
         "password_2fa_reset": "get_user_profile",
     }
     # For guests (user_id=None), skip all tool-forcing — no account data available.
