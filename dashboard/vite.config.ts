@@ -38,22 +38,9 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
         runtimeCaching: [
           {
-            // Individual ticket detail — must always be fresh (used for real-time polling)
-            urlPattern: /^\/api\/tickets\/[^?]+$/,
-            handler: 'NetworkOnly',
-          },
-          {
-            urlPattern: /^\/api\/supervisor\//,
-            handler: 'NetworkOnly',
-          },
-          {
+            // All API calls must hit the network — never serve stale data to CS agents
             urlPattern: /^\/api\//,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache-v2',
-              networkTimeoutSeconds: 10,
-              plugins: [{ cacheWillUpdate: async ({ response }) => response?.status === 200 ? response : null }],
-            },
+            handler: 'NetworkOnly',
           },
         ],
       },
