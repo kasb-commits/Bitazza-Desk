@@ -139,7 +139,7 @@ function init(httpServer) {
                  RETURNING id, user_id, role, type, priority, title, body, ticket_id, read, created_at`,
                 [id, sup.id, title, body]
               );
-              emitToSupervisors('notification:new', { notification: rows[0] });
+              emitToAgent(sup.id, 'notification:new', { notification: rows[0] });
             }
           }
         } catch (err) {

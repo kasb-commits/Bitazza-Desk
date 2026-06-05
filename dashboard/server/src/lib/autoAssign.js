@@ -88,7 +88,7 @@ async function handleAutoAssign(ticketId, { category, priority = 3, customer_id 
         ticketId,
       ],
     );
-    sockets.emitToSupervisors('notification:new', { notification: supNotif[0] });
+    sockets.emitToAgent(sup.id, 'notification:new', { notification: supNotif[0] });
   }
   return { status: 200, body: { assigned: false, queued: true } };
 }
