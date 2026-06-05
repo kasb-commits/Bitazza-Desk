@@ -59,6 +59,12 @@ class EscalateNode:
         prior_reply = ctx.variables.get("reply", "").strip()
         reply       = f"{prior_reply}\n\n{handoff}" if len(prior_reply) > 20 else handoff
 
+        logger.info("escalation_node_triggered", extra={
+            "node_id": node.id, "conv_id": ctx.conversation_id,
+            "channel": channel, "category": category,
+            "status": status, "team": node.config.get("team", "cs"),
+            "dry_run": ctx.dry_run,
+        })
         return NodeResult(
             output={
                 "reply":     reply,

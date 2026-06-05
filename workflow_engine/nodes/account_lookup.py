@@ -104,7 +104,14 @@ class AccountLookupNode:
         # ── External API path ─────────────────────────────────────────────────
         if api_url:
             endpoint = _TOOL_ENDPOINT.get(tool_name, tool_name)
+            logger.info("account_lookup_called", extra={
+                "node_id": node.id, "conv_id": ctx.conversation_id,
+                "tool": tool_name, "store_as": store_as, "external_api": True,
+            })
             result = _call_external_api(api_url, api_key, endpoint, user_id)
+            logger.info("account_lookup_result", extra={
+                "node_id": node.id, "tool": tool_name, "has_error": "error" in result,
+            })
             if tool_name in ("profile", "get_user_profile") and "error" not in result:
                 update_customer_from_profile(user_id, result)
             return NodeResult(
@@ -113,6 +120,10 @@ class AccountLookupNode:
             )
 
         # ── Built-in tool path ────────────────────────────────────────────────
+        logger.info("account_lookup_called", extra={
+            "node_id": node.id, "conv_id": ctx.conversation_id,
+            "tool": tool_name, "store_as": store_as, "external_api": False,
+        })
         if tool_name not in _TOOL_MAP:
             logger.warning("Unknown account tool: %s", tool_name)
             return NodeResult(

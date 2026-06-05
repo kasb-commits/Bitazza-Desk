@@ -1,8 +1,9 @@
 // Socket.io server — all real-time events
-const jwt = require('jsonwebtoken');
+const jwt    = require('jsonwebtoken');
 const { setAgentSession, deleteAgentSession, getAgentSession } = require('./redis');
-const pool = require('../db/pg');
+const pool   = require('../db/pg');
 const { v4: uuidv4 } = require('uuid');
+const logger = require('./logger').child({ logger: 'sockets' });
 require('dotenv').config();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change-me-in-production';
@@ -47,11 +48,11 @@ function init(httpServer) {
 
   io.on('connection', async (socket) => {
     const { id: agentId, role } = socket.user;
-    console.log(`[WS] connected: ${agentId} (${role})`);
+    logger.info({ event: 'ws_connected', agent_id: agentId, role });
 
     // Register socket in Redis (best-effort — non-fatal if Redis is down)
     try { await setAgentSession(agentId, { socket_id: socket.id }); } catch (e) {
-      console.warn(`[WS] Redis unavailable, skipping session register for ${agentId}:`, e.message);
+      logger.warn({ event: 'ws_redis_unavailable', agent_id: agentId, error: e.message });
     }
 
     // Join personal room for targeted messages
@@ -108,7 +109,7 @@ function init(httpServer) {
 
     // ── Disconnect with 30s grace ────────────────────────────────────────────
     socket.on('disconnect', () => {
-      console.log(`[WS] disconnected: ${agentId}`);
+      logger.info({ event: 'ws_disconnected', agent_id: agentId });
       setTimeout(async () => {
         // Check if agent reconnected (different socket)
         const session = await getAgentSession(agentId);
@@ -143,7 +144,7 @@ function init(httpServer) {
             }
           }
         } catch (err) {
-          console.error('[sockets] agent_offline notification error:', err.message);
+          logger.error({ event: 'ws_agent_offline_notif_error', agent_id: agentId, error: err.message });
         }
 
         // TODO: re-queue orphaned chats (Phase 2)

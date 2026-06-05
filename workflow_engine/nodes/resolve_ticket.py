@@ -45,6 +45,10 @@ class ResolveTicketNode:
         if csat_tokens:
             output["csat_tokens"] = csat_tokens
 
+        logger.info("ticket_resolved_by_node", extra={
+            "node_id": node.id, "conv_id": ctx.conversation_id,
+            "channel": channel, "dry_run": ctx.dry_run,
+        })
         return NodeResult(
             output=output,
             next_node_id=node.next_node_id,

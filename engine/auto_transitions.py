@@ -33,6 +33,7 @@ EMAIL_POLL_MESSAGES = 20      # how many recent inbox messages to check each pol
 
 async def run_auto_transitions() -> None:
     """Process all expired ticket states."""
+    logger.debug("auto_transition_run_start")
     try:
         buckets = get_tickets_for_auto_transition()
 
@@ -87,6 +88,12 @@ async def run_auto_transitions() -> None:
                 ticket_id, row.get("from_email", ""),
             )
 
+        logger.info("auto_transition_run_complete", extra={
+            "pending_customer_expired": len(buckets.get("pending_customer_expired", [])),
+            "snoozed_expired": len(buckets.get("snoozed_expired", [])),
+            "resolved_expired": len(buckets.get("resolved_expired", [])),
+            "verifications_escalated": len(expired_verifications),
+        })
     except Exception:
         logger.exception("Error in auto_transitions job")
 

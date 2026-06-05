@@ -35,6 +35,10 @@ class WaitForTriggerNode:
             token = f"dry-run-token-{uuid.uuid4().hex[:8]}"
 
         waiting_for = f"external_trigger:{token}" if token else "external_trigger:"
+        logger.info("wait_for_trigger_paused", extra={
+            "node_id": node.id, "conv_id": ctx.conversation_id,
+            "trigger_type": trigger_type, "dry_run": ctx.dry_run,
+        })
 
         return NodeResult(
             output={"trigger_type": trigger_type, "token": token},

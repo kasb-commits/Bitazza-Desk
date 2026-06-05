@@ -11,6 +11,14 @@ import type {
 // VITE_API_URL overrides — default to Node backend on :3002
 const API = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
 
+function sendClientLog(entry: Record<string, unknown>) {
+  fetch(`${API}/api/logs/client`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source: 'dashboard', entries: [entry] }),
+  }).catch(() => {}); // fire-and-forget
+}
+
 // ── Token helpers (reads from localStorage, set by LoginPage) ────────────────
 function getToken(): string | null {
   try {
@@ -32,9 +40,8 @@ async function req<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const url = `${API}${path}`;
-  console.debug('[api] %s %s', options.method ?? 'GET', url);
+  const method = options.method ?? 'GET';
   const r = await fetch(url, { ...options, headers });
-  console.debug('[api] %s %s → %d', options.method ?? 'GET', url, r.status);
 
   if (r.status === 401) {
     // Token expired — clear session; let React Router handle the redirect
@@ -46,6 +53,7 @@ async function req<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!r.ok) {
     let msg = `${r.status} ${path}`;
     try { const body = await r.json(); msg = body.error ?? msg; } catch { /* ignore */ }
+    sendClientLog({ level: 'error', event: 'api_error', method, path, status: r.status, message: msg, url: window.location.href });
     throw new Error(msg);
   }
 
@@ -82,29 +90,37 @@ export const api = {
   createTicket: (data: { customer_id: string; channel: string; category?: string; priority?: Priority }) =>
     req<{ id: string }>('/api/tickets', { method: 'POST', body: JSON.stringify(data) }),
 
-  setStatus: (id: string, status: TicketStatus) =>
-    req(`/api/tickets/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  setStatus: (id: string, status: TicketStatus) => {
+    sendClientLog({ level: 'info', event: 'ticket_status_changed', ticket_id: id, status });
+    return req(`/api/tickets/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+  },
 
   setPriority: (id: string, priority: Priority) =>
     req(`/api/tickets/${id}/priority`, { method: 'PATCH', body: JSON.stringify({ priority }) }),
 
-  assign: (id: string, assigned_to: string | null, team?: string, handoff_note?: string) =>
-    req(`/api/tickets/${id}/assign`, {
+  assign: (id: string, assigned_to: string | null, team?: string, handoff_note?: string) => {
+    sendClientLog({ level: 'info', event: 'ticket_assigned', ticket_id: id, assigned_to });
+    return req(`/api/tickets/${id}/assign`, {
       method: 'PATCH',
       body: JSON.stringify({ assigned_to, team, handoff_note }),
-    }),
+    });
+  },
 
   setTags: (id: string, tags: string[]) =>
     req(`/api/tickets/${id}/tags`, { method: 'PATCH', body: JSON.stringify({ tags }) }),
 
-  escalate: (id: string, reason?: string) =>
-    req(`/api/tickets/${id}/escalate`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  escalate: (id: string, reason?: string) => {
+    sendClientLog({ level: 'info', event: 'ticket_escalated', ticket_id: id, reason });
+    return req(`/api/tickets/${id}/escalate`, { method: 'POST', body: JSON.stringify({ reason }) });
+  },
 
-  reply: (id: string, content: string, is_note = false, channel?: string, attachmentIds?: string[]) =>
-    req(`/api/tickets/${id}/messages`, {
+  reply: (id: string, content: string, is_note = false, channel?: string, attachmentIds?: string[]) => {
+    sendClientLog({ level: 'info', event: 'agent_reply_sent', ticket_id: id, is_note });
+    return req(`/api/tickets/${id}/messages`, {
       method: 'POST',
       body: JSON.stringify({ content, is_note, channel, ...(attachmentIds?.length ? { attachment_ids: attachmentIds } : {}) }),
-    }),
+    });
+  },
 
   claimTicket: (id: string) =>
     req(`/api/tickets/${id}/claim`, { method: 'POST' }),
@@ -254,10 +270,12 @@ export const api = {
   deleteTag: (name: string) => req<{ tags: string[] }>(`/api/tags/${encodeURIComponent(name)}`, { method: 'DELETE' }).then(r => r.tags),
 
   // Copilot
-  suggestReply: (ticketId: string) =>
-    req<{ suggestion: string }>('/api/copilot/suggest-reply', {
+  suggestReply: (ticketId: string) => {
+    sendClientLog({ level: 'info', event: 'copilot_suggest_reply_used', ticket_id: ticketId });
+    return req<{ suggestion: string }>('/api/copilot/suggest-reply', {
       method: 'POST', body: JSON.stringify({ ticketId }),
-    }),
+    });
+  },
 
   summarize: (ticketId: string) =>
     req<{ summary: string }>('/api/copilot/summarize', {
@@ -410,12 +428,18 @@ const SOCKET_URL = (import.meta.env.VITE_SERVER_URL as string | undefined) ?? AP
 
 export function createSocket(): Socket {
   const token = getToken();
-  return io(SOCKET_URL, {
+  const socket = io(SOCKET_URL, {
     auth: { token: token ?? '' },
     transports: ['websocket', 'polling'],
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
   });
+
+  socket.on('connect',       () => sendClientLog({ level: 'info',  event: 'ws_connected',      url: SOCKET_URL }));
+  socket.on('disconnect',    (r) => sendClientLog({ level: 'info',  event: 'ws_disconnected',   reason: r }));
+  socket.on('connect_error', (e) => sendClientLog({ level: 'error', event: 'ws_connect_error',  message: e.message }));
+
+  return socket;
 }
 
 // Backwards-compat shim: wraps socket.io in a WebSocket-shaped object

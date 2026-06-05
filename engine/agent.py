@@ -7,6 +7,8 @@ Gemini is instructed to return structured JSON: {response, confidence, needs_hum
 This means escalation is driven by Gemini's own assessment, not post-hoc heuristics.
 """
 import json, logging, re, time
+
+logger = logging.getLogger("engine.agent")
 from google import genai
 from google.genai import types as genai_types
 from google.genai import errors as genai_errors
@@ -47,16 +49,15 @@ def _call_with_retry(fn, max_attempts: int = 3, base_delay: float = 0.5):
         except Exception as e:
             last_exc = e
             if attempt < max_attempts:
-                logging.warning(
-                    "Gemini call failed (attempt %d/%d): %s — retrying in %.1fs",
-                    attempt, max_attempts, e, base_delay * attempt,
-                )
+                logger.warning("llm_retry", extra={
+                    "attempt": attempt, "max_attempts": max_attempts,
+                    "error": str(e), "retry_delay_s": base_delay * attempt,
+                })
                 time.sleep(base_delay * attempt)
             else:
-                logging.error(
-                    "Gemini call failed after %d attempts: %s",
-                    max_attempts, e,
-                )
+                logger.error("llm_failed", extra={
+                    "max_attempts": max_attempts, "error": str(e),
+                })
     raise last_exc  # type: ignore[misc]
 
 
@@ -301,7 +302,12 @@ def chat(
 
     # 1. Security pre-filter
     check = pre_filter(user_message)
+    logger.info("security_prefilter", extra={
+        "conv_id": conversation_id, "allowed": check.allowed,
+        "reason": getattr(check, "reason", None),
+    })
     if not check.allowed:
+        logger.warning("message_blocked", extra={"conv_id": conversation_id, "language": language})
         return AgentResponse(
             text=("I'm unable to process that request. If you need help, please describe your issue normally."
                   if language == "en"
@@ -311,6 +317,7 @@ def chat(
 
     # 2. Financial advice guard
     if contains_financial_advice_request(user_message):
+        logger.info("financial_advice_blocked", extra={"conv_id": conversation_id})
         msg = ("I'm not able to provide investment or financial advice. For trading decisions, please consult a qualified financial advisor."
                if language == "en"
                else "ไม่สามารถให้คำแนะนำการลงทุนหรือทางการเงินได้ สำหรับการตัดสินใจซื้อขาย กรุณาปรึกษาที่ปรึกษาทางการเงินที่มีคุณสมบัติ")
@@ -408,7 +415,15 @@ def chat(
         _prev_user = _prev_user_msgs[1] if len(_prev_user_msgs) > 1 else None
         if _prev_user:
             _retrieval_query = _prev_user + " " + user_message
+    _t_rag = time.time()
     rag_chunks = retrieve_with_fallback(_retrieval_query) if collection_count() > 0 else []
+    logger.info("rag_retrieval", extra={
+        "conv_id": conversation_id,
+        "num_chunks": len(rag_chunks),
+        "top_score": rag_chunks[0].get("distance") if rag_chunks else None,
+        "latency_ms": round((time.time() - _t_rag) * 1000, 1),
+        "used_augmented_query": _retrieval_query != user_message,
+    })
 
     # 5. Conversation history
     history = get_history(conversation_id, limit=10)
@@ -537,11 +552,21 @@ def chat(
     gemini_messages = gemini_history + [
         genai_types.Content(role="user", parts=[genai_types.Part(text=augmented_message)])
     ]
+    _t_llm = time.time()
     try:
         final_response = _call_with_retry(
             lambda: client.models.generate_content(model=MODEL, contents=gemini_messages, config=config)
         )
+        logger.info("llm_call_success", extra={
+            "conv_id": conversation_id, "model": MODEL,
+            "latency_ms": round((time.time() - _t_llm) * 1000, 1),
+            "had_tools": bool(active_tool_defs),
+        })
     except Exception as e:
+        logger.error("llm_call_failed", extra={
+            "conv_id": conversation_id, "model": MODEL,
+            "error": str(e), "latency_ms": round((time.time() - _t_llm) * 1000, 1),
+        })
         ticket_id = get_ticket_id_by_conversation(conversation_id)
         from db.conversation_store import is_human_handling as _is_already_escalated
         if _is_already_escalated(conversation_id):
@@ -596,6 +621,10 @@ def chat(
             if tool_fn:
                 kwargs = dict(fn_call.args)
                 # Inject authenticated user_id — never trust tool input for this
+                logger.info("tool_called", extra={
+                    "conv_id": conversation_id, "tool": fn_call.name,
+                    "user_id_injected": True,
+                })
                 result = tool_fn(user_id=user_id, **kwargs)
                 account_data[fn_call.name] = result
                 # Backfill customer record with real profile data so the dashboard
@@ -661,6 +690,10 @@ def chat(
             raw_text += part.text
 
     response_text, confidence, needs_human, resolved = _parse_gemini_response(raw_text, language)
+    logger.info("llm_response_parsed", extra={
+        "conv_id": conversation_id, "confidence": confidence,
+        "needs_human": needs_human, "resolved": resolved,
+    })
 
     # 9a. Farewell override: if the model didn't set resolved=true but the reply
     # ends with an unambiguous farewell, force it. The model is reliable at choosing
@@ -708,6 +741,13 @@ def chat(
     _no_tools = not active_tool_defs
     if escalate and reason == "low_confidence" and not needs_human and (_no_tools or prior_successful_reply):
         escalate = False
+
+    logger.info("escalation_decision", extra={
+        "conv_id": conversation_id, "escalate": escalate,
+        "reason": reason, "confidence": confidence,
+        "needs_human": needs_human, "keyword_escalate": keyword_escalate,
+        "is_guest": is_guest_session,
+    })
 
     if escalate:
         # ── Information collection phase intercept ─────────────────────────

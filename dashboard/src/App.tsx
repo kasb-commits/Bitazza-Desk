@@ -793,7 +793,7 @@ function Workspace({ ws, tickets, ticketStats, selectedId, view, search, statusF
   useEffect(() => { setComposeReply(''); }, [selectedId]);
 
   return (
-    <div className="flex flex-1 overflow-hidden bg-white">
+    <div className="flex flex-1 overflow-hidden bg-surface-0">
 
       <ConversationList
         tickets={tickets} ticketStats={ticketStats} selectedId={selectedId} view={view} search={search}

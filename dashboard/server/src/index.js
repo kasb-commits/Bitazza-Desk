@@ -5,6 +5,8 @@ const express = require('express');
 const cors    = require('cors');
 const helmet  = require('helmet');
 const rateLimit = require('express-rate-limit');
+const logger  = require('./lib/logger');
+const requestLogger = require('./middleware/requestLogger');
 
 // Routes
 const authRouter       = require('./routes/auth');
@@ -55,6 +57,7 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json({ limit: '2mb' }));
+app.use(requestLogger);
 
 // Rate limit all API routes: 200 req/min per IP
 app.use('/api', rateLimit({
@@ -112,7 +115,14 @@ if (require('fs').existsSync(indexHtml)) {
 
 // Error handler
 app.use((err, req, res, _next) => {
-  console.error('[server] unhandled error:', err.message);
+  logger.error({
+    event:      'unhandled_error',
+    error:      err.message,
+    stack:      err.stack,
+    path:       req.path,
+    method:     req.method,
+    request_id: req.requestId,
+  });
   res.status(500).json({ error: 'Server error' });
 });
 
@@ -124,7 +134,7 @@ async function boot() {
   try {
     await ensureConnected();
   } catch (err) {
-    console.warn('[boot] Redis unavailable:', err.message, '— continuing without realtime state');
+    logger.warn({ event: 'redis_unavailable', error: err.message });
   }
 
   // Init Socket.io
@@ -134,8 +144,12 @@ async function boot() {
   crons.start();
 
   server.listen(PORT, () => {
-    console.log(`[server] listening on :${PORT}`);
-    console.log(`[server] frontend expected at ${process.env.FRONTEND_URL || 'http://localhost:3002'}`);
+    logger.info({
+      event:        'server_started',
+      port:         PORT,
+      frontend_url: process.env.FRONTEND_URL || 'http://localhost:3002',
+      env:          process.env.RAILWAY_ENVIRONMENT || 'local',
+    });
   });
 }
 

@@ -290,10 +290,8 @@ export default function ConversationList({
     <aside
       className="w-[320px] shrink-0 flex flex-col"
       style={{
-        background: 'rgba(255,255,255,0.85)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-        borderRight: '1px solid rgba(180,195,220,0.35)',
+        background: 'var(--surface-1)',
+        borderRight: '1px solid var(--surface-5)',
         position: 'relative',
         zIndex: 1,
       }}
@@ -327,7 +325,7 @@ export default function ConversationList({
             trigger={(open, ref) => (
               <button
                 ref={ref}
-                className="flex items-center gap-1 text-xs font-medium text-gray-700 px-2 py-1.5 rounded-lg bg-white ring-1 ring-gray-200 hover:bg-gray-50 transition-all shrink-0"
+                className="flex items-center gap-1 text-xs font-medium text-text-secondary px-2 py-1.5 rounded-lg bg-surface-2 ring-1 ring-surface-5 hover:bg-surface-3 transition-all shrink-0"
               >
                 <svg className="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
@@ -348,7 +346,7 @@ export default function ConversationList({
             trigger={(open, ref) => (
               <button
                 ref={ref}
-                className="flex items-center gap-1.5 text-xs font-medium text-gray-700 px-2 py-1.5 rounded-lg bg-white ring-1 ring-gray-200 hover:bg-gray-50 transition-all flex-1 min-w-0"
+                className="flex items-center gap-1.5 text-xs font-medium text-text-secondary px-2 py-1.5 rounded-lg bg-surface-2 ring-1 ring-surface-5 hover:bg-surface-3 transition-all flex-1 min-w-0"
               >
                 {currentFilter.dot
                   ? <span className="w-2 h-2 rounded-full shrink-0" style={{ background: currentFilter.dot }} />
@@ -374,10 +372,9 @@ export default function ConversationList({
                 ref={ref}
                 className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg ring-1 transition-all shrink-0"
                 style={{
-                  background: sort !== 'newest' ? '#F0FEF8' : '#ffffff',
-                  color: sort !== 'newest' ? '#00CE80' : '#374151',
-                  ringColor: sort !== 'newest' ? '#c7d2fe' : '#e5e7eb',
-                  border: `1px solid ${sort !== 'newest' ? '#c7d2fe' : '#e5e7eb'}`,
+                  background: sort !== 'newest' ? '#F0FEF8' : 'var(--surface-2)',
+                  color: sort !== 'newest' ? '#00CE80' : 'var(--text-secondary)',
+                  border: `1px solid ${sort !== 'newest' ? '#c7d2fe' : 'var(--surface-5)'}`,
                 }}
               >
                 <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -400,8 +397,8 @@ export default function ConversationList({
               onClick={() => onChannelFilterChange(f.id)}
               className="flex-1 text-[10px] font-medium py-1 rounded-md transition-all"
               style={channelFilter === f.id
-                ? { background: '#1a1d2e', color: '#ffffff', border: '1px solid #1a1d2e' }
-                : { background: 'transparent', color: '#6b7280', border: '1px solid rgba(180,195,220,0.35)' }
+                ? { background: 'var(--surface-4)', color: 'var(--text-primary)', border: '1px solid var(--surface-5)' }
+                : { background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--surface-5)' }
               }
             >
               {f.label}
@@ -492,12 +489,12 @@ export default function ConversationList({
           ref={statusDropRef}
           style={{
             position: 'fixed', top: statusMenuPos.top, left: statusMenuPos.left, zIndex: 9999,
-            background: '#ffffff', border: '1px solid rgba(0,0,0,0.1)',
+            background: 'var(--surface-2)', border: '1px solid var(--surface-5)',
             borderRadius: 12, boxShadow: 'none',
             minWidth: 180, padding: '4px 0', overflow: 'hidden',
           }}
         >
-          <div style={{ padding: '6px 14px 4px', fontSize: 10, color: '#9ca3af', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>
+          <div style={{ padding: '6px 14px 4px', fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>
             Set status for {selected.size} ticket{selected.size > 1 ? 's' : ''}
           </div>
           {BULK_STATUS_OPTIONS.map(opt => (
@@ -506,11 +503,11 @@ export default function ConversationList({
               onClick={() => handleBulkStatus(opt.status)}
               style={{
                 width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-                padding: '9px 14px', fontSize: 12, color: '#374151', border: 'none',
+                padding: '9px 14px', fontSize: 12, color: 'var(--text-secondary)', border: 'none',
                 background: 'transparent', cursor: 'pointer', textAlign: 'left',
                 transition: 'background 0.1s',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#f9fafb'; }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-3)'; }}
               onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
             >
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: opt.dot, flexShrink: 0 }} />
@@ -546,11 +543,11 @@ export default function ConversationList({
               onClick={() => onSelect(ticket.id)}
               className="group flex items-start gap-2.5 px-3 py-3.5 cursor-pointer transition-all duration-100"
               style={{
-                borderBottom: '1px solid rgba(180,195,220,0.2)',
-                background: isSelected ? '#ffffff' : undefined,
+                borderBottom: '1px solid var(--surface-5)',
+                background: isSelected ? 'var(--surface-3)' : undefined,
                 boxShadow: isSelected ? 'inset 3px 0 0 #00CE80' : undefined,
               }}
-              onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.7)'; }}
+              onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = 'var(--surface-2)'; }}
               onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = ''; }}
             >
               {/* Checkbox — left of avatar, shown on hover or when any selected */}
@@ -578,7 +575,7 @@ export default function ConversationList({
                 {/* Row 1: name + time */}
                 <div className="flex items-center justify-between gap-1 mb-0.5">
                   <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                    <span className="text-[13px] font-semibold truncate" style={{ color: '#111827' }}>
+                    <span className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
                       {ticket.customer?.name ?? 'Unknown'}
                     </span>
                     {ticket.customer?.tier === 'VIP' && (
@@ -589,7 +586,7 @@ export default function ConversationList({
                 </div>
 
                 {/* Row 2: last message preview */}
-                <p className="text-[12px] truncate leading-relaxed mb-1.5" style={{ color: '#6b7280' }}>
+                <p className="text-[12px] truncate leading-relaxed mb-1.5" style={{ color: 'var(--text-secondary)' }}>
                   {preview}
                 </p>
 

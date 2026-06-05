@@ -111,6 +111,13 @@ class WorkflowExecutionEngine:
             category=message.category,
         )
         self._persist_execution(execution)
+        logger.info("workflow_start", extra={
+            "workflow_id": workflow.id,
+            "workflow_name": getattr(workflow, "name", None),
+            "conv_id": message.conversation_id,
+            "channel": message.channel,
+            "category": message.category,
+        })
 
         try:
             return self._run_from_node(execution, workflow, message)
@@ -153,6 +160,13 @@ class WorkflowExecutionEngine:
 
         execution.status = ExecutionStatus.RUNNING
         self._persist_execution(execution)
+        logger.info("workflow_resume", extra={
+            "execution_id": execution.id,
+            "workflow_id": execution.workflow_id,
+            "conv_id": execution.conversation_id,
+            "current_node_id": execution.current_node_id,
+            "category_upgrade": category_upgrade,
+        })
 
         try:
             return self._run_from_node(execution, workflow, message)
@@ -224,6 +238,13 @@ class WorkflowExecutionEngine:
                 dry_run=False,
             )
 
+            logger.debug("node_entry", extra={
+                "execution_id": execution.id,
+                "node_id": node.id,
+                "node_kind": node.kind,
+                "conv_id": execution.conversation_id,
+            })
+
             try:
                 result = self.run_node(node, ctx)
             except Exception as node_exc:
@@ -236,6 +257,14 @@ class WorkflowExecutionEngine:
                     current_node_id = node.on_error_next_id
                     continue
                 raise
+
+            logger.debug("node_exit", extra={
+                "execution_id": execution.id,
+                "node_id": node.id,
+                "node_kind": node.kind,
+                "next_node_id": result.next_node_id,
+                "paused": result.pause,
+            })
 
             # Merge node outputs into execution variables
             execution.variables.update(result.output)
@@ -258,6 +287,13 @@ class WorkflowExecutionEngine:
                     else ExecutionStatus.WAITING_MESSAGE
                 )
                 self._persist_execution(execution)
+                logger.info("workflow_paused", extra={
+                    "execution_id": execution.id,
+                    "node_id": node.id,
+                    "node_kind": node.kind,
+                    "waiting_for": result.waiting_for,
+                    "conv_id": execution.conversation_id,
+                })
                 return execution
 
             current_node_id = result.next_node_id
@@ -292,6 +328,13 @@ class WorkflowExecutionEngine:
         execution.status = ExecutionStatus.COMPLETED
         execution.current_node_id = None
         self._persist_execution(execution)
+        logger.info("workflow_complete", extra={
+            "execution_id": execution.id,
+            "workflow_id": execution.workflow_id,
+            "conv_id": execution.conversation_id,
+            "escalated": execution.escalated,
+            "resolved": execution.resolved,
+        })
         return execution
 
     def run_node(self, node: WorkflowNode, ctx: ExecutionContext) -> NodeResult:

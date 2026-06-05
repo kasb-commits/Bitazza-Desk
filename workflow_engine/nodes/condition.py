@@ -82,6 +82,11 @@ class ConditionNode:
 
             branch  = "true" if passed else "false"
             next_id = true_next if passed else false_next
+            logger.info("condition_evaluated", extra={
+                "node_id": node.id, "conv_id": ctx.conversation_id,
+                "logic": logic, "num_clauses": len(conditions),
+                "result": passed, "branch_taken": branch,
+            })
             return NodeResult(
                 output={"branch": branch, "next_node_id": next_id},
                 next_node_id=next_id,
@@ -103,6 +108,11 @@ class ConditionNode:
             branch  = "false"
             next_id = false_next
 
+        logger.info("condition_evaluated", extra={
+            "node_id": node.id, "conv_id": ctx.conversation_id,
+            "variable": variable, "operator": operator, "value": value,
+            "result": branch == "true", "branch_taken": branch,
+        })
         return NodeResult(
             output={"branch": branch, "next_node_id": next_id},
             next_node_id=next_id,

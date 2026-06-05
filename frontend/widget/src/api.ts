@@ -1,5 +1,13 @@
 import type { CSBotConfig } from './types';
 
+export function sendClientLog(apiUrl: string, entry: Record<string, unknown>) {
+  fetch(`${apiUrl}/api/logs/client`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source: 'widget', entries: [entry] }),
+  }).catch(() => {}); // fire-and-forget
+}
+
 function getHeaders(cfg: CSBotConfig): HeadersInit {
   const h: HeadersInit = { 'Content-Type': 'application/json' };
   if (cfg.token) h['Authorization'] = `Bearer ${cfg.token}`;
@@ -113,7 +121,10 @@ async function _attemptStart(cfg: CSBotConfig, guestName?: string, guestEmail?: 
       ...(guestEmail ? { guest_email: guestEmail } : {}),
     }),
   });
-  if (!res.ok) throw new Error(`start failed: ${res.status}`);
+  if (!res.ok) {
+    sendClientLog(cfg.apiUrl, { level: 'error', event: 'api_error', path: '/chat/start', status: res.status });
+    throw new Error(`start failed: ${res.status}`);
+  }
   const data = await res.json();
   const isGuest: boolean = data.is_guest ?? false;
   storeSession(data.conversation_id, undefined, undefined, undefined, isGuest);
@@ -324,7 +335,10 @@ export async function uploadAttachment(
     headers,
     body: form,
   });
-  if (!res.ok) throw new Error(`upload failed: ${res.status}`);
+  if (!res.ok) {
+    sendClientLog(cfg.apiUrl, { level: 'error', event: 'api_error', path: '/api/uploads/attachment', status: res.status });
+    throw new Error(`upload failed: ${res.status}`);
+  }
   const data = await res.json();
   return {
     id: data.id,
@@ -354,7 +368,10 @@ export async function sendMessage(
       ...(attachmentIds?.length ? { attachment_ids: attachmentIds } : {}),
     }),
   });
-  if (!res.ok) throw new Error(`message failed: ${res.status}`);
+  if (!res.ok) {
+    sendClientLog(cfg.apiUrl, { level: 'error', event: 'api_error', path: '/chat/message', status: res.status, conv_id: conversationId });
+    throw new Error(`message failed: ${res.status}`);
+  }
   const data = await res.json();
   return {
     reply: data.reply,

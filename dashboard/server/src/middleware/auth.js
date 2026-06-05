@@ -1,6 +1,7 @@
 // JWT auth middleware + RBAC helpers
-const jwt  = require('jsonwebtoken');
-const pool = require('../db/pg');
+const jwt    = require('jsonwebtoken');
+const pool   = require('../db/pg');
+const logger = require('../lib/logger').child({ logger: 'auth' });
 require('dotenv').config();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change-me-in-production';
@@ -9,12 +10,14 @@ const JWT_SECRET = process.env.JWT_SECRET || 'change-me-in-production';
 function authenticate(req, res, next) {
   const header = req.headers['authorization'];
   if (!header || !header.startsWith('Bearer ')) {
+    logger.warn({ event: 'auth_missing_token', path: req.path, ip: req.ip });
     return res.status(401).json({ error: 'Missing token' });
   }
   try {
     req.user = jwt.verify(header.slice(7), JWT_SECRET);
     next();
-  } catch {
+  } catch (err) {
+    logger.warn({ event: 'auth_invalid_token', path: req.path, ip: req.ip, error: err.message });
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 }

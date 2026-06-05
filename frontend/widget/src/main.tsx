@@ -1,8 +1,42 @@
-import { StrictMode } from 'react';
+import { StrictMode, Component } from 'react';
+import type { ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import Widget from './Widget';
 import type { CSBotConfig } from './types';
 import './index.css';
+
+let _apiBase = '';
+
+function sendClientLog(entry: Record<string, unknown>) {
+  fetch(`${_apiBase}/api/logs/client`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source: 'widget', entries: [entry] }),
+  }).catch(() => {}); // fire-and-forget
+}
+
+class WidgetErrorBoundary extends Component<{ children: ReactNode }, { crashed: boolean }> {
+  state = { crashed: false };
+  static getDerivedStateFromError() { return { crashed: true }; }
+  componentDidCatch(error: Error, info: { componentStack: string }) {
+    sendClientLog({
+      level: 'error',
+      event: 'react_error_boundary',
+      message: error.message,
+      stack: error.stack,
+      component: info.componentStack,
+      url: window.location.href,
+    });
+  }
+  render() {
+    if (this.state.crashed) return (
+      <div style={{ padding: 16, fontFamily: 'sans-serif', color: '#c00' }}>
+        Chat unavailable. Please refresh the page.
+      </div>
+    );
+    return this.props.children;
+  }
+}
 
 // All 21 mock user IDs (dev_user + USR-000001 … USR-000020)
 const MOCK_USER_IDS = [
@@ -54,6 +88,17 @@ async function mount() {
     platform: 'web',
     apiUrl: import.meta.env.VITE_API_URL ?? 'http://localhost:8000',
   };
+  _apiBase = rawCfg.apiUrl;
+
+  window.addEventListener('unhandledrejection', (e) => {
+    sendClientLog({
+      level: 'error',
+      event: 'unhandled_rejection',
+      message: e.reason instanceof Error ? e.reason.message : String(e.reason),
+      stack: e.reason instanceof Error ? e.reason.stack : undefined,
+      url: window.location.href,
+    });
+  });
 
   // Inject a mock token when running in dev without a real JWT.
   // Skip when ?guest=1 is in the URL — lets devs test the guest widget flow locally.
@@ -74,13 +119,18 @@ async function mount() {
 
   createRoot(container).render(
     <StrictMode>
-      <Widget cfg={rawCfg} />
+      <WidgetErrorBoundary>
+        <Widget cfg={rawCfg} />
+      </WidgetErrorBoundary>
     </StrictMode>,
   );
 }
 
 function safeMount() {
-  mount().catch((e) => console.error('[csbot] mount failed:', e));
+  mount().catch((e) => {
+    console.error('[csbot] mount failed:', e);
+    sendClientLog({ level: 'error', event: 'widget_mount_failed', message: e instanceof Error ? e.message : String(e) });
+  });
 }
 
 if (document.readyState === 'loading') {

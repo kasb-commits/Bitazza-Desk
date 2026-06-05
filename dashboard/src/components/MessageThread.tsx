@@ -718,7 +718,7 @@ export default function MessageThread({ ticketId, ws, onStatusChange, pendingDra
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full bg-white">
+      <div className="flex items-center justify-center h-full bg-surface-1">
         <Spinner size="md" className="text-gray-300" />
       </div>
     );
@@ -732,19 +732,19 @@ export default function MessageThread({ ticketId, ws, onStatusChange, pendingDra
   const slaBreachAt = (ticket as TicketDetail & { sla_breach_at?: string }).sla_breach_at;
 
   return (
-    <div className="flex flex-col h-full bg-white" style={{ position: 'relative', zIndex: 1 }}>
+    <div className="flex flex-col h-full bg-surface-1" style={{ position: 'relative', zIndex: 1 }}>
 
       {/* ── Thread Header ── */}
       <div
-        className="px-5 py-3.5 flex items-center justify-between gap-4 shrink-0 bg-white"
-        style={{ borderBottom: '1px solid rgba(180,195,220,0.35)' }}
+        className="px-5 py-3.5 flex items-center justify-between gap-4 shrink-0 bg-surface-2"
+        style={{ borderBottom: '1px solid var(--surface-5)' }}
       >
         {/* Left: avatar + name + meta */}
         <div className="flex items-center gap-3 min-w-0">
           <Avatar name={ticket.customer?.name ?? '?'} size="sm" />
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-[14px] font-semibold text-gray-900 truncate">
+              <span className="text-[14px] font-semibold text-text-primary truncate">
                 {ticket.customer?.name || ticket.customer?.user_id || ticket.id.slice(0, 8)}
               </span>
               {ticket.customer?.tier === 'VIP' && (
@@ -752,13 +752,13 @@ export default function MessageThread({ ticketId, ws, onStatusChange, pendingDra
               )}
             </div>
             <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-[11px] font-mono text-gray-400"># {ticket.id.slice(0, 10)}</span>
+              <span className="text-[11px] font-mono text-text-muted"># {ticket.id.slice(0, 10)}</span>
               {ticket.category && (
-                <span className="text-[11px] text-gray-400 capitalize">{ticket.category.replace(/_/g, ' ')}</span>
+                <span className="text-[11px] text-text-muted capitalize">{ticket.category.replace(/_/g, ' ')}</span>
               )}
               {slaBreachAt && <SLATimer deadline={slaBreachAt} showLabel />}
               {isVirtual && (
-                <span className="text-[11px] text-gray-400">{messages.length} msgs</span>
+                <span className="text-[11px] text-text-muted">{messages.length} msgs</span>
               )}
             </div>
           </div>
@@ -787,7 +787,7 @@ export default function MessageThread({ ticketId, ws, onStatusChange, pendingDra
       </div>
 
       {/* ── Message list ── */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-2" style={{ background: '#FCFCFE' }}>
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-2" style={{ background: 'var(--surface-1)' }}>
         {isVirtual && <div style={{ height: topPad }} />}
 
         {visibleMessages.map((msg, i) => {
@@ -814,7 +814,7 @@ export default function MessageThread({ ticketId, ws, onStatusChange, pendingDra
       {/* ── Canned response dropdown ── */}
       {cannedMatches.length > 0 && (
         <div className="mx-3 mb-1 rounded-xl overflow-hidden animate-slide-in-up"
-          style={{ background: '#fff', border: '1px solid #EDEDF8' }}>
+          style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-5)' }}>
           {cannedMatches.map(c => (
             <button key={c.id} onClick={() => applyCanned(c.body)}
               className="w-full text-left px-3 py-2.5 text-sm transition-colors" style={{ borderBottom: '1px solid #EDEDF8' }}>
@@ -827,7 +827,7 @@ export default function MessageThread({ ticketId, ws, onStatusChange, pendingDra
 
       {/* ── Composer ── */}
       {(canReply || canInternalNote) && (
-        <div className="px-4 pb-4 pt-3 shrink-0" style={{ background: '#FFFFFF', borderTop: '1px solid #EDEDF8' }}>
+        <div className="px-4 pb-4 pt-3 shrink-0" style={{ background: 'var(--surface-2)', borderTop: '1px solid var(--surface-5)' }}>
 
           {/* Inline AI summary result */}
           {inlineSummary && (

@@ -37,6 +37,10 @@ class AiReplyNode:
         language     = ctx.variables.get("language", "en")
         channel      = ctx.variables.get("channel", ctx.channel)
         category     = node.config.get("category") or ctx.variables.get("category", "other")
+        logger.debug("ai_reply_entry", extra={
+            "node_id": node.id, "conv_id": ctx.conversation_id,
+            "category": category, "channel": channel,
+        })
 
         # ── Security pre-filter (mandatory, not bypassable) ───────────────────
         check = pre_filter(user_message)
@@ -115,6 +119,11 @@ class AiReplyNode:
         if escalated:
             output["escalation_reason"] = getattr(response, "escalation_reason", "")
 
+        logger.debug("ai_reply_exit", extra={
+            "node_id": node.id, "conv_id": ctx.conversation_id,
+            "escalated": escalated, "resolved": output.get("resolved"),
+            "confidence": output.get("confidence"),
+        })
         return NodeResult(
             output=output,
             next_node_id=node.next_node_id,

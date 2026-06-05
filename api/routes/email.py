@@ -251,9 +251,11 @@ async def _process_inbound_email(gmail_message_id: str) -> None:
     Full pipeline for a single inbound Gmail message.
     Called from the webhook handler after Pub/Sub notification arrives.
     """
+    logger.info("email_pipeline_start", extra={"gmail_message_id": gmail_message_id})
     if not try_claim_gmail_message(gmail_message_id):
-        logger.info("Skipping already-claimed message %s (duplicate delivery)", gmail_message_id)
+        logger.debug("email_message_already_claimed", extra={"gmail_message_id": gmail_message_id})
         return
+    logger.info("email_message_claimed", extra={"gmail_message_id": gmail_message_id})
 
     service = _get_gmail_service()
     raw_message = _fetch_gmail_message(service, gmail_message_id)
@@ -271,6 +273,14 @@ async def _process_inbound_email(gmail_message_id: str) -> None:
         return
 
     parsed = parse_gmail_message(raw_message)
+    logger.info("email_parsed", extra={
+        "gmail_message_id": gmail_message_id,
+        "from_email": parsed.from_email,
+        "subject": (parsed.subject or "")[:80],
+        "has_attachments": bool(parsed.attachments),
+        "body_length": len(parsed.body or ""),
+        "language": parsed.language,
+    })
 
     # Secondary idempotency guard using the RFC Message-ID stored in email_threads.
     # Catches messages processed before the email_processing_claims table existed —
@@ -301,6 +311,11 @@ async def _process_inbound_email(gmail_message_id: str) -> None:
     # ── 3. Detect category from subject + body ────────────────────────────────
     combined_text = f"{parsed.subject} {parsed.body}"
     category = classify_message_with_gemini(combined_text) or detect_category_from_message(combined_text)
+    logger.info("email_classified", extra={
+        "gmail_message_id": gmail_message_id,
+        "category": category,
+        "is_new_ticket": is_new_ticket,
+    })
 
     # ── 4. Create ticket if new thread ────────────────────────────────────────
     if is_new_ticket:
@@ -462,6 +477,10 @@ async def _process_inbound_email(gmail_message_id: str) -> None:
     consecutive_low = _count_consecutive_low_confidence(ticket_id)
 
     from engine.agent import chat
+    logger.info("email_ai_invoked", extra={
+        "ticket_id": ticket_id, "category": category,
+        "gmail_message_id": gmail_message_id,
+    })
     agent_response = chat(
         conversation_id=ticket_id,
         user_id=user_id,
@@ -494,6 +513,13 @@ async def _process_inbound_email(gmail_message_id: str) -> None:
         attachment_notice="",  # already appended to reply_text above
     )
 
+    logger.info("email_reply_sent", extra={
+        "ticket_id": ticket_id,
+        "to_email": parsed.from_email,
+        "escalated": agent_response.escalated,
+        "resolved": agent_response.resolved,
+        "sent_gmail_id": sent_id,
+    })
     add_message(ticket_id, "assistant", reply_text, metadata={
         "channel": "email",
         "confidence": agent_response.confidence,
@@ -871,6 +897,9 @@ async def gmail_pubsub_webhook(request: Request):
 
     email_address = notification.get("emailAddress", "")
     history_id = notification.get("historyId")
+    logger.info("email_webhook_received", extra={
+        "history_id": history_id, "email_address": email_address,
+    })
 
     if not history_id:
         return Response(status_code=204)

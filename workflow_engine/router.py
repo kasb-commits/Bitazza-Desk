@@ -47,12 +47,22 @@ class WorkflowRouter:
                     category_upgrade=None,
                 )
             upgrade = detect_upgrade(message.text, active_execution.category)
-            return RouterResult(
+            result = RouterResult(
                 matched_workflow=workflow,
                 active_execution=active_execution,
                 fallthrough=False,
                 category_upgrade=upgrade,
             )
+            logger.info("workflow_route", extra={
+                "conv_id": message.conversation_id,
+                "channel": message.channel,
+                "category": message.category,
+                "fallthrough": False,
+                "matched_workflow": workflow.name if hasattr(workflow, "name") else workflow.id,
+                "has_active_execution": True,
+                "category_upgrade": upgrade,
+            })
+            return result
 
         # 2. Match a published workflow by trigger.
         # If the ticket is already escalated, don't restart the workflow from scratch —
@@ -69,17 +79,37 @@ class WorkflowRouter:
         workflows = get_published_workflows()
         for wf in workflows:
             if _trigger_matches(wf, message.channel, message.category):
-                return RouterResult(
+                result = RouterResult(
                     matched_workflow=wf,
                     active_execution=None,
                     fallthrough=False,
                     category_upgrade=None,
                 )
+                logger.info("workflow_route", extra={
+                    "conv_id": message.conversation_id,
+                    "channel": message.channel,
+                    "category": message.category,
+                    "fallthrough": False,
+                    "matched_workflow": wf.name if hasattr(wf, "name") else wf.id,
+                    "has_active_execution": False,
+                    "category_upgrade": None,
+                })
+                return result
 
         # 3. No match — fall through to legacy agent
-        return RouterResult(
+        result = RouterResult(
             matched_workflow=None,
             active_execution=None,
             fallthrough=True,
             category_upgrade=None,
         )
+        logger.info("workflow_route", extra={
+            "conv_id": message.conversation_id,
+            "channel": message.channel,
+            "category": message.category,
+            "fallthrough": result.fallthrough,
+            "matched_workflow": None,
+            "has_active_execution": False,
+            "category_upgrade": None,
+        })
+        return result

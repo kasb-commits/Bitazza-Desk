@@ -1,10 +1,18 @@
 """FastAPI application entry point."""
+# Configure logging FIRST — before any other import so that module-level
+# getLogger() calls during import are already wired to our handlers.
+from api.logging_config import configure_logging
+configure_logging()
+
 import asyncio
+import logging
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI
 from config import settings
+
+_startup_logger = logging.getLogger(__name__)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from api.routes.auth import router as auth_router
@@ -17,6 +25,7 @@ from api.routes.studio import router as studio_router
 from api.routes.notifications import router as notifications_router
 from api.routes.uploads import router as uploads_router
 from api.routes.announcements import router as announcements_router
+from api.routes.logs import router as logs_router
 from db.conversation_store import init_db
 from engine.auto_transitions import start_auto_transition_loop
 from engine.report_sender import start_report_scheduler_loop
@@ -77,6 +86,10 @@ async def _email_safety_net_loop() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _startup_logger.info(
+        "server_startup",
+        extra={"env": os.getenv("RAILWAY_ENVIRONMENT", "local")},
+    )
     init_db()
     asyncio.create_task(start_auto_transition_loop())
     asyncio.create_task(_email_safety_net_loop())
@@ -85,6 +98,7 @@ async def lifespan(app: FastAPI):
     from api.ws_manager import manager as ws_manager
     asyncio.create_task(start_notification_scanner_loop(ws_manager))
     yield
+    _startup_logger.info("server_shutdown")
 
 
 app = FastAPI(
@@ -108,6 +122,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Logging middleware wraps the entire stack (added after CORS so it is outermost
+# in Starlette's LIFO processing order).
+from api.middleware.logging_middleware import RequestLoggingMiddleware
+app.add_middleware(RequestLoggingMiddleware)
+
 app.include_router(auth_router)
 app.include_router(chat_router)
 app.include_router(copilot_router)
@@ -118,6 +137,7 @@ app.include_router(studio_router)
 app.include_router(notifications_router)
 app.include_router(uploads_router, prefix="/api/uploads", tags=["uploads"])
 app.include_router(announcements_router)
+app.include_router(logs_router)
 
 # Mount mock User/KYC API and token issuer only in development
 if settings.USE_MOCK_USER_API:

@@ -1,9 +1,13 @@
 """Chat API routes — user-facing message endpoint."""
 import asyncio
+import logging
 import time
 from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from api.middleware.auth import get_user_id, get_optional_user_id
+from api.logging_config import conversation_id_var
+
+logger = logging.getLogger("api.chat")
 from api.ws_manager import manager
 from db.conversation_store import (
     init_db, create_conversation, add_message, get_history, get_paginated_history,
@@ -99,6 +103,10 @@ async def start_conversation(body: StartRequest, user_id: str | None = Depends(g
     agent = pick_agent(body.category)
     assign_ai_persona(cid, agent["name"], agent["avatar"], agent["avatar_url"])
     tid = cid  # ticket already created by create_conversation; no status change needed
+    logger.info("conversation_started", extra={
+        "conv_id": cid, "platform": body.platform,
+        "category": body.category, "is_guest": is_guest,
+    })
     customer_display_name = body.guest_name or "Guest" if is_guest else "—"
     await manager.broadcast_all({
         "type": "new_ticket",
@@ -282,6 +290,16 @@ async def send_message(request: Request, body: MessageRequest, user_id: str | No
     if not body.message.strip() and not body.attachment_ids:
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
+    # Set conv_id ContextVar so all downstream logs (agent, workflow) carry it
+    _token_conv = conversation_id_var.set(body.conversation_id)
+    logger.info("message_received", extra={
+        "conv_id": body.conversation_id,
+        "language": body.language,
+        "category": body.category,
+        "has_attachments": bool(body.attachment_ids),
+        "is_guest": user_id is None,
+    })
+
     # Intent resolution: on the first user turn, refine the picked category using
     # the message content so that deposit_issue / trade_issue (which have no widget
     # card) and mis-picked categories are routed correctly from the very start.
@@ -402,6 +420,11 @@ async def send_message(request: Request, body: MessageRequest, user_id: str | No
     )
 
     if _force_escalate:
+        logger.info("attachment_escalation", extra={
+            "conv_id": body.conversation_id,
+            "reason": "attachment" if _attachments else "screenshot_declined",
+            "category": effective_category,
+        })
         # Clear collection phase — handoff is happening now
         if _collection_phase is not None:
             set_info_collection_phase(body.conversation_id, None)
@@ -422,6 +445,7 @@ async def send_message(request: Request, body: MessageRequest, user_id: str | No
             "message": {"id": _bot_msg_id, "role": "assistant", "sender_type": "bot", "content": _reply_text, "created_at": int(time.time())},
         }))
         asyncio.create_task(emit_ticket_event(_ticket_id, "status_change", {"status": "Pending_Human"}))
+        conversation_id_var.reset(_token_conv)
         return MessageResponse(
             reply=_reply_text,
             language=_lang,
@@ -481,6 +505,15 @@ async def send_message(request: Request, body: MessageRequest, user_id: str | No
     _final_agent_avatar_url = result.agent_avatar_url or (_intent_resolved_agent["avatar_url"] if _intent_resolved_agent else None)
     _final_upgraded_category = result.upgraded_category or (effective_category if _intent_resolved_agent else None)
 
+    logger.info("response_sent", extra={
+        "conv_id": body.conversation_id,
+        "escalated": result.escalated,
+        "escalation_reason": result.escalation_reason,
+        "resolved": result.resolved,
+        "language": result.language,
+        "upgraded_category": result.upgraded_category,
+    })
+    conversation_id_var.reset(_token_conv)
     return MessageResponse(
         reply=result.text,
         language=result.language,

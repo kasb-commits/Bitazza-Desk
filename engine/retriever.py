@@ -2,6 +2,7 @@
 RAG retriever — queries the vector store for relevant knowledge chunks.
 """
 import logging
+import time
 
 from db.vector_store import query
 from config.settings import MAX_RAG_CHUNKS
@@ -31,8 +32,15 @@ def retrieve_with_fallback(user_message: str, n: int = MAX_RAG_CHUNKS) -> list[d
     """
     Retrieves chunks; returns empty list gracefully if vector DB is empty or unavailable.
     """
+    _t = time.time()
     try:
-        return retrieve(user_message, n)
+        chunks_raw = retrieve(user_message, n)
+        logger.info("retriever_complete", extra={
+            "num_results": len(chunks_raw),
+            "latency_ms": round((time.time() - _t) * 1000, 1),
+            "threshold": _DISTANCE_THRESHOLD,
+        })
+        return chunks_raw
     except Exception:
         logger.exception("Vector DB unavailable or empty — returning no chunks")
         return []
