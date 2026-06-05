@@ -981,22 +981,27 @@ export default function App() {
             if (prev.some(existing => existing.id === n.id)) return prev;
             return [n, ...prev];
           });
-          // Play alert sound for all new notifications
+          // Play Slack-style two-note descending chime
           try {
             const ctx = new AudioContext();
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            // Short two-tone chime: higher pitch for critical/high
-            const freq = (n.priority === 'critical' || n.priority === 'high') ? 880 : 660;
-            osc.frequency.setValueAtTime(freq, ctx.currentTime);
-            osc.frequency.setValueAtTime(freq * 1.25, ctx.currentTime + 0.08);
-            gain.gain.setValueAtTime(0.18, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
-            osc.start(ctx.currentTime);
-            osc.stop(ctx.currentTime + 0.35);
-            osc.onended = () => ctx.close();
+            const t = ctx.currentTime;
+            const playNote = (freq: number, startAt: number, duration: number) => {
+              const osc = ctx.createOscillator();
+              const gain = ctx.createGain();
+              osc.type = 'sine';
+              osc.frequency.setValueAtTime(freq, t + startAt);
+              gain.gain.setValueAtTime(0, t + startAt);
+              gain.gain.linearRampToValueAtTime(0.22, t + startAt + 0.01); // quick attack
+              gain.gain.exponentialRampToValueAtTime(0.001, t + startAt + duration);
+              osc.connect(gain);
+              gain.connect(ctx.destination);
+              osc.start(t + startAt);
+              osc.stop(t + startAt + duration);
+            };
+            // High note then lower note — Slack's characteristic descending ding
+            playNote(1046.5, 0,    0.55); // C6
+            playNote(783.99, 0.11, 0.55); // G5
+            setTimeout(() => ctx.close(), 900);
           } catch { /* AudioContext blocked (e.g. no user gesture yet) — silent */ }
           if (n.priority === 'critical' || n.priority === 'high') {
             setToasts(prev => {
