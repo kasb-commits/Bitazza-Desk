@@ -61,30 +61,6 @@ const CHANNEL_PIE_COLORS: Record<string, string> = {
 };
 const CHANNEL_PIE_FALLBACK = '#6b7280';
 
-// ── Background Blobs ──────────────────────────────────────────────────────────
-
-function BgBlobs() {
-  return (
-    <div className="pointer-events-none fixed inset-0 overflow-hidden" style={{ zIndex: 0 }}>
-      <div style={{
-        position: 'absolute', width: 600, height: 600, top: -200, right: -100,
-        borderRadius: '50%', filter: 'blur(80px)', opacity: 0.35,
-        background: 'radial-gradient(circle, #a5b4fc, #818cf8)',
-      }} />
-      <div style={{
-        position: 'absolute', width: 400, height: 400, bottom: -100, left: 200,
-        borderRadius: '50%', filter: 'blur(80px)', opacity: 0.2,
-        background: 'radial-gradient(circle, #c7d2fe, #6366f1)',
-      }} />
-      <div style={{
-        position: 'absolute', width: 300, height: 300, top: '40%', right: '30%',
-        borderRadius: '50%', filter: 'blur(80px)', opacity: 0.18,
-        background: 'radial-gradient(circle, #bfdbfe, #93c5fd)',
-      }} />
-    </div>
-  );
-}
-
 // ── KPI Icons ─────────────────────────────────────────────────────────────────
 
 const IconTicket = () => (
@@ -449,7 +425,6 @@ export default function HomeDashboard({ onSelectTicket, onNavigateInbox }: HomeD
 
   return (
     <div className="glass-page flex-1 overflow-y-auto relative">
-      <BgBlobs />
 
       <div className="relative max-w-7xl mx-auto p-6 space-y-5" style={{ zIndex: 1 }}>
 
