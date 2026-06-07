@@ -860,7 +860,7 @@ export default function MessageThread({ ticketId, ws, onStatusChange, pendingDra
           {/* Glass card composer */}
           <div
             className={`rounded-xl overflow-hidden transition-all ${isDragOver ? 'ring-2 ring-[#00CE80]' : isNote ? 'ring-2 ring-amber-300' : 'ring-1 ring-[#EDEDF8] focus-within:ring-2 focus-within:ring-[#00CE80]'}`}
-            style={{ background: '#ffffff' }}
+            style={{ background: 'var(--surface-3)' }}
             onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
             onDragLeave={() => setIsDragOver(false)}
             onDrop={(e) => { e.preventDefault(); setIsDragOver(false); if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files); }}

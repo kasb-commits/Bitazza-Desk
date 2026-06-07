@@ -35,7 +35,7 @@ function CoreApiPanel({ bitazzaUid }: { bitazzaUid: string }) {
           {[1,2,3].map(i => <Skeleton key={i} className="h-3 w-full" />)}
         </div>
       )}
-      {error && <p className="text-xs italic" style={{ color: '#9ca3af' }}>{error}</p>}
+      {error && <p className="text-xs italic" style={{ color: 'var(--text-muted)' }}>{error}</p>}
       {data && !loading && (
         <div className="space-y-3">
           <div className="space-y-1.5">
@@ -44,12 +44,12 @@ function CoreApiPanel({ bitazzaUid }: { bitazzaUid: string }) {
           </div>
           {data.balances?.length > 0 && (
             <div>
-              <p className="text-[10px] uppercase tracking-wide mb-1.5" style={{ color: '#9ca3af' }}>Balances</p>
+              <p className="text-[10px] uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-muted)' }}>Balances</p>
               <div className="space-y-1">
                 {data.balances.slice(0, 5).map(b => (
                   <div key={b.currency} className="flex justify-between text-xs">
-                    <span className="font-mono" style={{ color: '#6b7280' }}>{b.currency}</span>
-                    <span className="font-mono tabular-nums" style={{ color: '#111827' }}>
+                    <span className="font-mono" style={{ color: 'var(--text-secondary)' }}>{b.currency}</span>
+                    <span className="font-mono tabular-nums" style={{ color: 'var(--text-primary)' }}>
                       {b.available.toLocaleString(undefined, { maximumFractionDigits: 6 })}
                     </span>
                   </div>
@@ -59,16 +59,16 @@ function CoreApiPanel({ bitazzaUid }: { bitazzaUid: string }) {
           )}
           {data.recent_transactions?.length > 0 && (
             <div>
-              <p className="text-[10px] uppercase tracking-wide mb-1.5" style={{ color: '#9ca3af' }}>Recent Transactions</p>
+              <p className="text-[10px] uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-muted)' }}>Recent Transactions</p>
               <div className="space-y-1.5">
                 {data.recent_transactions.slice(0, 4).map(tx => (
                   <div key={tx.id} className="flex items-center justify-between gap-2 text-xs">
-                    <span className="shrink-0 capitalize" style={{ color: '#6b7280' }}>{tx.type}</span>
-                    <span className="truncate font-mono tabular-nums" style={{ color: '#111827' }}>
+                    <span className="shrink-0 capitalize" style={{ color: 'var(--text-secondary)' }}>{tx.type}</span>
+                    <span className="truncate font-mono tabular-nums" style={{ color: 'var(--text-primary)' }}>
                       {tx.amount.toLocaleString()} {tx.currency}
                     </span>
                     <span className="shrink-0 text-[10px] font-medium" style={{
-                      color: tx.status === 'completed' ? '#16a34a' : '#9ca3af'
+                      color: tx.status === 'completed' ? '#16a34a' : 'var(--text-muted)'
                     }}>{tx.status}</span>
                   </div>
                 ))}
@@ -119,25 +119,25 @@ function ReassignModal({
     >
       <div
         className="rounded-2xl p-5 w-72 space-y-4 animate-scale-in"
-        style={{ background: '#ffffff', boxShadow: 'none', border: '1px solid #e8ecf2' }}
+        style={{ background: 'var(--surface-2)', boxShadow: 'none', border: '1px solid var(--surface-5)' }}
       >
         <div>
-          <p className="text-sm font-semibold mb-0.5" style={{ color: '#111827' }}>Reassign ticket?</p>
-          <p className="text-xs" style={{ color: '#6b7280' }}>This conversation will be moved to:</p>
+          <p className="text-sm font-semibold mb-0.5" style={{ color: 'var(--text-primary)' }}>Reassign ticket?</p>
+          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>This conversation will be moved to:</p>
         </div>
 
         <div className="flex items-center gap-2.5 rounded-xl p-2.5" style={{ background: '#F0FEF8', border: '1px solid #D3FCEA' }}>
           <Avatar name={agent.name} size="sm" />
           <div className="min-w-0">
-            <p className="text-xs font-semibold truncate" style={{ color: '#111827' }}>{agent.name}</p>
-            <p className="text-[10px]" style={{ color: '#6b7280' }}>
+            <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{agent.name}</p>
+            <p className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>
               {(agent.active_chats ?? agent.active_conversation_count ?? 0)} active chats
             </p>
           </div>
         </div>
 
         <div>
-          <label className="text-[10px] font-medium uppercase tracking-wide block mb-1" style={{ color: '#9ca3af' }}>
+          <label className="text-[10px] font-medium uppercase tracking-wide block mb-1" style={{ color: 'var(--text-muted)' }}>
             Handoff note (optional)
           </label>
           <textarea
@@ -146,9 +146,9 @@ function ReassignModal({
             placeholder="Add context for the new agent…"
             rows={2}
             className="w-full text-xs px-2.5 py-2 rounded-lg outline-none resize-none transition-all"
-            style={{ background: '#f9fafb', border: '1px solid #e5e7eb', color: '#111827' }}
+            style={{ background: 'var(--surface-3)', border: '1px solid var(--surface-5)', color: 'var(--text-primary)' }}
             onFocus={e => { e.currentTarget.style.borderColor = '#00CE80'; }}
-            onBlur={e => { e.currentTarget.style.borderColor = '#e5e7eb'; }}
+            onBlur={e => { e.currentTarget.style.borderColor = 'var(--surface-5)'; }}
           />
         </div>
 
@@ -156,7 +156,7 @@ function ReassignModal({
           <button
             onClick={onCancel}
             className="flex-1 text-xs py-2 rounded-lg transition-colors font-medium"
-            style={{ background: '#f3f4f6', border: '1px solid #e5e7eb', color: '#374151' }}
+            style={{ background: 'var(--surface-3)', border: '1px solid var(--surface-5)', color: 'var(--text-secondary)' }}
           >
             Cancel
           </button>
@@ -263,10 +263,10 @@ export default function PropertiesPanel({ ticket, onUpdate, partialDraft = '', o
   const availableAgents = agents.filter(a => (a.state ?? a.status) !== 'Offline');
 
   return (
-    <aside className="w-[364px] shrink-0 bg-white flex flex-col overflow-hidden" data-theme="light"
-      style={{ borderLeft: '1px solid rgba(180,195,220,0.35)', position: 'relative', zIndex: 1 }}
+    <aside className="w-[364px] shrink-0 bg-surface-1 flex flex-col overflow-hidden"
+      style={{ borderLeft: '1px solid var(--surface-5)', position: 'relative', zIndex: 1 }}
     >
-      <div className="flex-1 overflow-y-auto" style={{ background: '#f4f6f9' }}>
+      <div className="flex-1 overflow-y-auto" style={{ background: 'var(--surface-0)' }}>
         <div className="p-3 space-y-3">
 
           {/* ── Customer ── */}
@@ -277,13 +277,13 @@ export default function PropertiesPanel({ ticket, onUpdate, partialDraft = '', o
               <div className="min-w-0 flex-1">
                 <button
                   className="text-sm font-semibold truncate hover:underline text-left w-full transition-colors"
-                  style={{ color: '#111827' }}
+                  style={{ color: 'var(--text-primary)' }}
                   onClick={() => {
                     const uid = ticket.customer?.bitazza_uid ?? ticket.customer?.user_id;
                     if (uid) navigate(`/users?uid=${uid}`);
                   }}
                 >{ticket.customer?.name ?? '—'}</button>
-                <div className="text-xs truncate" style={{ color: '#6b7280' }}>{ticket.customer?.email ?? '—'}</div>
+                <div className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{ticket.customer?.email ?? '—'}</div>
               </div>
               {tier !== 'Standard' && (
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
@@ -306,7 +306,7 @@ export default function PropertiesPanel({ ticket, onUpdate, partialDraft = '', o
 
               {/* Status row + select */}
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs" style={{ color: '#6b7280' }}>Status</span>
+                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Status</span>
                 <StatusBadge status={ticket.status} dot size="xs" />
               </div>
               <Select
@@ -327,7 +327,7 @@ export default function PropertiesPanel({ ticket, onUpdate, partialDraft = '', o
 
               {/* Assignee drilldown */}
               <div ref={assigneeRef}>
-                <span className="text-xs block mb-1.5" style={{ color: '#6b7280' }}>Assigned to</span>
+                <span className="text-xs block mb-1.5" style={{ color: 'var(--text-secondary)' }}>Assigned to</span>
 
                 {/* Trigger row */}
                 <button
@@ -335,8 +335,8 @@ export default function PropertiesPanel({ ticket, onUpdate, partialDraft = '', o
                   onClick={() => canAssign && setShowAgentList(v => !v)}
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-md transition-colors text-left"
                   style={{
-                    background: showAgentList ? '#f9fafb' : '#ffffff',
-                    border: '1px solid #e5e7eb',
+                    background: showAgentList ? 'var(--surface-3)' : 'var(--surface-2)',
+                    border: '1px solid var(--surface-5)',
                     cursor: canAssign ? 'pointer' : 'default',
                   }}
                 >
@@ -349,17 +349,17 @@ export default function PropertiesPanel({ ticket, onUpdate, partialDraft = '', o
                   ) : assignedName !== 'Unassigned' ? (
                     <Avatar name={assignedName} size="xs" />
                   ) : (
-                    <span className="w-5 h-5 rounded-full shrink-0 flex items-center justify-center" style={{ background: '#f3f4f6', border: '1px dashed #d1d5db' }}>
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#9ca3af' }}>
+                    <span className="w-5 h-5 rounded-full shrink-0 flex items-center justify-center" style={{ background: 'var(--surface-3)', border: '1px dashed var(--surface-5)' }}>
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: 'var(--text-muted)' }}>
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                       </svg>
                     </span>
                   )}
-                  <span className="flex-1 text-xs truncate" style={{ color: isAiHandled ? '#00CE80' : '#111827', fontWeight: isAiHandled ? 500 : 400 }}>
+                  <span className="flex-1 text-xs truncate" style={{ color: isAiHandled ? '#00CE80' : 'var(--text-primary)', fontWeight: isAiHandled ? 500 : 400 }}>
                     {assignedName}
                   </span>
                   {canAssign && (
-                    <svg className={`w-3.5 h-3.5 shrink-0 transition-transform ${showAgentList ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#9ca3af' }}>
+                    <svg className={`w-3.5 h-3.5 shrink-0 transition-transform ${showAgentList ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: 'var(--text-muted)' }}>
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
                     </svg>
                   )}
@@ -367,9 +367,9 @@ export default function PropertiesPanel({ ticket, onUpdate, partialDraft = '', o
 
                 {/* Inline agent list */}
                 {showAgentList && (
-                  <div className="mt-1 rounded-lg overflow-hidden animate-slide-in-up" style={{ border: '1px solid #e5e7eb', background: '#ffffff', border: '1px solid #EDEDF8' }}>
+                  <div className="mt-1 rounded-lg overflow-hidden animate-slide-in-up" style={{ border: '1px solid var(--surface-5)', background: 'var(--surface-2)' }}>
                     {availableAgents.length === 0 ? (
-                      <p className="text-xs px-3 py-2.5" style={{ color: '#9ca3af' }}>No agents available</p>
+                      <p className="text-xs px-3 py-2.5" style={{ color: 'var(--text-muted)' }}>No agents available</p>
                     ) : (
                       <div className="max-h-44 overflow-y-auto">
                         {availableAgents.map(a => {
@@ -388,12 +388,12 @@ export default function PropertiesPanel({ ticket, onUpdate, partialDraft = '', o
                                 cursor: full ? 'not-allowed' : 'pointer',
                                 background: isCurrent ? '#F0FEF8' : 'transparent',
                               }}
-                              onMouseEnter={e => { if (!full && !isCurrent) (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb'; }}
+                              onMouseEnter={e => { if (!full && !isCurrent) (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-3)'; }}
                               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = isCurrent ? '#F0FEF8' : 'transparent'; }}
                             >
                               <Avatar name={a.name} size="xs" />
-                              <span className="flex-1 text-xs truncate" style={{ color: '#111827', fontWeight: isCurrent ? 600 : 400 }}>{a.name}</span>
-                              <span className="text-[10px] font-mono shrink-0" style={{ color: full ? '#ef4444' : '#9ca3af' }}>{active}/{max}</span>
+                              <span className="flex-1 text-xs truncate" style={{ color: 'var(--text-primary)', fontWeight: isCurrent ? 600 : 400 }}>{a.name}</span>
+                              <span className="text-[10px] font-mono shrink-0" style={{ color: full ? '#ef4444' : 'var(--text-muted)' }}>{active}/{max}</span>
                               {isCurrent && (
                                 <svg className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 20 20" style={{ color: '#00CE80' }}>
                                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
@@ -416,19 +416,19 @@ export default function PropertiesPanel({ ticket, onUpdate, partialDraft = '', o
             <SectionHeading>Info</SectionHeading>
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs" style={{ color: '#6b7280' }}>Channel</span>
+                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Channel</span>
                 <ChannelBadge channel={ticket.channel as any} size="xs" />
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs" style={{ color: '#6b7280' }}>Category</span>
+                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Category</span>
                 {ticket.category
                   ? <CategoryBadge category={ticket.category as any} size="xs" />
-                  : <span className="text-xs" style={{ color: '#9ca3af' }}>—</span>
+                  : <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
                 }
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs" style={{ color: '#6b7280' }}>Source</span>
-                <span className="text-xs font-medium" style={{ color: ticket.source ? '#111827' : '#9ca3af' }}>
+                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Source</span>
+                <span className="text-xs font-medium" style={{ color: ticket.source ? 'var(--text-primary)' : 'var(--text-muted)' }}>
                   {ticket.source ?? '—'}
                 </span>
               </div>
@@ -436,16 +436,16 @@ export default function PropertiesPanel({ ticket, onUpdate, partialDraft = '', o
                 typeof ticket.created_at === 'number' ? ticket.created_at * 1000 : ticket.created_at
               ).toLocaleString() : '—'} />
               <div className="flex items-center justify-between">
-                <span className="text-xs" style={{ color: '#6b7280' }}>CSAT</span>
+                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>CSAT</span>
                 {ticket.csat_score != null ? (
                   <span className="text-xs font-medium flex items-center gap-1" style={{
                     color: ticket.csat_score >= 4 ? '#16a34a' : ticket.csat_score === 3 ? '#d97706' : '#dc2626'
                   }}>
                     {'★'.repeat(ticket.csat_score)}{'☆'.repeat(5 - ticket.csat_score)}
-                    <span className="font-normal ml-0.5" style={{ color: '#9ca3af' }}>({ticket.csat_score}/5)</span>
+                    <span className="font-normal ml-0.5" style={{ color: 'var(--text-muted)' }}>({ticket.csat_score}/5)</span>
                   </span>
                 ) : (
-                  <span className="text-xs" style={{ color: '#9ca3af' }}>—</span>
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
                 )}
               </div>
             </div>
@@ -465,7 +465,7 @@ export default function PropertiesPanel({ ticket, onUpdate, partialDraft = '', o
               </div>
             )}
             {tags.length === 0 && (
-              <span className="text-xs" style={{ color: '#9ca3af' }}>No tags on this ticket</span>
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>No tags on this ticket</span>
             )}
             {canSetTags && (
               <>
@@ -476,7 +476,7 @@ export default function PropertiesPanel({ ticket, onUpdate, partialDraft = '', o
                     </button>
                   ))}
                   {[...new Set([...allTags, ...knownTags])].filter(t => !tags.includes(t)).length === 0 && tags.length === 0 && (
-                    <span className="text-xs" style={{ color: '#9ca3af' }}>No tags available</span>
+                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>No tags available</span>
                   )}
                 </div>
                 <div className="flex gap-1">
@@ -486,12 +486,12 @@ export default function PropertiesPanel({ ticket, onUpdate, partialDraft = '', o
                     onKeyDown={e => e.key === 'Enter' && addCustomTag()}
                     placeholder="Add tag…"
                     className="flex-1 text-xs px-2.5 py-1.5 rounded outline-none transition-all"
-                    style={{ background: '#ffffff', border: '1px solid #e5e7eb', color: '#111827' }}
+                    style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-5)', color: 'var(--text-primary)' }}
                   />
                   <button
                     onClick={addCustomTag}
                     className="text-xs px-3 py-1.5 rounded transition-colors"
-                    style={{ background: '#f3f4f6', border: '1px solid #e5e7eb', color: '#374151' }}
+                    style={{ background: 'var(--surface-3)', border: '1px solid var(--surface-5)', color: 'var(--text-secondary)' }}
                   >
                     Add
                   </button>
@@ -510,7 +510,7 @@ export default function PropertiesPanel({ ticket, onUpdate, partialDraft = '', o
           {/* ── AI Copilot ── */}
           <div
             className="rounded-xl overflow-hidden"
-            style={{ background: '#ffffff', border: '1px solid #e8ecf2', border: '1px solid #EDEDF8' }}
+            style={{ background: 'var(--surface-1)', border: '1px solid var(--surface-5)' }}
           >
             <div className="px-3 py-2.5 flex items-center gap-1.5" style={{ background: '#F0FEF8', borderBottom: '1px solid #ede9fe' }}>
               <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#00CE80' }}>
@@ -545,7 +545,7 @@ function Section({ children }: { children: React.ReactNode }) {
   return (
     <div
       className="rounded-xl p-3 space-y-3"
-      style={{ background: '#ffffff', border: '1px solid #e8ecf2', border: '1px solid #EDEDF8' }}
+      style={{ background: 'var(--surface-1)', border: '1px solid var(--surface-5)' }}
     >
       {children}
     </div>
@@ -616,10 +616,10 @@ function TicketPropertiesSection({ ticketId, category }: { ticketId: string; cat
           return (
             <div key={def.id}>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] font-medium" style={{ color: def.is_required && isEmpty ? '#d97706' : '#6b7280' }}>
+                <span className="text-[10px] font-medium" style={{ color: def.is_required && isEmpty ? '#d97706' : 'var(--text-secondary)' }}>
                   {def.name}{def.is_required && isEmpty ? ' *' : ''}
                 </span>
-                {isSaving && <span className="text-[9px]" style={{ color: '#9ca3af' }}>saving…</span>}
+                {isSaving && <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>saving…</span>}
               </div>
 
               {def.field_type === 'single_select' && (
@@ -628,7 +628,7 @@ function TicketPropertiesSection({ ticketId, category }: { ticketId: string; cat
                   onChange={e => handleChange(def, e.target.value || null)}
                   disabled={isSaving}
                   className="w-full text-xs rounded-lg px-2.5 py-1.5 outline-none"
-                  style={{ background: '#f9fafb', border: '1px solid #e5e7eb', color: displayVal ? '#111827' : '#9ca3af' }}
+                  style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-5)', color: displayVal ? 'var(--text-primary)' : 'var(--text-muted)' }}
                 >
                   <option value="">— select —</option>
                   {(def.options ?? []).map(o => (
@@ -651,9 +651,9 @@ function TicketPropertiesSection({ ticketId, category }: { ticketId: string; cat
                         }}
                         className="text-[10px] px-2 py-0.5 rounded-full transition-colors"
                         style={{
-                          background: selected ? '#D3FCEA' : '#f3f4f6',
-                          color: selected ? '#00CE80' : '#6b7280',
-                          border: selected ? '1px solid #c4b5fd' : '1px solid #e5e7eb',
+                          background: selected ? '#D3FCEA' : 'var(--surface-3)',
+                          color: selected ? '#00CE80' : 'var(--text-secondary)',
+                          border: selected ? '1px solid #c4b5fd' : '1px solid var(--surface-5)',
                         }}
                       >
                         {o.label}
@@ -671,7 +671,7 @@ function TicketPropertiesSection({ ticketId, category }: { ticketId: string; cat
                   onBlur={() => handleTextBlur(def)}
                   disabled={isSaving}
                   className="w-full text-xs rounded-lg px-2.5 py-1.5 outline-none"
-                  style={{ background: '#f9fafb', border: '1px solid #e5e7eb', color: '#111827' }}
+                  style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-5)', color: 'var(--text-primary)' }}
                 />
               )}
 
@@ -683,7 +683,7 @@ function TicketPropertiesSection({ ticketId, category }: { ticketId: string; cat
                   onBlur={() => handleTextBlur(def)}
                   disabled={isSaving}
                   className="w-full text-xs rounded-lg px-2.5 py-1.5 outline-none"
-                  style={{ background: '#f9fafb', border: '1px solid #e5e7eb', color: '#111827' }}
+                  style={{ background: 'var(--surface-2)', border: '1px solid var(--surface-5)', color: 'var(--text-primary)' }}
                 />
               )}
 
@@ -692,7 +692,7 @@ function TicketPropertiesSection({ ticketId, category }: { ticketId: string; cat
                   disabled={isSaving}
                   onClick={() => handleChange(def, committed === 'true' ? 'false' : 'true')}
                   className="w-8 rounded-full relative transition-colors"
-                  style={{ height: 18, background: committed === 'true' ? '#00CE80' : '#e5e7eb' }}
+                  style={{ height: 18, background: committed === 'true' ? '#00CE80' : 'var(--surface-5)' }}
                 >
                   <span
                     className="absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white shadow transition-transform"
@@ -710,17 +710,17 @@ function TicketPropertiesSection({ ticketId, category }: { ticketId: string; cat
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: '#9ca3af' }}>{children}</h3>
+    <h3 className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{children}</h3>
   );
 }
 
 function PropRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="flex items-start justify-between gap-2">
-      <span className="text-xs shrink-0" style={{ color: '#6b7280' }}>{label}</span>
+      <span className="text-xs shrink-0" style={{ color: 'var(--text-secondary)' }}>{label}</span>
       <span
         className={`text-xs truncate text-right max-w-[150px] ${mono ? 'font-mono text-[10px]' : ''}`}
-        style={{ color: '#111827' }}
+        style={{ color: 'var(--text-primary)' }}
       >
         {value}
       </span>
