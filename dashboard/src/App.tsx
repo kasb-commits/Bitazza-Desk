@@ -929,7 +929,9 @@ export default function App() {
 
   useEffect(() => {
     if (!user) return;
+    let active = true;
     const connect = () => {
+      if (!active) return;
       const ws = createWS((event) => {
         const e = event as WSEvent;
 
@@ -1024,6 +1026,7 @@ export default function App() {
     const pollInterval = setInterval(() => { loadTicketsRef.current(); }, 30_000);
 
     return () => {
+      active = false;
       wsRef.current?.close();
       clearInterval(pollInterval);
     };
@@ -1059,7 +1062,7 @@ export default function App() {
   const handleNavigateInbox = (v: InboxView, f: StatusFilter) => { handleViewChange(v); handleStatusFilterChange(f); navigate('/inbox'); };
   const handleSearchChange = (s: string) => { sessionStorage.setItem('inboxSearch', s); setSearch(s); };
   const handleLogin = (u: AuthUser) => { setAuthUser(u); setUser(u); };
-  const handleLogout = () => { setAuthUser(null); setUser(null); sessionStorage.clear(); };
+  const handleLogout = () => { setAuthUser(null); setUser(null); sessionStorage.clear(); localStorage.removeItem('auth_user'); };
 
   if (!user) {
     return (
@@ -1088,7 +1091,11 @@ export default function App() {
 
         <ToastContainer
           toasts={toasts}
-          onDismiss={(id) => setToasts(prev => prev.filter(t => t.id !== id))}
+          onDismiss={(id) => {
+            setToasts(prev => prev.filter(t => t.id !== id));
+            setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+            api.markNotificationRead(id).catch(() => {});
+          }}
           onOpenTicket={handleSelectAndNavigate}
         />
 

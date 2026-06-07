@@ -59,7 +59,13 @@ export function NotificationPanel({
 }: NotificationPanelProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectMode, setSelectMode] = useState(false);
+  const [, setTick] = useState(0);
 
+  // Re-render timestamps every 60 s so timeAgo stays current
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -94,7 +100,12 @@ export function NotificationPanel({
     }
     if (!n.read) {
       onMarkRead(n.id);
-      await api.markNotificationRead(n.id).catch(err => console.error('[notifications] mark-read failed:', err));
+      try {
+        await api.markNotificationRead(n.id);
+      } catch (err) {
+        console.error('[notifications] mark-read failed:', err);
+        onMarkUnread(n.id);
+      }
     }
     if (n.ticket_id) {
       onOpenTicket(n.ticket_id);
@@ -103,8 +114,14 @@ export function NotificationPanel({
   };
 
   const handleMarkAllRead = async () => {
+    const unreadIds = notifications.filter(n => !n.read).map(n => n.id);
     onMarkAllRead();
-    await api.markAllNotificationsRead().catch(err => console.error('[notifications] mark-all-read failed:', err));
+    try {
+      await api.markAllNotificationsRead();
+    } catch (err) {
+      console.error('[notifications] mark-all-read failed:', err);
+      onBulkMark(unreadIds, false);
+    }
   };
 
   const handleBulkRead = async (read: boolean) => {
@@ -112,7 +129,22 @@ export function NotificationPanel({
     onBulkMark(ids, read);
     setSelected(new Set());
     setSelectMode(false);
-    await api.bulkMarkNotifications(ids, read).catch(err => console.error('[notifications] bulk mark failed:', err));
+    try {
+      await api.bulkMarkNotifications(ids, read);
+    } catch (err) {
+      console.error('[notifications] bulk mark failed:', err);
+      onBulkMark(ids, !read);
+    }
+  };
+
+  const handleMarkUnread = async (n: Notification) => {
+    onMarkUnread(n.id);
+    try {
+      await api.markNotificationUnread(n.id);
+    } catch (err) {
+      console.error('[notifications] mark-unread failed:', err);
+      onMarkRead(n.id);
+    }
   };
 
   const allSelected = sorted.length > 0 && selected.size === sorted.length;
@@ -237,13 +269,16 @@ export function NotificationPanel({
               const priority = n.priority as NotificationPriority;
               const isSelected = selected.has(n.id);
               return (
-                <button
+                <div
                   key={n.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleItemClick(n)}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') handleItemClick(n); }}
                   className={`
-                    w-full text-left px-4 py-3 border-l-2 ${PRIORITY_BORDER[priority] ?? 'border-l-surface-5'}
+                    group w-full text-left px-4 py-3 border-l-2 ${PRIORITY_BORDER[priority] ?? 'border-l-surface-5'}
                     border-b border-surface-5 last:border-b-0
-                    hover:bg-surface-3 transition-colors
+                    hover:bg-surface-3 transition-colors cursor-pointer
                     ${n.read && !isSelected ? 'opacity-50' : ''}
                     ${isSelected ? 'bg-brand/5' : ''}
                   `}
@@ -282,8 +317,19 @@ export function NotificationPanel({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                     )}
+                    {!selectMode && n.read && (
+                      <button
+                        onClick={e => { e.stopPropagation(); handleMarkUnread(n); }}
+                        className="opacity-0 group-hover:opacity-100 shrink-0 mt-0.5 p-0.5 rounded text-text-muted hover:text-text-primary transition-all"
+                        title="Mark as unread"
+                      >
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                          <circle cx="12" cy="12" r="5" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
-                </button>
+                </div>
               );
             })
           )}

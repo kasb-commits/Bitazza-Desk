@@ -452,7 +452,7 @@ export function createWS(onEvent: (e: unknown) => void): WebSocket {
 
   // Forward all server→client events as fake MessageEvents
   const EVENTS = [
-    'new_message', 'status_change', 'ticket:updated', 'ticket:assigned',
+    'new_ticket', 'new_message', 'status_change', 'ticket:updated', 'ticket:assigned',
     'ticket_assigned', 'agent_typing', 'agent_presence', 'sla:breach',
     'whisper', 'supervisor_joined', 'ticket:resolve_request', 'notification:new',
   ];

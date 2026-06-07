@@ -123,8 +123,8 @@ router.post('/sla-breach', authenticate, async (req, res) => {
         [id, s.id, title, body, ticket_id]
       );
       created.push(rows[0]);
+      emitToAgent(s.id, 'notification:new', { notification: rows[0] });
     }
-    emitToSupervisors('notification:new', { notification: { title, body, type: 'sla_breach', priority: 'critical', ticket_id } });
 
     res.json({ created: created.length });
   } catch (err) {
