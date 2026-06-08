@@ -106,12 +106,13 @@ class AiReplyNode:
                 escalated = False
 
         output: dict = {
-            "reply":    reply_text,
-            "language": response.language,
-            "escalated": escalated,
-            "resolved":  response.resolved,
-            "confidence": response.confidence,
+            "reply":         reply_text,
+            "language":      response.language,
+            "escalated":     escalated,
+            "resolved":      response.resolved,
+            "confidence":    response.confidence,
             "profile_fetched": getattr(response, "profile_fetched", False),
+            "quick_replies": getattr(response, "quick_replies", None) or [],
         }
 
         if response.upgraded_category:

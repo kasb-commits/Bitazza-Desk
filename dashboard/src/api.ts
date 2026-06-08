@@ -415,6 +415,13 @@ export const api = {
       clearTimeout(timeout);
     }
   },
+
+  // Bot Config
+  getBotConfig: () =>
+    req<{ quick_replies_enabled: boolean; quick_replies_mode: string }>('/api/bot-config'),
+
+  updateBotConfig: (data: { quick_replies_enabled: boolean; quick_replies_mode: string }) =>
+    req('/api/bot-config', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ── Socket.io client ──────────────────────────────────────────────────────────

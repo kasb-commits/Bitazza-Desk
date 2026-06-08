@@ -1505,6 +1505,50 @@ def get_unreplied_email_tickets() -> list[dict]:
         return [dict(r) for r in cur.fetchall()]
 
 
+# ── Bot config (feature flags) ────────────────────────────────────────────────
+
+_BOT_CONFIG_DEFAULTS: dict = {
+    "quick_replies_enabled": True,
+    "quick_replies_mode": "ai",  # "ai" | "curated"
+}
+
+
+def get_bot_config() -> dict:
+    """Return current bot config as a plain dict, falling back to defaults."""
+    try:
+        with _conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT key, value FROM bot_config")
+                rows = cur.fetchall()
+        result = dict(_BOT_CONFIG_DEFAULTS)
+        for row in rows:
+            try:
+                result[row["key"]] = json.loads(row["value"])
+            except (json.JSONDecodeError, TypeError):
+                result[row["key"]] = row["value"]
+        return result
+    except Exception:
+        logger.exception("get_bot_config failed — returning defaults")
+        return dict(_BOT_CONFIG_DEFAULTS)
+
+
+def update_bot_config(data: dict) -> None:
+    """Upsert key-value pairs into bot_config table."""
+    with _conn() as conn:
+        with conn.cursor() as cur:
+            for key, value in data.items():
+                cur.execute(
+                    """
+                    INSERT INTO bot_config (key, value, updated_at)
+                    VALUES (%s, %s, NOW())
+                    ON CONFLICT (key) DO UPDATE
+                        SET value = EXCLUDED.value,
+                            updated_at = NOW()
+                    """,
+                    (key, json.dumps(value)),
+                )
+
+
 def backfill_outbound_message(
     ticket_id: str,
     gmail_thread_id: str,

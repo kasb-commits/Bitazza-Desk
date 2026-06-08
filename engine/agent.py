@@ -135,7 +135,8 @@ class AgentResponse:
                  upgraded_category: str | None = None,
                  transition_message: str | None = None,
                  info_collection: bool = False,
-                 profile_fetched: bool = False):
+                 profile_fetched: bool = False,
+                 quick_replies: list[str] | None = None):
         self.text = text
         self.language = language
         self.escalated = escalated
@@ -151,6 +152,7 @@ class AgentResponse:
         self.transition_message: str | None = transition_message  # outgoing-agent farewell shown before specialist reply
         self.info_collection = info_collection  # True when this reply is a collection-phase question
         self.profile_fetched = profile_fetched  # True when get_user_profile tool was called this turn
+        self.quick_replies: list[str] | None = quick_replies  # Suggested customer reply pills (None = suppress)
 
 
 _UPGRADE_TRANSITION_MESSAGES: dict[str, dict[str, str]] = {
@@ -586,7 +588,16 @@ def chat(
             if _meta.get("customer_id"):
                 trigger_auto_assign(ticket_id, category, _meta["priority"], str(_meta["customer_id"]))
         effective_category = detect_category_from_message(user_message) or category
-        reply_text = "" if suppress_handoff else build_handoff_message(effective_category, language)
+        if suppress_handoff:
+            # Workflow mode: EscalateNode sends the formal handoff, but we still need
+            # a visible message now — the escalate node may be 1-2 turns away.
+            reply_text = (
+                "Sorry, I'm having trouble right now. Please hold on — a specialist will be with you shortly."
+                if language == "en"
+                else "ขออภัย เกิดปัญหาในการตอบกลับ กรุณารอสักครู่ เจ้าหน้าที่จะติดต่อคุณเร็วๆ นี้ค่ะ"
+            )
+        else:
+            reply_text = build_handoff_message(effective_category, language)
         return AgentResponse(
             text=reply_text,
             language=language, escalated=True,
@@ -674,7 +685,14 @@ def chat(
                 if _meta.get("customer_id"):
                     trigger_auto_assign(ticket_id, category, _meta["priority"], str(_meta["customer_id"]))
             effective_category = detect_category_from_message(user_message) or category
-            reply_text = "" if suppress_handoff else build_handoff_message(effective_category, language)
+            if suppress_handoff:
+                reply_text = (
+                    "Sorry, I'm having trouble right now. Please hold on — a specialist will be with you shortly."
+                    if language == "en"
+                    else "ขออภัย เกิดปัญหาในการตอบกลับ กรุณารอสักครู่ เจ้าหน้าที่จะติดต่อคุณเร็วๆ นี้ค่ะ"
+                )
+            else:
+                reply_text = build_handoff_message(effective_category, language)
             return AgentResponse(
                 text=reply_text,
                 language=language, escalated=True,
@@ -689,10 +707,11 @@ def chat(
         if hasattr(part, "text") and part.text:
             raw_text += part.text
 
-    response_text, confidence, needs_human, resolved = _parse_gemini_response(raw_text, language)
+    response_text, confidence, needs_human, resolved, quick_replies = _parse_gemini_response(raw_text, language)
     logger.info("llm_response_parsed", extra={
         "conv_id": conversation_id, "confidence": confidence,
         "needs_human": needs_human, "resolved": resolved,
+        "quick_replies": quick_replies, "raw_snippet": raw_text[:300],
     })
 
     # 9a. Farewell override: if the model didn't set resolved=true but the reply
@@ -765,8 +784,20 @@ def chat(
             reason = "already_escalated"
         elif suppress_handoff:
             # Inside a workflow — the workflow owns escalation routing via its
-            # own escalate node. Don't intercept with collection questions.
-            pass
+            # own escalate node. Signal escalation via the response's escalated flag
+            # so chk_esc can route, but DO NOT update the ticket here (EscalateNode
+            # handles that) and DO NOT suppress pills — gathering turns still need them.
+            _workflow_pills = quick_replies if not resolved else None
+            logger.info("agent_workflow_escalation_signal", extra={
+                "conv_id": conversation_id, "reason": reason,
+                "quick_replies": _workflow_pills,
+            })
+            return AgentResponse(
+                text=response_text, language=language, resolved=resolved,
+                confidence=confidence, escalated=True, escalation_reason=reason,
+                profile_fetched="get_user_profile" in account_data,
+                quick_replies=_workflow_pills,
+            )
         elif reason in _intercept_reasons:
             _phase = get_info_collection_phase(conversation_id)
             if _phase is None:
@@ -814,9 +845,15 @@ def chat(
             escalation_reason=reason, ticket_id=ticket_id,
         )
 
+    final_pills = quick_replies if not resolved and not escalate else None
+    logger.info("agent_return_pills", extra={
+        "conv_id": conversation_id, "resolved": resolved, "escalate": escalate,
+        "quick_replies_raw": quick_replies, "quick_replies_final": final_pills,
+    })
     return AgentResponse(
         text=response_text, language=language, resolved=resolved, confidence=confidence,
         profile_fetched="get_user_profile" in account_data,
+        quick_replies=final_pills,
     )
 
 
@@ -883,14 +920,14 @@ def _is_farewell_reply(text: str, language: str) -> bool:
         return False
 
 
-def _parse_gemini_response(raw: str, language: str) -> tuple[str, float, bool, bool]:
+def _parse_gemini_response(raw: str, language: str) -> tuple[str, float, bool, bool, list[str]]:
     """
     Parse Gemini's structured JSON response.
-    Returns (response_text, confidence, needs_human, resolved).
+    Returns (response_text, confidence, needs_human, resolved, quick_replies).
     Falls back gracefully if JSON is malformed.
     """
     if not raw:
-        return UNABLE_TO_HELP_MESSAGES.get(language, UNABLE_TO_HELP_MESSAGES["en"]), 0.0, True, False
+        return UNABLE_TO_HELP_MESSAGES.get(language, UNABLE_TO_HELP_MESSAGES["en"]), 0.0, True, False, []
 
     # Strip markdown code fences if present
     cleaned = re.sub(r"```(?:json)?\s*|\s*```", "", raw.strip())
@@ -901,10 +938,14 @@ def _parse_gemini_response(raw: str, language: str) -> tuple[str, float, bool, b
         confidence = float(data.get("confidence", ESCALATION_CONFIDENCE_THRESHOLD))
         needs_human = bool(data.get("needs_human", False))
         resolved = bool(data.get("resolved", False))
+        quick_replies = [
+            str(q) for q in data.get("quick_replies", [])
+            if isinstance(q, str) and q.strip()
+        ][:4]
         if not response_text:
             response_text = UNABLE_TO_HELP_MESSAGES.get(language, UNABLE_TO_HELP_MESSAGES["en"])
             needs_human = True
-        return response_text, confidence, needs_human, resolved
+        return response_text, confidence, needs_human, resolved, quick_replies
 
     # 1. Try the whole cleaned string as JSON
     try:
@@ -920,9 +961,38 @@ def _parse_gemini_response(raw: str, language: str) -> tuple[str, float, bool, b
         except (json.JSONDecodeError, ValueError, TypeError):
             pass
 
+    # 2b. Truncated-JSON rescue: extract quick_replies array + response text individually.
+    # quick_replies is now the FIRST field in the schema so it will be present even if
+    # the response text is cut off. Extract them and then find the response text separately.
+    rescued_pills: list[str] = []
+    qr_match = re.search(r'"quick_replies"\s*:\s*(\[[^\]]*\])', cleaned)
+    if qr_match:
+        try:
+            rescued_pills = [
+                str(q) for q in json.loads(qr_match.group(1))
+                if isinstance(q, str) and str(q).strip()
+            ][:4]
+        except (json.JSONDecodeError, ValueError):
+            pass
+    resp_match = re.search(r'"response"\s*:\s*"((?:[^"\\]|\\.)*)"', cleaned, re.DOTALL)
+    if resp_match:
+        try:
+            resp_text = json.loads('"' + resp_match.group(1) + '"')
+            if resp_text.strip():
+                conf_match = re.search(r'"confidence"\s*:\s*([0-9.]+)', cleaned)
+                nh_match   = re.search(r'"needs_human"\s*:\s*(true|false)', cleaned)
+                res_match  = re.search(r'"resolved"\s*:\s*(true|false)', cleaned)
+                conf = float(conf_match.group(1)) if conf_match else ESCALATION_CONFIDENCE_THRESHOLD
+                nh   = (nh_match.group(1) == "true")  if nh_match  else False
+                res  = (res_match.group(1) == "true") if res_match else False
+                logger.debug("_parse_gemini_response: rescued truncated JSON, pills=%s", rescued_pills)
+                return resp_text.strip(), conf, nh, res, rescued_pills if not nh and not res else []
+        except (json.JSONDecodeError, ValueError, TypeError):
+            pass
+
     # 3. Last resort: strip any trailing JSON-looking block and use the prose
     prose = re.sub(r'\{[\s\S]*\}', '', cleaned).strip()
     if prose:
-        return prose, 0.7, False, False
+        return prose, 0.7, False, False, []
 
-    return UNABLE_TO_HELP_MESSAGES.get(language, UNABLE_TO_HELP_MESSAGES["en"]), 0.0, True, False
+    return UNABLE_TO_HELP_MESSAGES.get(language, UNABLE_TO_HELP_MESSAGES["en"]), 0.0, True, False, []

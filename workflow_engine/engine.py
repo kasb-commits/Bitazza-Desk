@@ -272,7 +272,11 @@ class WorkflowExecutionEngine:
             # Propagate reply and escalation flags to execution level
             if "reply" in result.output:
                 execution.output_reply = result.output["reply"]
-            if result.output.get("escalated"):
+            # Only the EscalateNode sets "escalated_final" — this marks the execution as
+            # truly handed off to a human. AiReplyNode sets "escalated" in variables so
+            # the chk_esc condition can route, but that must NOT sticky execution.escalated
+            # (which would suppress pills on all subsequent gathering turns).
+            if result.output.get("escalated_final"):
                 execution.escalated = True
             if result.output.get("resolved"):
                 execution.resolved = True

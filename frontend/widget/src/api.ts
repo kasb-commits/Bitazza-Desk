@@ -190,6 +190,7 @@ export interface SendResult {
   offerResolution: boolean;
   upgradedCategory: string | null;
   transitionMessage: string | null;
+  quickReplies: string[];
 }
 
 export interface GreetResult {
@@ -384,5 +385,6 @@ export async function sendMessage(
     offerResolution: data.offer_resolution ?? false,
     upgradedCategory: data.upgraded_category ?? null,
     transitionMessage: data.transition_message ?? null,
+    quickReplies: Array.isArray(data.quick_replies) ? data.quick_replies : [],
   };
 }

@@ -1133,6 +1133,24 @@ def save_notification_channel(
     }
 
 
+@router.get("/bot-config")
+def get_bot_config_endpoint(user_id: str = Depends(get_user_id)):
+    from db.conversation_store import get_bot_config
+    return get_bot_config()
+
+
+class BotConfigUpdateRequest(BaseModel):
+    quick_replies_enabled: bool
+    quick_replies_mode: str  # "ai" | "curated"
+
+
+@router.post("/bot-config")
+def update_bot_config_endpoint(body: BotConfigUpdateRequest, user_id: str = Depends(get_user_id)):
+    from db.conversation_store import update_bot_config
+    update_bot_config(body.dict())
+    return {"ok": True}
+
+
 @router.post("/admin/notification-channels/{channel}/test")
 async def test_notification_channel(
     channel: str,

@@ -238,7 +238,7 @@ export default function AdminSettings({ currentUser }: Props) {
         {tab === 'Canned Responses'  && <CannedResponsesTab />}
         {tab === 'Assignment Rules'  && <AssignmentRulesTab />}
         {tab === 'SLA Targets'       && <StubTab label="SLA Targets" description="Set SLA response and resolution time targets per tier: VIP 1 min · EA 3 min · Standard 10 min." />}
-        {tab === 'Bot Config'        && <StubTab label="Bot Config" description="Configure bot persona, greeting, fallback message, and business hours. Use Workflow Studio for flow editing." />}
+        {tab === 'Bot Config'        && <BotConfigTab />}
         {tab === 'Announcements'     && <AnnouncementsTab />}
         {tab === 'Report Settings'   && <NotificationsTab />}
       </div>
@@ -2141,6 +2141,116 @@ function AnnouncementsTab() {
           <ModalFooter onClose={() => setShowForm(false)} onSave={handleSave} saving={saving} saveLabel={editing ? 'Save Changes' : 'Create'} />
         </ModalShell>
       )}
+    </div>
+  );
+}
+
+// ── Bot Config tab ────────────────────────────────────────────────────────────
+
+function BotConfigTab() {
+  const { toast } = useToast();
+  const [enabled, setEnabled] = useState(true);
+  const [mode, setMode]       = useState<'ai' | 'curated'>('ai');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving]   = useState(false);
+
+  useEffect(() => {
+    api.getBotConfig()
+      .then((cfg) => {
+        setEnabled(cfg.quick_replies_enabled ?? true);
+        setMode((cfg.quick_replies_mode === 'curated' ? 'curated' : 'ai'));
+      })
+      .catch(() => {/* use defaults */})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await api.updateBotConfig({ quick_replies_enabled: enabled, quick_replies_mode: mode });
+      toast('Bot config saved', 'success');
+    } catch {
+      toast('Failed to save', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-surface-2 ring-1 ring-surface-5 rounded-lg p-8 flex justify-center">
+        <Spinner size={20} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-surface-2 ring-1 ring-surface-5 rounded-lg p-6 space-y-6 max-w-lg">
+      <div>
+        <h3 className="text-sm font-semibold text-text-primary mb-1">Quick-Reply Pill Buttons</h3>
+        <p className="text-xs text-text-secondary mb-4">
+          Show tappable suggestion pills below each bot message so customers can reply in one tap.
+        </p>
+
+        {/* On/Off toggle */}
+        <div className="flex items-center justify-between py-3 border-b border-surface-5">
+          <span className="text-sm text-text-primary">Enable quick-reply pills</span>
+          <button
+            onClick={() => setEnabled((v) => !v)}
+            className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors duration-200"
+            style={{ background: enabled ? '#00CE80' : '#d1d5db' }}
+            role="switch"
+            aria-checked={enabled}
+          >
+            <span
+              className="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 mt-0.5"
+              style={{ transform: enabled ? 'translateX(22px)' : 'translateX(2px)' }}
+            />
+          </button>
+        </div>
+
+        {/* AI vs Curated radio — visible only when toggle is on */}
+        {enabled && (
+          <div className="pt-4 space-y-3">
+            <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Generation mode</p>
+            {(['ai', 'curated'] as const).map((m) => (
+              <label key={m} className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  type="radio"
+                  name="pills-mode"
+                  value={m}
+                  checked={mode === m}
+                  onChange={() => setMode(m)}
+                  className="mt-0.5"
+                />
+                <div>
+                  <p className="text-sm font-medium text-text-primary">
+                    {m === 'ai' ? 'AI-Generated' : 'Curated library'}
+                  </p>
+                  <p className="text-xs text-text-secondary">
+                    {m === 'ai'
+                      ? 'Gemini suggests 2–4 contextual pills per reply — adapts to any conversation.'
+                      : 'Show static pills from the built-in category library — consistent and predictable.'}
+                  </p>
+                </div>
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="px-5 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
+          style={{ background: '#00CE80', color: '#1B1A18' }}
+          onMouseEnter={e => { if (!saving) e.currentTarget.style.background = '#079755'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = '#00CE80'; }}
+        >
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+      </div>
     </div>
   );
 }

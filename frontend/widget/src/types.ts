@@ -76,6 +76,7 @@ export interface Message {
   /** Explicit sender name to display — overrides the dynamic botName. Used to pin static messages to "Bitazza Support". */
   senderName?: string;
   attachments?: MessageAttachment[];
+  quickReplies?: string[];
 }
 
 export interface CSBotConfig {

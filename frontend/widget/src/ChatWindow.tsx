@@ -122,6 +122,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
   const [dismissedAnnIds, setDismissedAnnIds] = useState<Set<string>>(new Set());
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [activePills, setActivePills] = useState<{ msgId: string; pills: string[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastAgentMsgTime = useRef(0);
   const lastFailedText = useRef('');
@@ -533,6 +534,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
   }, [convId, cfg]);
 
   const send = useCallback(async (text: string, category?: string, skipUserBubble = false) => {
+    setActivePills(null);
     const hasAttachments = pendingAttachments.length > 0;
     if (!text.trim() && !hasAttachments) return;
     if (!convId || loading) return;
@@ -591,8 +593,9 @@ export default function ChatWindow({ cfg, onClose }: Props) {
           // 3. Brief pause, then specialist's reply — pinned to specialist's identity
           await new Promise((r) => setTimeout(r, 2200 + Math.random() * 600));
           playNotificationBeep();
+          const transitionMsgId = crypto.randomUUID();
           setMessages((prev) => [...prev, {
-            id: crypto.randomUUID(),
+            id: transitionMsgId,
             role: 'assistant' as const,
             content: result.reply,
             timestamp: Date.now(),
@@ -600,12 +603,16 @@ export default function ChatWindow({ cfg, onClose }: Props) {
             senderName: incomingName ?? undefined,
             agentAvatarUrl: incomingAvatarUrl ?? undefined,
           }]);
+          if (result.quickReplies.length > 0 && !result.escalated && !result.offerResolution) {
+            setActivePills({ msgId: transitionMsgId, pills: result.quickReplies });
+          }
         } else {
           // Normal reply — pin current bot identity onto the bubble
           await new Promise((r) => setTimeout(r, 900 + Math.random() * 600));
           playNotificationBeep();
+          const botMsgId = crypto.randomUUID();
           setMessages((prev) => [...prev, {
-            id: crypto.randomUUID(),
+            id: botMsgId,
             role: 'assistant' as const,
             content: result.reply,
             timestamp: Date.now(),
@@ -613,6 +620,9 @@ export default function ChatWindow({ cfg, onClose }: Props) {
             senderName: botName ?? undefined,
             agentAvatarUrl: botAvatarUrl ?? undefined,
           }]);
+          if (result.quickReplies.length > 0 && !result.escalated && !result.offerResolution) {
+            setActivePills({ msgId: botMsgId, pills: result.quickReplies });
+          }
         }
       }
 
@@ -929,15 +939,15 @@ export default function ChatWindow({ cfg, onClose }: Props) {
           // they stay pinned there for the whole conversation.
           const categoryPromptIdx = messages.findIndex(m => m.id === 'category-prompt');
           if (visibleAnnouncements.length === 0 || categoryPromptIdx === -1) {
-            return messages.map((m) => <MessageBubble key={m.id} message={m} primaryColor={primaryColor} botName={botName} botAvatarUrl={botAvatarUrl} escalatedAgent={escalatedAgent} />);
+            return messages.map((m) => <MessageBubble key={m.id} message={m} primaryColor={primaryColor} botName={botName} botAvatarUrl={botAvatarUrl} escalatedAgent={escalatedAgent} activePills={activePills?.msgId === m.id ? activePills.pills : undefined} onPillTap={send} />);
           }
           const before = messages.slice(0, categoryPromptIdx);
           const after = messages.slice(categoryPromptIdx);
           return (
             <>
-              {before.map((m) => <MessageBubble key={m.id} message={m} primaryColor={primaryColor} botName={botName} botAvatarUrl={botAvatarUrl} escalatedAgent={escalatedAgent} />)}
+              {before.map((m) => <MessageBubble key={m.id} message={m} primaryColor={primaryColor} botName={botName} botAvatarUrl={botAvatarUrl} escalatedAgent={escalatedAgent} activePills={activePills?.msgId === m.id ? activePills.pills : undefined} onPillTap={send} />)}
               {annCards}
-              {after.map((m) => <MessageBubble key={m.id} message={m} primaryColor={primaryColor} botName={botName} botAvatarUrl={botAvatarUrl} escalatedAgent={escalatedAgent} />)}
+              {after.map((m) => <MessageBubble key={m.id} message={m} primaryColor={primaryColor} botName={botName} botAvatarUrl={botAvatarUrl} escalatedAgent={escalatedAgent} activePills={activePills?.msgId === m.id ? activePills.pills : undefined} onPillTap={send} />)}
             </>
           );
         })()}

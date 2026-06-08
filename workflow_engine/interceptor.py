@@ -47,6 +47,7 @@ def _execution_to_agent_response(execution) -> AgentResponse:
         resolved=execution.resolved,
         transition_message=execution.transition_message,
         profile_fetched=execution.variables.get("profile_fetched", False),
+        quick_replies=execution.variables.get("quick_replies") or [],
     )
 
 

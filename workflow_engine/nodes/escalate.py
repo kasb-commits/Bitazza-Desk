@@ -67,11 +67,12 @@ class EscalateNode:
         })
         return NodeResult(
             output={
-                "reply":     reply,
-                "escalated": True,
-                "status":    status,
-                "team":      node.config.get("team", "cs"),
-                "reason":    node.config.get("reason", "workflow_escalation"),
+                "reply":           reply,
+                "escalated":       True,
+                "escalated_final": True,   # Tells engine to set execution.escalated
+                "status":          status,
+                "team":            node.config.get("team", "cs"),
+                "reason":          node.config.get("reason", "workflow_escalation"),
             },
             next_node_id=node.next_node_id,
         )

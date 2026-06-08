@@ -85,6 +85,7 @@ class MessageResponse(BaseModel):
     specialist_intro: str | None = None  # First message from the incoming specialist agent
     upgraded_category: str | None = None  # Set when mid-convo specialist handoff occurred
     transition_message: str | None = None  # Outgoing-agent farewell shown before specialist reply
+    quick_replies: list[str] = []
 
 
 @router.post("/start", response_model=StartResponse)
@@ -505,6 +506,22 @@ async def send_message(request: Request, body: MessageRequest, user_id: str | No
     _final_agent_avatar_url = result.agent_avatar_url or (_intent_resolved_agent["avatar_url"] if _intent_resolved_agent else None)
     _final_upgraded_category = result.upgraded_category or (effective_category if _intent_resolved_agent else None)
 
+    # Quick-reply pills: read admin config once per request (cheap — single DB query)
+    from db.conversation_store import get_bot_config as _get_bot_config
+    from engine.quick_reply_defaults import get_curated_pills
+    _cfg = _get_bot_config()
+    _pills_enabled = _cfg.get("quick_replies_enabled", True)
+    _pills_mode    = _cfg.get("quick_replies_mode", "ai")
+    if not _pills_enabled or result.escalated or result.resolved:
+        _quick_replies: list[str] = []
+    elif _pills_mode == "curated":
+        _quick_replies = get_curated_pills(effective_category, result.language)
+    else:
+        # AI mode: use Gemini-generated pills; fall back to curated when Gemini
+        # returns empty despite being on a non-escalation, non-resolution turn.
+        _ai_pills = getattr(result, "quick_replies", None) or []
+        _quick_replies = _ai_pills if _ai_pills else get_curated_pills(effective_category, result.language)
+
     logger.info("response_sent", extra={
         "conv_id": body.conversation_id,
         "escalated": result.escalated,
@@ -526,6 +543,7 @@ async def send_message(request: Request, body: MessageRequest, user_id: str | No
         specialist_intro=result.specialist_intro,
         upgraded_category=_final_upgraded_category,
         transition_message=getattr(result, 'transition_message', None),
+        quick_replies=_quick_replies,
     )
 
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import DOMPurify from 'dompurify';
 import type { Message } from './types';
+import PillRow from './PillRow';
 
 const SANITIZE_CONFIG = {
   ALLOWED_TAGS: ['p','strong','em','u','s','h2','h3','ul','ol','li','a','br','blockquote','code'],
@@ -30,9 +31,11 @@ interface Props {
   botName?: string | null;
   botAvatarUrl?: string | null;
   escalatedAgent?: { name: string; avatar: string; avatarUrl: string | null } | null;
+  activePills?: string[];
+  onPillTap?: (text: string) => void;
 }
 
-export default function MessageBubble({ message, primaryColor = '#00CE80', botName, botAvatarUrl, escalatedAgent }: Props) {
+export default function MessageBubble({ message, primaryColor = '#00CE80', botName, botAvatarUrl, escalatedAgent, activePills, onPillTap }: Props) {
   const [lightbox, setLightbox] = useState<string | null>(null);
 
   if (message.role === 'system') {
@@ -147,6 +150,12 @@ export default function MessageBubble({ message, primaryColor = '#00CE80', botNa
       </div>
 
       <span className="text-[10px] mt-1 mx-1" style={{ color: 'rgba(27,26,24,0.4)' }}>{time}</span>
+
+      {activePills && activePills.length > 0 && onPillTap && (
+        <div className="w-full flex justify-end mt-1">
+          <PillRow pills={activePills} primaryColor={primaryColor} onTap={onPillTap} />
+        </div>
+      )}
 
       {/* Lightbox */}
       {lightbox && (
