@@ -395,7 +395,16 @@ def chat(
             if _meta.get("customer_id"):
                 trigger_auto_assign(ticket_id, category, _meta["priority"], str(_meta["customer_id"]))
         effective_category = detect_category_from_message(user_message) or category
-        reply_text = "" if suppress_handoff else build_handoff_message(effective_category, language)
+        if suppress_handoff:
+            # Workflow mode: EscalateNode sends the formal handoff message — don't duplicate it.
+            # But we still need a visible acknowledgement so the customer isn't left silent.
+            reply_text = (
+                "Understood — let me get a specialist to help you right away."
+                if language == "en"
+                else "เข้าใจแล้วค่ะ ขอให้เจ้าหน้าที่ผู้เชี่ยวชาญช่วยเหลือคุณลูกค้าได้เลยค่ะ"
+            )
+        else:
+            reply_text = build_handoff_message(effective_category, language)
         return AgentResponse(
             text=reply_text,
             language=language, escalated=True,
@@ -588,16 +597,7 @@ def chat(
             if _meta.get("customer_id"):
                 trigger_auto_assign(ticket_id, category, _meta["priority"], str(_meta["customer_id"]))
         effective_category = detect_category_from_message(user_message) or category
-        if suppress_handoff:
-            # Workflow mode: EscalateNode sends the formal handoff, but we still need
-            # a visible message now — the escalate node may be 1-2 turns away.
-            reply_text = (
-                "Sorry, I'm having trouble right now. Please hold on — a specialist will be with you shortly."
-                if language == "en"
-                else "ขออภัย เกิดปัญหาในการตอบกลับ กรุณารอสักครู่ เจ้าหน้าที่จะติดต่อคุณเร็วๆ นี้ค่ะ"
-            )
-        else:
-            reply_text = build_handoff_message(effective_category, language)
+        reply_text = build_handoff_message(effective_category, language)
         return AgentResponse(
             text=reply_text,
             language=language, escalated=True,
@@ -685,14 +685,7 @@ def chat(
                 if _meta.get("customer_id"):
                     trigger_auto_assign(ticket_id, category, _meta["priority"], str(_meta["customer_id"]))
             effective_category = detect_category_from_message(user_message) or category
-            if suppress_handoff:
-                reply_text = (
-                    "Sorry, I'm having trouble right now. Please hold on — a specialist will be with you shortly."
-                    if language == "en"
-                    else "ขออภัย เกิดปัญหาในการตอบกลับ กรุณารอสักครู่ เจ้าหน้าที่จะติดต่อคุณเร็วๆ นี้ค่ะ"
-                )
-            else:
-                reply_text = build_handoff_message(effective_category, language)
+            reply_text = build_handoff_message(effective_category, language)
             return AgentResponse(
                 text=reply_text,
                 language=language, escalated=True,
@@ -832,7 +825,9 @@ def chat(
         effective_category = detect_category_from_message(user_message) or category
         if suppress_handoff:
             # Workflow mode: the Escalate node handles the handoff message — don't append it here.
-            reply_text = response_text if (response_text and len(response_text.strip()) > 20) else ""
+            # Pass the AI's reply through as-is; the escalated flag signals chk_esc to route to
+            # the EscalateNode which will append the proper handoff.
+            reply_text = response_text or ""
         else:
             handoff = build_handoff_message(effective_category, language)
             # Always show the AI's substantive answer before the handoff — whether escalation

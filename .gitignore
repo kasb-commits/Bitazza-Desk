@@ -12,3 +12,4 @@ data/
 node_modules/
 .DS_Store
 .vercel
+claude-skills/engineering/skills/dependency-auditor/test-project/
