@@ -438,8 +438,7 @@ export function createSocket(): Socket {
   const socket = io(SOCKET_URL, {
     auth: { token: token ?? '' },
     transports: ['websocket', 'polling'],
-    reconnectionDelay: 1000,
-    reconnectionDelayMax: 5000,
+    reconnection: false, // App.tsx owns reconnection via ws.onclose → setTimeout(connect)
   });
 
   socket.on('connect',       () => sendClientLog({ level: 'info',  event: 'ws_connected',      url: SOCKET_URL }));
