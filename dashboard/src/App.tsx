@@ -772,6 +772,7 @@ interface WorkspaceProps {
   tickets: Ticket[];
   ticketStats: { open: number; active: number; escalated: number };
   selectedId: string | null;
+  listVersion: number;
   view: InboxView;
   search: string;
   statusFilter: StatusFilter;
@@ -784,7 +785,7 @@ interface WorkspaceProps {
   onRefresh: () => void;
 }
 
-function Workspace({ ws, tickets, ticketStats, selectedId, view, search, statusFilter, channelFilter, onSelect, onViewChange, onSearchChange, onStatusFilterChange, onChannelFilterChange, onRefresh }: WorkspaceProps) {
+function Workspace({ ws, tickets, ticketStats, selectedId, listVersion, view, search, statusFilter, channelFilter, onSelect, onViewChange, onSearchChange, onStatusFilterChange, onChannelFilterChange, onRefresh }: WorkspaceProps) {
   const selectedTicket = tickets.find(t => t.id === selectedId) ?? null;
   const [pendingDraft, setPendingDraft] = useState<string | null>(null);
   const [composeReply, setComposeReply] = useState('');
@@ -807,6 +808,7 @@ function Workspace({ ws, tickets, ticketStats, selectedId, view, search, statusF
           ? <MessageThread
               ticketId={selectedId}
               ws={ws}
+              listVersion={listVersion}
               onStatusChange={onRefresh}
               pendingDraft={pendingDraft}
               onDraftConsumed={() => setPendingDraft(null)}
@@ -852,6 +854,7 @@ export default function App() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(() => (sessionStorage.getItem('inboxStatusFilter') as StatusFilter) ?? 'all');
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>(() => (sessionStorage.getItem('inboxChannelFilter') as ChannelFilter) ?? 'all');
   const [search, setSearch] = useState(() => sessionStorage.getItem('inboxSearch') ?? '');
+  const [listVersion, setListVersion] = useState(0);
   const [myStatus, setMyStatus] = useState<AgentStatus>('Available');
   const [activeChats, setActiveChats] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -861,6 +864,8 @@ export default function App() {
   const wsRef = useRef<WebSocket | null>(null);
   const [wsSocket, setWsSocket] = useState<WebSocket | null>(null);
   const loadTicketsRef = useRef<() => void>(() => {});
+  const seenNotifIds = useRef<Set<string>>(new Set());
+  const notifsLoaded = useRef(false);
 
   // Refresh permissions from server on mount (ensures stale localStorage is patched)
   useEffect(() => {
@@ -881,10 +886,14 @@ export default function App() {
     }).catch(() => {});
   }, []);
 
-  // Load notifications on mount
+  // Load notifications once on mount — ref-guard prevents re-fire when api.me() updates user
   useEffect(() => {
-    if (!user) return;
-    api.getNotifications().then(setNotifications).catch(() => {});
+    if (!user || notifsLoaded.current) return;
+    notifsLoaded.current = true;
+    api.getNotifications().then(notifs => {
+      notifs.forEach(n => seenNotifIds.current.add(n.id));
+      setNotifications(notifs);
+    }).catch(() => {});
   }, [user]);
 
   // Handle token expiry without a hard browser reload
@@ -915,6 +924,7 @@ export default function App() {
       // Backend wraps the list: { tickets: [...] } — unwrap if needed
       const data: Ticket[] = Array.isArray(raw) ? raw : (raw as { tickets: Ticket[] }).tickets ?? [];
       setTickets(data);
+      setListVersion(v => v + 1);
       if (!selectedId && data.length > 0) handleSelect(data[0].id);
     } catch { /* backend stub — silent */ }
     // Load stats independently so a failure doesn't block the ticket list
@@ -979,10 +989,11 @@ export default function App() {
 
         if (e.type === 'notification:new') {
           const n = e.notification;
-          setNotifications(prev => {
-            if (prev.some(existing => existing.id === n.id)) return prev;
-            return [n, ...prev];
-          });
+          // Drop duplicates at the event level — guards against multiple active sockets
+          // delivering the same event (e.g. during reconnect overlap).
+          if (seenNotifIds.current.has(n.id)) return;
+          seenNotifIds.current.add(n.id);
+          setNotifications(prev => [n, ...prev]);
           // Play Slack-style two-note descending chime
           try {
             const ctx = new AudioContext();
@@ -1007,9 +1018,8 @@ export default function App() {
           } catch { /* AudioContext blocked (e.g. no user gesture yet) — silent */ }
           if (n.priority === 'critical' || n.priority === 'high') {
             setToasts(prev => {
-              // Prepend new toast; deduplicate by id; keep newest 5 (drop oldest)
-              const next = [{ id: n.id, notification: n }, ...prev.filter(t => t.id !== n.id)];
-              return next.slice(0, 5);
+              // Prepend new toast; keep newest 5 (drop oldest)
+              return [{ id: n.id, notification: n }, ...prev].slice(0, 5);
             });
           }
           return;
@@ -1126,7 +1136,7 @@ export default function App() {
               <Route path="/inbox" element={
                 <Workspace
                   ws={wsSocket}
-                  tickets={tickets} ticketStats={ticketStats} selectedId={selectedId} view={view} search={search}
+                  tickets={tickets} ticketStats={ticketStats} selectedId={selectedId} listVersion={listVersion} view={view} search={search}
                   statusFilter={statusFilter} channelFilter={channelFilter}
                   onSelect={handleSelect} onViewChange={handleViewChange}
                   onSearchChange={handleSearchChange} onStatusFilterChange={handleStatusFilterChange}

@@ -471,13 +471,14 @@ type ReplyChannel = typeof REPLY_CHANNELS[number];
 interface Props {
   ticketId: string;
   ws: WebSocket | null;
+  listVersion?: number;
   onStatusChange: () => void;
   pendingDraft?: string | null;
   onDraftConsumed?: () => void;
   onReplyChange?: (value: string) => void;
 }
 
-export default function MessageThread({ ticketId, ws, onStatusChange, pendingDraft, onDraftConsumed, onReplyChange }: Props) {
+export default function MessageThread({ ticketId, ws, listVersion, onStatusChange, pendingDraft, onDraftConsumed, onReplyChange }: Props) {
   const canReply        = usePerm('inbox.reply');
   const canInternalNote = usePerm('inbox.internal_note');
   const canClose        = usePerm('inbox.close');
@@ -527,6 +528,17 @@ export default function MessageThread({ ticketId, ws, onStatusChange, pendingDra
   }, [ticketId]);
 
   useEffect(() => { load(); }, [load]);
+
+  // When the parent list refreshes (e.g. PropertiesPanel status change), reload
+  // the ticket detail so the header status stays in sync. Skip version 0 (initial
+  // mount) — the [load] effect above already handles that fetch.
+  const prevListVersion = useRef(listVersion);
+  useEffect(() => {
+    if (listVersion === undefined || listVersion === 0) return;
+    if (listVersion === prevListVersion.current) return;
+    prevListVersion.current = listVersion;
+    load();
+  }, [listVersion, load]);
 
   // Polling fallback — re-fetch the thread every 4 seconds for active tickets.
   // Socket.io delivers events instantly when it works; this guarantees updates
