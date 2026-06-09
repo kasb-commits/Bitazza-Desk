@@ -40,10 +40,15 @@ def legacy_agent_chat(
 
 def _execution_to_agent_response(execution) -> AgentResponse:
     """Convert a WorkflowExecution result into an AgentResponse."""
+    # Propagate escalation_reason from variables so chat.py can detect when the AI
+    # node escalated (ai_service_unavailable, low_confidence, etc.) but the workflow
+    # paused before reaching EscalateNode — preventing status downgrades to Pending_Customer.
+    escalation_reason = execution.variables.get("escalation_reason", "")
     return AgentResponse(
         text=execution.output_reply or "",
         language=execution.variables.get("language", "en"),
         escalated=execution.escalated,
+        escalation_reason=escalation_reason,
         resolved=execution.resolved,
         transition_message=execution.transition_message,
         profile_fetched=execution.variables.get("profile_fetched", False),

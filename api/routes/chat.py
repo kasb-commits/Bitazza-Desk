@@ -493,10 +493,15 @@ async def send_message(request: Request, body: MessageRequest, user_id: str | No
     # After the AI replies, move status to Pending_Customer (ball is in customer's court).
     # Skip if the AI escalated — agent.py already wrote the correct Escalated status.
     # Also skip if the ticket was already escalated before this turn — never downgrade.
-    if not result.escalated and _ticket_id and not _already_escalated:
+    # Also skip if escalation_reason is set — this means an AI node escalated (e.g.
+    # ai_service_unavailable) but the workflow paused before reaching EscalateNode,
+    # so execution.escalated is still False. agent.py already set Escalated status
+    # and called trigger_auto_assign; overwriting with Pending_Customer would lose that.
+    _ai_escalated = result.escalated or bool(result.escalation_reason)
+    if not _ai_escalated and _ticket_id and not _already_escalated:
         update_ticket_status(_ticket_id, "pending_customer")
         asyncio.create_task(emit_ticket_event(_ticket_id, "status_change", {"status": "Pending_Customer"}))
-    elif result.escalated and _ticket_id and not _already_escalated:
+    elif _ai_escalated and _ticket_id and not _already_escalated:
         asyncio.create_task(emit_ticket_event(_ticket_id, "status_change", {"status": "Pending_Human"}))
 
     # Merge intent-resolver agent update with any mid-conversation upgrade from the agent.

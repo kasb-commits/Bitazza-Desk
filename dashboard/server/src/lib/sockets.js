@@ -11,6 +11,25 @@ const JWT_SECRET = process.env.JWT_SECRET || 'change-me-in-production';
 // Grace period before marking agent Offline on disconnect (FR-02 edge)
 const DISCONNECT_GRACE_MS = 30_000;
 
+/**
+ * Ensures the agent's `state` field is populated in Redis whenever their socket connects.
+ * Only updates `socket_id` if a state already exists (e.g. 'Offline' set by the grace
+ * period — agent must explicitly click Available again). If Redis has no state at all
+ * (Redis restart, 24h TTL expiry, first-ever connection) the agent's last-known state is
+ * restored from PostgreSQL, defaulting to 'Available' if the DB column is NULL.
+ *
+ * Exported so it can be unit-tested independently of the socket.io server.
+ */
+async function restoreAgentStateToRedis(agentId, socketId) {
+  const existing = await getAgentSession(agentId);
+  const fields = { socket_id: socketId };
+  if (!existing?.state) {
+    const { rows } = await pool.query('SELECT state FROM users WHERE id=$1', [agentId]);
+    fields.state = rows[0]?.state ?? 'Available';
+  }
+  await setAgentSession(agentId, fields);
+}
+
 let io; // set by init()
 
 function init(httpServer) {
@@ -47,8 +66,8 @@ function init(httpServer) {
     const { id: agentId, role } = socket.user;
     logger.info({ event: 'ws_connected', agent_id: agentId, role });
 
-    // Register socket in Redis (best-effort — non-fatal if Redis is down)
-    try { await setAgentSession(agentId, { socket_id: socket.id }); } catch (e) {
+    // Register socket in Redis (best-effort — non-fatal if Redis is down).
+    try { await restoreAgentStateToRedis(agentId, socket.id); } catch (e) {
       logger.warn({ event: 'ws_redis_unavailable', agent_id: agentId, error: e.message });
     }
 
@@ -111,8 +130,11 @@ function init(httpServer) {
         // Check if agent reconnected (different socket)
         const session = await getAgentSession(agentId);
         if (session?.socket_id && session.socket_id !== socket.id) return; // reconnected
-        // Grace expired — force Offline
+        // Grace expired — force Offline in both Redis and DB so they stay in sync.
+        // Without the DB update, restoreAgentStateToRedis on the next reconnect sees
+        // Offline in Redis (preserved), but the UI reads Available from DB — they diverge.
         try { await setAgentSession(agentId, { state: 'Offline', socket_id: '' }); } catch {}
+        try { await pool.query('UPDATE users SET state=$1 WHERE id=$2', ['Offline', agentId]); } catch {}
         io.to('supervisors').emit('agent_presence', { agentId, state: 'Offline' });
 
         // Notify supervisors if agent had open tickets assigned
@@ -173,4 +195,4 @@ function emitToAll(event, payload) {
   io.emit(event, payload);
 }
 
-module.exports = { init, emitToTicket, emitToAgent, emitToSupervisors, emitToAll };
+module.exports = { init, emitToTicket, emitToAgent, emitToSupervisors, emitToAll, restoreAgentStateToRedis };

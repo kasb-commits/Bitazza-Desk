@@ -83,7 +83,8 @@ async function routeTicket(ticketId, customerId, priority, team = 'default') {
       MAX(t2.updated_at) AS last_assigned_at
     FROM users u
     LEFT JOIN tickets t2 ON t2.assigned_to = u.id
-    WHERE u.role IN ('agent','supervisor')
+    WHERE u.role IN ('agent','supervisor','super_admin')
+      AND u.active = true
       AND ($1::text IS NULL OR u.team = $1)
     GROUP BY u.id, u.max_chats
     HAVING COUNT(t2.id) FILTER (WHERE t2.status NOT IN ('Closed_Resolved','Closed_Unresponsive')) < u.max_chats
@@ -709,3 +710,5 @@ router.post('/', async (req, res) => {
 
 module.exports = router;
 module.exports.bustRulesCache = bustRulesCache;
+module.exports.routeTicket = routeTicket;
+module.exports.getAssignmentRules = getAssignmentRules;
