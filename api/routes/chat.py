@@ -291,6 +291,11 @@ async def send_message(request: Request, body: MessageRequest, user_id: str | No
     if not body.message.strip() and not body.attachment_ids:
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
+    # Reject messages on closed tickets — hoisted early so add_message is never called
+    _ticket = get_ticket_by_id(body.conversation_id)
+    if _ticket and _ticket.get("status") in ("Closed_Resolved", "Closed_Unresponsive"):
+        raise HTTPException(status_code=403, detail="This conversation is closed.")
+
     # Set conv_id ContextVar so all downstream logs (agent, workflow) carry it
     _token_conv = conversation_id_var.set(body.conversation_id)
     logger.info("message_received", extra={
@@ -355,7 +360,7 @@ async def send_message(request: Request, body: MessageRequest, user_id: str | No
     _already_escalated = is_human_handling(body.conversation_id)
     if _already_escalated and has_human_agent_replied(body.conversation_id):
         # Notify the assigned agent that the customer sent a new message
-        ticket = get_ticket_by_id(body.conversation_id)
+        ticket = _ticket  # already fetched at top of handler — reuse
         assigned_to = str(ticket["assigned_to"]) if ticket and ticket.get("assigned_to") else None
         if assigned_to:
             from engine.notifications import create_notification
@@ -579,9 +584,12 @@ def get_conversation_history(
         history = get_history(conversation_id, limit=50)
     signals = get_system_signals(conversation_id)
     combined = sorted(history + signals, key=lambda m: m["created_at"])
+    _ticket = get_ticket_by_id(conversation_id)
+    _human_handling = bool(_ticket and (_ticket.get("status") == "Escalated" or _ticket.get("assigned_to")))
     return {
         "history": combined,
-        "human_handling": is_human_handling(conversation_id),
+        "human_handling": _human_handling,
+        "ticket_status": _ticket["status"] if _ticket else None,
     }
 
 

@@ -238,15 +238,16 @@ export async function greetConversation(cfg: CSBotConfig, conversationId: string
 export interface HistoryResult {
   messages: { role: string; content: string; created_at: number; agent_name?: string; agent_avatar?: string; agent_avatar_url?: string; attachments?: { id: string; url: string; name: string; mime_type: string; size: number }[] }[];
   humanHandling: boolean;
+  ticketStatus: string | null;
 }
 
 export async function fetchHistory(cfg: CSBotConfig, conversationId: string): Promise<HistoryResult> {
   const res = await fetch(`${cfg.apiUrl}/chat/history/${conversationId}`, {
     headers: getHeaders(cfg),
   });
-  if (!res.ok) return { messages: [], humanHandling: false };
+  if (!res.ok) return { messages: [], humanHandling: false, ticketStatus: null };
   const data = await res.json();
-  return { messages: data.history ?? [], humanHandling: data.human_handling ?? false };
+  return { messages: data.history ?? [], humanHandling: data.human_handling ?? false, ticketStatus: data.ticket_status ?? null };
 }
 
 export interface PastTicket {
@@ -295,11 +296,11 @@ export async function fetchPaginatedHistory(
       `${cfg.apiUrl}/chat/history/${conversationId}?page=${page}&limit=${limit}`,
       { headers: getHeaders(cfg) },
     );
-    if (!res.ok) return { messages: [], humanHandling: false };
+    if (!res.ok) return { messages: [], humanHandling: false, ticketStatus: null };
     const data = await res.json();
-    return { messages: data.history ?? [], humanHandling: data.human_handling ?? false };
+    return { messages: data.history ?? [], humanHandling: data.human_handling ?? false, ticketStatus: data.ticket_status ?? null };
   } catch {
-    return { messages: [], humanHandling: false };
+    return { messages: [], humanHandling: false, ticketStatus: null };
   }
 }
 

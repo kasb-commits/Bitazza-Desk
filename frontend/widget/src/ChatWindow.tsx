@@ -90,6 +90,8 @@ interface Props {
   onClose: () => void;
 }
 
+const CLOSED_STATUSES = ['Closed_Resolved', 'Closed_Unresponsive'];
+
 export default function ChatWindow({ cfg, onClose }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -110,6 +112,8 @@ export default function ChatWindow({ cfg, onClose }: Props) {
   const [csatSubmitted, setCsatSubmitted] = useState(false);
   const [csatHover, setCsatHover] = useState(0);
   const [agentClosureRequest, setAgentClosureRequest] = useState(false);
+  const [ticketStatus, setTicketStatus] = useState<string | null>(null);
+  const prevClosedRef = useRef(false);
   const [prevTickets, setPrevTickets] = useState<PastTicket[]>([]);
   const [showPrevTickets, setShowPrevTickets] = useState(false);
   const [openTicket, setOpenTicket] = useState<PastTicket | null>(null);
@@ -133,6 +137,8 @@ export default function ChatWindow({ cfg, onClose }: Props) {
   const annRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const t = UI_TEXT[lang];
+  // Closed when DB status says so; fall back to csatSubmitted if status not yet known
+  const isTicketClosed = ticketStatus ? CLOSED_STATUSES.includes(ticketStatus) : csatSubmitted;
 
   // Init conversation — restore if session exists, otherwise start fresh
   useEffect(() => {
@@ -149,7 +155,6 @@ export default function ChatWindow({ cfg, onClose }: Props) {
           .catch(() => setError('Could not connect. Please refresh.'));
         return;
       }
-      setConvId(existing.id);
       if (existing.isGuest) setIsGuest(true);
       // Restore lang selection from session if available
       if (existing.lang) {
@@ -166,7 +171,16 @@ export default function ChatWindow({ cfg, onClose }: Props) {
         setBotName(existing.botName);
         setBotAvatarUrl(existing.botAvatarUrl ?? null);
       }
-      fetchHistory(cfg, existing.id).then(({ messages: history, humanHandling }) => {
+      fetchHistory(cfg, existing.id).then(({ messages: history, humanHandling, ticketStatus: restoredStatus }) => {
+        // Seed ticketStatus and prevClosedRef from server truth before enabling the input.
+        // setConvId is intentionally deferred to here so ticketStatus and convId land in the
+        // same React render batch — preventing a window where convId is set but ticketStatus
+        // is still null, which would briefly enable the input on a closed ticket.
+        if (restoredStatus) {
+          setTicketStatus(restoredStatus);
+          prevClosedRef.current = CLOSED_STATUSES.includes(restoredStatus);
+        }
+        setConvId(existing.id);
         if (history.length === 0) {
           // Session exists but no messages — show greeting
           showGreeting();
@@ -454,7 +468,17 @@ export default function ChatWindow({ cfg, onClose }: Props) {
     lastAgentMsgTime.current = startedAt;
 
     const poll = async () => {
-      const { messages: history, humanHandling } = await fetchHistory(cfg, convId);
+      const { messages: history, humanHandling, ticketStatus: polledStatus } = await fetchHistory(cfg, convId);
+
+      // Track closed→open transition so we can reset stale UI state
+      const polledClosed = polledStatus ? CLOSED_STATUSES.includes(polledStatus) : false;
+      if (prevClosedRef.current && !polledClosed) {
+        // Agent reopened a previously closed ticket — clear stale closure UI
+        setAgentClosureRequest(false);
+        setCsatPending(false);
+      }
+      prevClosedRef.current = polledClosed;
+      setTicketStatus(polledStatus);
 
       // Check for a new resolve_request system message from agent
       const resolveRequestMsgs = history.filter(
@@ -953,7 +977,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
         })()}
         {(() => {
           const lastResMsg = [...messages].reverse().find((m) => m.offerResolution);
-          if (!lastResMsg || csatPending || csatSubmitted) return null;
+          if (!lastResMsg || csatPending || isTicketClosed) return null;
           if (messages[messages.length - 1]?.id !== lastResMsg.id) return null;
           return (
             <div className="flex gap-2 justify-center pt-1 pb-2">
@@ -994,7 +1018,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
           );
         })()}
         {/* Agent-initiated closure confirmation */}
-        {agentClosureRequest && !csatPending && !csatSubmitted && (
+        {agentClosureRequest && !csatPending && !isTicketClosed && (
           <div className="flex flex-col items-center gap-2 py-3 px-2">
             <p className="text-sm font-medium text-center" style={{ color: 'rgba(27,26,24,0.75)' }}>
               {lang === 'th'
@@ -1095,7 +1119,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
             </div>
           </div>
         )}
-        {csatSubmitted && (
+        {isTicketClosed && (
           <div className="text-center text-xs py-2" style={{ color: 'rgba(27,26,24,0.5)' }}>
             {lang === 'th' ? 'การสนทนานี้ปิดแล้ว' : 'This conversation is closed.'}
           </div>
@@ -1139,7 +1163,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
       </div>
 
       {/* Request human support pill — visible once conversation has started, until a human agent connects */}
-      {messages.length > 0 && langSelected && !escalatedAgent && !csatPending && !csatSubmitted && !agentClosureRequest && (
+      {messages.length > 0 && langSelected && !escalatedAgent && !csatPending && !isTicketClosed && !agentClosureRequest && (
         <div className="flex justify-center px-4 py-2 bg-white" style={{ borderTop: '1px solid #EDEDF8' }}>
           <button
             onClick={handleTalkToAgent}
@@ -1197,7 +1221,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
           {/* Paperclip button */}
           <button
             onClick={() => fileInputRef.current?.click()}
-            disabled={showGuestForm || !convId || !langSelected || (!isGuest && !selectedCategory) || awaitingFirstReply || csatPending || csatSubmitted || agentClosureRequest}
+            disabled={showGuestForm || !convId || !langSelected || (!isGuest && !selectedCategory) || awaitingFirstReply || csatPending || isTicketClosed || agentClosureRequest}
             className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-30 flex-shrink-0"
             aria-label="Attach file"
           >
@@ -1212,12 +1236,12 @@ export default function ChatWindow({ cfg, onClose }: Props) {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={!langSelected ? 'Select a language / เลือกภาษา' : (!isGuest && !selectedCategory) ? (lang === 'th' ? 'เลือกประเภทปัญหาด้านบน' : 'Select an issue type above') : awaitingFirstReply ? t.placeholderConnecting : t.placeholder}
-            disabled={showGuestForm || loading || !convId || !langSelected || (!isGuest && !selectedCategory) || awaitingFirstReply || csatPending || csatSubmitted || agentClosureRequest}
+            disabled={showGuestForm || loading || !convId || !langSelected || (!isGuest && !selectedCategory) || awaitingFirstReply || csatPending || isTicketClosed || agentClosureRequest}
             className="csbot-input flex-1 text-sm px-4 py-2.5 outline-none disabled:opacity-40"
           />
           <button
             onClick={() => send(input)}
-            disabled={showGuestForm || loading || (!input.trim() && !pendingAttachments.length) || !convId || !langSelected || (!isGuest && !selectedCategory) || awaitingFirstReply || csatPending || csatSubmitted || agentClosureRequest}
+            disabled={showGuestForm || loading || (!input.trim() && !pendingAttachments.length) || !convId || !langSelected || (!isGuest && !selectedCategory) || awaitingFirstReply || csatPending || isTicketClosed || agentClosureRequest}
             className="csbot-send-btn w-9 h-9 rounded-full flex items-center justify-center"
             style={{ background: primaryColor }}
             aria-label={t.send}
