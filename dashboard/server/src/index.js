@@ -31,6 +31,7 @@ const ticketPropertiesRouter       = require('./routes/ticketProperties');
 const uploadsRouter                = require('./routes/uploads');
 const announcementsRouter          = require('./routes/announcements');
 const internalRouter               = require('./routes/internal');
+const logsRouter                   = require('./routes/logs');
 
 // Auth middleware
 const { authenticate, requirePermission } = require('./middleware/auth');
@@ -91,6 +92,7 @@ app.use('/api/ticket-properties',           ticketPropertiesRouter);
 app.use('/api/uploads',                     uploadsRouter);
 app.use('/api/announcements',               announcementsRouter);
 app.use('/api/internal',                   internalRouter);
+app.use('/api/logs',                       logsRouter);
 
 // Health check — must be before static/SPA fallback
 app.get('/health', (req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
