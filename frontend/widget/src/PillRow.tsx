@@ -18,14 +18,14 @@ export default function PillRow({ pills, primaryColor, onTap }: Props) {
 
   return (
     <div
-      className="flex flex-col items-end gap-2 mt-2"
+      className="flex flex-col items-end gap-1.5 mt-2"
       style={{ opacity: visible ? 1 : 0, transition: 'opacity 150ms ease' }}
     >
-      {pills.map((pill) => (
+      {[...pills].sort((a, b) => a.length - b.length).map((pill) => (
         <button
           key={pill}
           onClick={() => onTap(pill)}
-          className="rounded-full border-2 text-xs px-4 py-2.5 cursor-pointer font-semibold transition-colors w-full text-center"
+          className="rounded-full border text-[11px] px-3 py-1 cursor-pointer font-medium transition-colors"
           style={{ borderColor: primaryColor, color: primaryColor, background: 'transparent' }}
           onMouseEnter={e => {
             const el = e.currentTarget as HTMLButtonElement;
