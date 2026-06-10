@@ -3,22 +3,21 @@ Curated quick-reply pill library.
 
 Used when quick_replies_mode == "curated" (admin-selected in Bot Config).
 Also serves as the LLM fallback when the AI-generated pills fail validation.
-Pills are shown as style/tone examples in the system prompt.
 """
 
 CURATED_QUICK_REPLIES: dict[str, dict[str, list[str]]] = {
     "kyc_verification": {
         "en": [
             "What documents do I need?",
-            "How long does it take?",
             "My document was rejected",
             "Stuck on 'Under review'",
+            "How long does approval take?",
         ],
         "th": [
             "ต้องใช้เอกสารอะไรบ้าง",
-            "ใช้เวลานานแค่ไหน",
             "เอกสารของฉันถูกปฏิเสธ",
             "ติดอยู่ที่ 'กำลังตรวจสอบ'",
+            "อนุมัติใช้เวลานานแค่ไหน",
         ],
     },
     "account_restriction": {
@@ -26,41 +25,41 @@ CURATED_QUICK_REPLIES: dict[str, dict[str, list[str]]] = {
             "Why is my account restricted?",
             "How do I unlock it?",
             "I already submitted documents",
-            "Talk to an agent",
+            "What's the expected timeline?",
         ],
         "th": [
             "ทำไมบัญชีถูกระงับ",
             "ปลดล็อกได้อย่างไร",
             "ส่งเอกสารไปแล้ว",
-            "ขอคุยกับเจ้าหน้าที่",
+            "คาดว่าจะใช้เวลานานแค่ไหน",
         ],
     },
     "withdrawal_issue": {
         "en": [
             "My withdrawal is still pending",
-            "Funds didn't arrive",
+            "Funds didn't arrive in my bank",
             "I have the transaction ID",
-            "How long does it take?",
+            "How long do withdrawals take?",
         ],
         "th": [
             "การถอนยังค้างอยู่",
-            "เงินยังไม่ถึง",
+            "เงินยังไม่ถึงบัญชีธนาคาร",
             "มี transaction ID แล้ว",
-            "ใช้เวลานานแค่ไหน",
+            "การถอนใช้เวลานานแค่ไหน",
         ],
     },
     "deposit_issue": {
         "en": [
             "My deposit hasn't arrived",
-            "I have the transaction ID",
-            "How long does it take?",
-            "Check my deposit status",
+            "I have the transaction hash",
+            "How long do deposits take?",
+            "Is there a minimum deposit?",
         ],
         "th": [
             "เงินฝากยังไม่เข้า",
-            "มี transaction ID แล้ว",
-            "ใช้เวลานานแค่ไหน",
-            "เช็คสถานะการฝาก",
+            "มี transaction hash แล้ว",
+            "การฝากใช้เวลานานแค่ไหน",
+            "มีขั้นต่ำการฝากไหม",
         ],
     },
     "password_2fa_reset": {
@@ -72,7 +71,7 @@ CURATED_QUICK_REPLIES: dict[str, dict[str, list[str]]] = {
         ],
         "th": [
             "ลืมรหัสผ่าน",
-            "หมดสิทธิ์เข้าใช้ 2FA",
+            "ไม่มีอุปกรณ์ 2FA แล้ว",
             "ไม่ได้รับ OTP",
             "ยังเข้าบัญชีไม่ได้",
         ],
@@ -80,27 +79,27 @@ CURATED_QUICK_REPLIES: dict[str, dict[str, list[str]]] = {
     "fraud_security": {
         "en": [
             "I didn't make this transaction",
-            "My account may be hacked",
+            "My account may be compromised",
             "I received a suspicious message",
-            "Talk to an agent",
+            "How do I secure my account?",
         ],
         "th": [
             "ฉันไม่ได้ทำธุรกรรมนี้",
-            "บัญชีอาจถูกแฮก",
+            "บัญชีอาจถูกเข้าถึงโดยไม่ได้รับอนุญาต",
             "ได้รับข้อความน่าสงสัย",
-            "ขอคุยกับเจ้าหน้าที่",
+            "จะรักษาความปลอดภัยบัญชีได้อย่างไร",
         ],
     },
     "other": {
         "en": [
-            "Tell me more",
-            "How does this work?",
-            "Talk to an agent",
+            "I have a follow-up question",
+            "Can you explain that further?",
+            "I'm still having the issue",
         ],
         "th": [
-            "บอกเพิ่มเติม",
-            "ทำงานอย่างไร",
-            "ขอคุยกับเจ้าหน้าที่",
+            "มีคำถามเพิ่มเติม",
+            "ช่วยอธิบายเพิ่มเติมได้ไหม",
+            "ยังมีปัญหาอยู่",
         ],
     },
 }

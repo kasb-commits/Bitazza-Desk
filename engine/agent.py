@@ -6,7 +6,7 @@ account tools → Gemini Flash (JSON response with confidence) → compliance fi
 Gemini is instructed to return structured JSON: {response, confidence, needs_human}.
 This means escalation is driven by Gemini's own assessment, not post-hoc heuristics.
 """
-import json, logging, re, time
+import json, logging, os, re, time
 
 logger = logging.getLogger("engine.agent")
 from google import genai
@@ -33,7 +33,17 @@ from db.conversation_store import (
 from db.vector_store import collection_count
 from engine.assignment_client import trigger_auto_assign
 
-client = genai.Client(api_key=GEMINI_API_KEY)
+# Force the Gemini SDK to use httpx (not aiohttp) for async calls, with
+# trust_env=True so that the HTTPS_PROXY / HTTP_PROXY environment variables
+# are respected.  Without this, setting HTTPS_PROXY in Railway has no effect:
+# the SDK silently falls back to aiohttp which ignores proxy env vars by default.
+import httpx as _httpx
+_http_options = genai_types.HttpOptions(
+    httpxClient=_httpx.Client(trust_env=True),
+    httpxAsyncClient=_httpx.AsyncClient(trust_env=True),
+)
+
+client = genai.Client(api_key=GEMINI_API_KEY, http_options=_http_options)
 
 
 def _call_with_retry(fn, max_attempts: int = 3, base_delay: float = 0.5):
