@@ -1549,6 +1549,48 @@ def update_bot_config(data: dict) -> None:
                 )
 
 
+def get_curated_pills_db() -> dict:
+    """
+    Return curated pills from DB as { category: { language: [pills] } }.
+    Falls back to empty dict on error (caller should fall back to hardcoded defaults).
+    """
+    try:
+        with _conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT category, language, pills FROM curated_quick_replies")
+                rows = cur.fetchall()
+        result: dict = {}
+        for row in rows:
+            cat  = row["category"]
+            lang = row["language"]
+            pills = row["pills"] if isinstance(row["pills"], list) else json.loads(row["pills"])
+            result.setdefault(cat, {})[lang] = pills
+        return result
+    except Exception:
+        logger.exception("get_curated_pills_db failed")
+        return {}
+
+
+def update_curated_pills_db(data: dict) -> None:
+    """
+    Upsert curated pills. data shape: { category: { language: [pills] } }
+    """
+    with _conn() as conn:
+        with conn.cursor() as cur:
+            for category, langs in data.items():
+                for language, pills in langs.items():
+                    cur.execute(
+                        """
+                        INSERT INTO curated_quick_replies (category, language, pills, updated_at)
+                        VALUES (%s, %s, %s::jsonb, NOW())
+                        ON CONFLICT (category, language) DO UPDATE
+                            SET pills = EXCLUDED.pills,
+                                updated_at = NOW()
+                        """,
+                        (category, language, json.dumps(pills)),
+                    )
+
+
 def backfill_outbound_message(
     ticket_id: str,
     gmail_thread_id: str,

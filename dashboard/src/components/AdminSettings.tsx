@@ -2147,18 +2147,135 @@ function AnnouncementsTab() {
 
 // ── Bot Config tab ────────────────────────────────────────────────────────────
 
+const PILL_CATEGORY_LABELS: Record<string, string> = {
+  kyc_verification:   'KYC Verification',
+  account_restriction:'Account Restriction',
+  withdrawal_issue:   'Withdrawal Issue',
+  deposit_issue:      'Deposit Issue',
+  password_2fa_reset: 'Password / 2FA Reset',
+  fraud_security:     'Fraud & Security',
+  other:              'Other',
+};
+
+type PillLibrary = Record<string, Record<string, string[]>>;
+
+function CuratedLibraryEditor({ library, onChange }: {
+  library: PillLibrary;
+  onChange: (lib: PillLibrary) => void;
+}) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, Record<string, string>>>({});
+
+  const updatePill = (cat: string, lang: string, idx: number, val: string) => {
+    const next = structuredClone(library);
+    next[cat][lang][idx] = val;
+    onChange(next);
+  };
+
+  const deletePill = (cat: string, lang: string, idx: number) => {
+    const next = structuredClone(library);
+    next[cat][lang] = next[cat][lang].filter((_: string, i: number) => i !== idx);
+    onChange(next);
+  };
+
+  const addPill = (cat: string, lang: string) => {
+    const key = `${cat}:${lang}`;
+    const text = (drafts[key] ?? '').trim();
+    if (!text) return;
+    const next = structuredClone(library);
+    next[cat][lang] = [...(next[cat][lang] ?? []), text];
+    onChange(next);
+    setDrafts(d => ({ ...d, [key]: '' }));
+  };
+
+  return (
+    <div className="space-y-2">
+      {Object.keys(PILL_CATEGORY_LABELS).map((cat) => {
+        const isOpen = expanded === cat;
+        const catData = library[cat] ?? {};
+        return (
+          <div key={cat} className="ring-1 ring-surface-5 rounded-lg overflow-hidden">
+            <button
+              onClick={() => setExpanded(isOpen ? null : cat)}
+              className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-surface-3 transition-colors"
+            >
+              <span className="text-sm font-medium text-text-primary">{PILL_CATEGORY_LABELS[cat]}</span>
+              <svg className={`w-4 h-4 text-text-muted transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {isOpen && (
+              <div className="border-t border-surface-5 px-4 py-4 space-y-5 bg-surface-1">
+                {(['en', 'th'] as const).map((lang) => {
+                  const key = `${cat}:${lang}`;
+                  const pills: string[] = catData[lang] ?? [];
+                  return (
+                    <div key={lang}>
+                      <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wide mb-2">
+                        {lang === 'en' ? '🇬🇧 English' : '🇹🇭 Thai'}
+                      </p>
+                      <div className="space-y-1.5">
+                        {pills.map((pill: string, idx: number) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <input
+                              value={pill}
+                              onChange={e => updatePill(cat, lang, idx, e.target.value)}
+                              className="flex-1 bg-surface-2 ring-1 ring-surface-5 rounded px-2.5 py-1.5 text-xs text-text-primary focus:outline-none focus:ring-brand"
+                            />
+                            <button
+                              onClick={() => deletePill(cat, lang, idx)}
+                              className="text-text-muted hover:text-red-400 transition-colors flex-shrink-0"
+                              title="Remove"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        ))}
+                        <div className="flex items-center gap-2 mt-2">
+                          <input
+                            placeholder="Add a pill…"
+                            value={drafts[key] ?? ''}
+                            onChange={e => setDrafts(d => ({ ...d, [key]: e.target.value }))}
+                            onKeyDown={e => { if (e.key === 'Enter') addPill(cat, lang); }}
+                            className="flex-1 bg-surface-2 ring-1 ring-surface-5 rounded px-2.5 py-1.5 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-brand"
+                          />
+                          <button
+                            onClick={() => addPill(cat, lang)}
+                            className="text-xs px-2 py-1.5 rounded bg-surface-3 text-text-secondary hover:bg-surface-4 transition-colors flex-shrink-0"
+                          >
+                            Add
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function BotConfigTab() {
   const { toast } = useToast();
-  const [enabled, setEnabled] = useState(true);
-  const [mode, setMode]       = useState<'ai' | 'curated'>('ai');
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving]   = useState(false);
+  const [enabled, setEnabled]   = useState(true);
+  const [mode, setMode]         = useState<'ai' | 'curated'>('ai');
+  const [library, setLibrary]   = useState<PillLibrary>({});
+  const [loading, setLoading]   = useState(true);
+  const [saving, setSaving]     = useState(false);
 
   useEffect(() => {
-    api.getBotConfig()
-      .then((cfg) => {
+    Promise.all([api.getBotConfig(), api.getCuratedPills()])
+      .then(([cfg, pills]) => {
         setEnabled(cfg.quick_replies_enabled ?? true);
-        setMode((cfg.quick_replies_mode === 'curated' ? 'curated' : 'ai'));
+        setMode(cfg.quick_replies_mode === 'curated' ? 'curated' : 'ai');
+        setLibrary(pills);
       })
       .catch(() => {/* use defaults */})
       .finally(() => setLoading(false));
@@ -2167,7 +2284,10 @@ function BotConfigTab() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await api.updateBotConfig({ quick_replies_enabled: enabled, quick_replies_mode: mode });
+      await Promise.all([
+        api.updateBotConfig({ quick_replies_enabled: enabled, quick_replies_mode: mode }),
+        api.updateCuratedPills(library),
+      ]);
       toast('Bot config saved', 'success');
     } catch {
       toast('Failed to save', 'error');
@@ -2185,7 +2305,7 @@ function BotConfigTab() {
   }
 
   return (
-    <div className="bg-surface-2 ring-1 ring-surface-5 rounded-lg p-6 space-y-6 max-w-lg">
+    <div className="bg-surface-2 ring-1 ring-surface-5 rounded-lg p-6 space-y-6 max-w-2xl">
       <div>
         <h3 className="text-sm font-semibold text-text-primary mb-1">Quick-Reply Pill Buttons</h3>
         <p className="text-xs text-text-secondary mb-4">
@@ -2209,7 +2329,7 @@ function BotConfigTab() {
           </button>
         </div>
 
-        {/* AI vs Curated radio — visible only when toggle is on */}
+        {/* AI vs Curated radio */}
         {enabled && (
           <div className="pt-4 space-y-3">
             <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Generation mode</p>
@@ -2230,13 +2350,25 @@ function BotConfigTab() {
                   <p className="text-xs text-text-secondary">
                     {m === 'ai'
                       ? 'Gemini suggests 2–4 contextual pills per reply — adapts to any conversation.'
-                      : 'Show static pills from the built-in category library — consistent and predictable.'}
+                      : 'Show static pills from the library below — consistent and predictable.'}
                   </p>
                 </div>
               </label>
             ))}
           </div>
         )}
+      </div>
+
+      {/* Curated library editor — always visible so admins can edit even in AI mode */}
+      <div>
+        <h3 className="text-sm font-semibold text-text-primary mb-1">Curated pill library</h3>
+        <p className="text-xs text-text-secondary mb-3">
+          These pills are shown when mode is set to "Curated library", and also as fallback when AI returns no suggestions.
+        </p>
+        {Object.keys(library).length > 0
+          ? <CuratedLibraryEditor library={library} onChange={setLibrary} />
+          : <p className="text-xs text-text-muted">Loading library…</p>
+        }
       </div>
 
       <div className="flex justify-end">

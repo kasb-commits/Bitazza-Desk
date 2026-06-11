@@ -422,6 +422,12 @@ export const api = {
 
   updateBotConfig: (data: { quick_replies_enabled: boolean; quick_replies_mode: string }) =>
     req('/api/bot-config', { method: 'POST', body: JSON.stringify(data) }),
+
+  getCuratedPills: () =>
+    req<Record<string, Record<string, string[]>>>('/api/bot-config/curated-pills'),
+
+  updateCuratedPills: (pills: Record<string, Record<string, string[]>>) =>
+    req('/api/bot-config/curated-pills', { method: 'PUT', body: JSON.stringify({ pills }) }),
 };
 
 // ── Socket.io client ──────────────────────────────────────────────────────────

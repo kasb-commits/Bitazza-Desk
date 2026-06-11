@@ -1151,6 +1151,31 @@ def update_bot_config_endpoint(body: BotConfigUpdateRequest, user_id: str = Depe
     return {"ok": True}
 
 
+@router.get("/bot-config/curated-pills")
+def get_curated_pills_endpoint(user_id: str = Depends(get_user_id)):
+    from db.conversation_store import get_curated_pills_db
+    from engine.quick_reply_defaults import CURATED_QUICK_REPLIES
+    db_data = get_curated_pills_db()
+    # Merge: DB wins over hardcoded defaults; always return all known categories
+    result = {}
+    for cat, langs in CURATED_QUICK_REPLIES.items():
+        result[cat] = {}
+        for lang in langs:
+            result[cat][lang] = db_data.get(cat, {}).get(lang, langs[lang])
+    return result
+
+
+class CuratedPillsUpdateRequest(BaseModel):
+    pills: dict  # { category: { language: [str] } }
+
+
+@router.put("/bot-config/curated-pills")
+def update_curated_pills_endpoint(body: CuratedPillsUpdateRequest, user_id: str = Depends(get_user_id)):
+    from db.conversation_store import update_curated_pills_db
+    update_curated_pills_db(body.pills)
+    return {"ok": True}
+
+
 @router.post("/admin/notification-channels/{channel}/test")
 async def test_notification_channel(
     channel: str,

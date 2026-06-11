@@ -32,6 +32,7 @@ const uploadsRouter                = require('./routes/uploads');
 const announcementsRouter          = require('./routes/announcements');
 const internalRouter               = require('./routes/internal');
 const logsRouter                   = require('./routes/logs');
+const botConfigRouter              = require('./routes/botConfig');
 
 // Auth middleware
 const { authenticate, requirePermission } = require('./middleware/auth');
@@ -91,6 +92,7 @@ app.use('/api/notifications',               notificationsRouter);
 app.use('/api/ticket-properties',           ticketPropertiesRouter);
 app.use('/api/uploads',                     uploadsRouter);
 app.use('/api/announcements',               announcementsRouter);
+app.use('/api/bot-config',                  botConfigRouter);
 app.use('/api/internal',                   internalRouter);
 app.use('/api/logs',                       logsRouter);
 

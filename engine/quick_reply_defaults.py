@@ -106,7 +106,23 @@ CURATED_QUICK_REPLIES: dict[str, dict[str, list[str]]] = {
 
 
 def get_curated_pills(category: str | None, language: str) -> list[str]:
-    """Return curated pills for the given category and language."""
-    cat  = category if category in CURATED_QUICK_REPLIES else "other"
+    """
+    Return curated pills for the given category and language.
+    Reads from the DB first; falls back to the hardcoded dict if the DB
+    has no row for this category/language.
+    """
+    cat  = category if category else "other"
     lang = language if language in ("en", "th") else "en"
-    return CURATED_QUICK_REPLIES[cat][lang]
+    try:
+        from db.conversation_store import get_curated_pills_db
+        db_data = get_curated_pills_db()
+        if db_data:
+            resolved_cat = cat if cat in db_data else "other"
+            row = db_data.get(resolved_cat, {})
+            if lang in row:
+                return row[lang]
+    except Exception:
+        pass
+    # Hardcoded fallback
+    resolved_cat = cat if cat in CURATED_QUICK_REPLIES else "other"
+    return CURATED_QUICK_REPLIES[resolved_cat][lang]
