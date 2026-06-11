@@ -14,6 +14,40 @@ function getHeaders(cfg: CSBotConfig): HeadersInit {
   return h;
 }
 
+// ── Proactive token refresh ──────────────────────────────────────────────────
+// Checks if the token is within 60 s of expiry and refreshes it before the
+// request fires.  Uses a singleton promise to dedup concurrent callers.
+const TOKEN_REFRESH_BUFFER_MS = 60_000; // refresh 60 s before expiry
+let _refreshPromise: Promise<void> | null = null;
+
+async function ensureFreshToken(cfg: CSBotConfig): Promise<void> {
+  // Nothing to refresh — guest or no expiry info
+  if (!cfg.onTokenRefresh || !cfg.tokenExpiresAt) return;
+  // Token still has time
+  if (Date.now() < cfg.tokenExpiresAt - TOKEN_REFRESH_BUFFER_MS) return;
+
+  // Already refreshing — wait for the in-flight refresh
+  if (_refreshPromise) return _refreshPromise;
+
+  _refreshPromise = (async () => {
+    try {
+      const newToken = await cfg.onTokenRefresh!();
+      cfg.token = newToken;
+      // Decode exp from JWT payload to update expiresAt
+      try {
+        const payload = JSON.parse(atob(newToken.split('.')[1]));
+        if (payload.exp) cfg.tokenExpiresAt = payload.exp * 1000;
+      } catch { /* non-standard JWT — keep old expiresAt, will refresh again next call */ }
+    } catch (e) {
+      // Refresh failed — proceed with the old (possibly expired) token.
+      // The backend will treat it as guest; the next call will retry refresh.
+      sendClientLog(cfg.apiUrl, { level: 'warn', event: 'token_refresh_failed', message: e instanceof Error ? e.message : String(e) });
+    }
+  })().finally(() => { _refreshPromise = null; });
+
+  return _refreshPromise;
+}
+
 const SESSION_KEY = 'csbot_session';
 const SESSION_TTL_MS = 3 * 60 * 60 * 1000; // 3 hours
 const CUSTOMER_KEY = 'csbot_customer_id'; // permanent — no TTL
@@ -112,6 +146,7 @@ export function storeSessionBotInfo(botName: string, botAvatarUrl: string | null
 let _startPromise: Promise<string> | null = null;
 
 async function _attemptStart(cfg: CSBotConfig, guestName?: string, guestEmail?: string): Promise<string> {
+  await ensureFreshToken(cfg);
   const res = await fetch(`${cfg.apiUrl}/chat/start`, {
     method: 'POST',
     headers: getHeaders(cfg),
@@ -210,6 +245,7 @@ export async function setCategoryAgent(
   conversationId: string,
   category: string,
 ): Promise<SetCategoryResult> {
+  await ensureFreshToken(cfg);
   const res = await fetch(`${cfg.apiUrl}/chat/set-category`, {
     method: 'POST',
     headers: getHeaders(cfg),
@@ -225,6 +261,7 @@ export async function setCategoryAgent(
 }
 
 export async function greetConversation(cfg: CSBotConfig, conversationId: string, language: 'en' | 'th'): Promise<GreetResult> {
+  await ensureFreshToken(cfg);
   const res = await fetch(`${cfg.apiUrl}/chat/greet`, {
     method: 'POST',
     headers: getHeaders(cfg),
@@ -328,6 +365,7 @@ export async function uploadAttachment(
   cfg: CSBotConfig,
   file: File,
 ): Promise<{ id: string; url: string; name: string; mimeType: string; size: number }> {
+  await ensureFreshToken(cfg);
   const form = new FormData();
   form.append('file', file);
   const headers: Record<string, string> = {};
@@ -359,6 +397,7 @@ export async function sendMessage(
   category?: string,
   attachmentIds?: string[],
 ): Promise<SendResult> {
+  await ensureFreshToken(cfg);
   const res = await fetch(`${cfg.apiUrl}/chat/message`, {
     method: 'POST',
     headers: getHeaders(cfg),

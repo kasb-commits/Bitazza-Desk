@@ -57,7 +57,12 @@ const DEV_USER_KEY = 'csbot_dev_user_id';
  * In production Freedom/Bitazza sets window.CSBotConfig.token before the
  * widget loads — this function is never called.
  */
-async function getDevToken(apiUrl: string): Promise<string> {
+interface DevTokenResult {
+  token: string;
+  expiresAt: number; // ms since epoch
+}
+
+async function getDevToken(apiUrl: string): Promise<DevTokenResult> {
   let userId = sessionStorage.getItem(DEV_USER_KEY);
   if (!userId) {
     userId = MOCK_USER_IDS[Math.floor(Math.random() * MOCK_USER_IDS.length)];
@@ -77,7 +82,8 @@ async function getDevToken(apiUrl: string): Promise<string> {
     if (!res.ok) throw new Error(`mock token failed for ${userId}: ${res.status}`);
     const data = await res.json();
     console.debug(`[csbot-dev] signed in as mock user ${userId}`);
-    return data.token as string;
+    const expiresAt = Date.now() + (data.expires_in as number) * 1000;
+    return { token: data.token as string, expiresAt };
   } finally {
     clearTimeout(timeout);
   }
@@ -107,7 +113,14 @@ async function mount() {
     rawCfg.guestMode = true;
   } else if (!rawCfg.token) {
     try {
-      rawCfg.token = await getDevToken(rawCfg.apiUrl);
+      const result = await getDevToken(rawCfg.apiUrl);
+      rawCfg.token = result.token;
+      rawCfg.tokenExpiresAt = result.expiresAt;
+      rawCfg.onTokenRefresh = async () => {
+        const r = await getDevToken(rawCfg.apiUrl);
+        rawCfg.tokenExpiresAt = r.expiresAt;
+        return r.token;
+      };
     } catch (e) {
       console.warn('[csbot-dev] could not fetch mock token, falling back to unauthenticated', e);
     }
