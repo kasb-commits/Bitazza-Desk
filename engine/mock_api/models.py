@@ -70,6 +70,11 @@ class RestrictionStatus(str, Enum):
 class AccountRestriction(BaseModel):
     restriction_id: str
     type: RestrictionType
+    subtype: Optional[str] = None            # drives specific bot response; see values below:
+                                             # mule_permanent, mule_reviewable, cfr_freeze,
+                                             # wrong_password, 2fa_lost, edd_incomplete,
+                                             # daily_limit_reached, first_deposit_hold,
+                                             # monthly_limit_reached
     status: RestrictionStatus
     reason: str                              # human-readable; never expose regulatory detail
     applied_at: str                          # ISO-8601
@@ -84,6 +89,8 @@ class AccountRestrictionsResponse(BaseModel):
     restrictions: list[AccountRestriction]
     trading_available: bool
     trading_block_reason: Optional[str] = None
+    deposit_available: bool = True           # False when deposit_block or full_freeze is active
+    withdrawal_available: bool = True        # False when withdrawal_block or full_freeze is active
 
 
 # ── Transaction & Trade history models ───────────────────────────────────────

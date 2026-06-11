@@ -7,8 +7,18 @@ Scenario coverage (original 20):
   • trading_block         : USR-000007, USR-000012, USR-000018
   • deposit_block         : USR-000008, USR-000019
   • full_freeze (AML/comp) : USR-000009, USR-000010, USR-000015, USR-000016, USR-000020
-  • login_block            : USR-000013
-  • can_self_resolve=True  : USR-000011, USR-000017 (expired KYC), USR-000013 (2FA reset)
+  • login_block            : USR-000013 (2fa_lost), USR-000076 (wrong_password), USR-000082 (wrong_password)
+  • can_self_resolve=True  : USR-000011, USR-000017 (expired KYC), USR-000013 (2fa_lost)
+
+New subtype scenarios:
+  • full_freeze/mule_reviewable  : USR-000021
+  • full_freeze/mule_permanent   : USR-000022
+  • full_freeze/cfr_freeze       : USR-000023
+  • deposit_block/daily_limit    : USR-000024
+  • withdrawal_block/daily_limit : USR-000025
+  • withdrawal_block/first_deposit_hold : USR-000029
+  • trading_block/monthly_limit  : USR-000032
+  • trading_block/edd_incomplete : USR-000039 (updated)
 
 Simulation pool (USR-000021–100, ~25 users with restrictions):
   • withdrawal_block      : USR-000026, USR-000030, USR-000034, USR-000042, USR-000046,
@@ -54,6 +64,148 @@ _SEED: list[dict] = [
     {"user_id": "USR-000003", "restrictions": []},
     {"user_id": "USR-000004", "restrictions": []},
     {"user_id": "USR-000014", "restrictions": []},
+
+    # ── Mule account — reviewable (Light Grey / Brown tier) ──────────────────
+    {
+        "user_id": "USR-000021",
+        "restrictions": [
+            AccountRestriction(
+                restriction_id="RST-000021-001",
+                type=RestrictionType.full_freeze,
+                subtype="mule_reviewable",
+                status=RestrictionStatus.active,
+                reason="Your account has been restricted pending a compliance review. You may submit information for review.",
+                applied_at="2026-05-10T09:00:00Z",
+                expected_lift_at=None,
+                can_self_resolve=True,
+                resolution_steps=(
+                    "Please complete the KYC compliance review form at: "
+                    "https://forms.gle/N5v2hFAKaA3f3JiS6 — our Compliance/KYC team will "
+                    "review your submission and contact you with next steps."
+                ),
+            )
+        ],
+    },
+
+    # ── Mule account — permanent (Black / Dark Grey tier) ────────────────────
+    {
+        "user_id": "USR-000022",
+        "restrictions": [
+            AccountRestriction(
+                restriction_id="RST-000022-001",
+                type=RestrictionType.full_freeze,
+                subtype="mule_permanent",
+                status=RestrictionStatus.active,
+                reason="Your account has been permanently restricted.",
+                applied_at="2026-04-15T11:00:00Z",
+                expected_lift_at=None,
+                can_self_resolve=False,
+            )
+        ],
+    },
+
+    # ── CFR freeze — 4-day legal hold ────────────────────────────────────────
+    {
+        "user_id": "USR-000023",
+        "restrictions": [
+            AccountRestriction(
+                restriction_id="RST-000023-001",
+                type=RestrictionType.full_freeze,
+                subtype="cfr_freeze",
+                status=RestrictionStatus.active,
+                reason="Your account has been temporarily suspended under the 2023 Royal Decree pending receipt of an official order.",
+                applied_at="2026-06-10T08:00:00Z",
+                expected_lift_at="2026-06-14T08:00:00Z",
+                can_self_resolve=False,
+            )
+        ],
+    },
+
+    # ── Daily fiat deposit limit reached ─────────────────────────────────────
+    {
+        "user_id": "USR-000024",
+        "restrictions": [
+            AccountRestriction(
+                restriction_id="RST-000024-001",
+                type=RestrictionType.deposit_block,
+                subtype="daily_limit_reached",
+                status=RestrictionStatus.active,
+                reason="You have reached your daily THB deposit limit for your current KYC tier.",
+                applied_at="2026-06-11T00:00:00Z",
+                expected_lift_at="2026-06-12T00:00:00Z",
+                can_self_resolve=True,
+                resolution_steps=(
+                    "To increase your daily deposit limit, upgrade your KYC tier by submitting "
+                    "your information at: https://docs.google.com/forms/d/e/"
+                    "1FAIpQLSdn9jGmWV497bWdggqlIINyFiUPCkaeMNsaEPBtvd7ltf6e4A/viewform — "
+                    "our KYC team will review and increase your tier accordingly. "
+                    "Alternatively, your current daily limit resets at midnight."
+                ),
+            )
+        ],
+    },
+
+    # ── Daily fiat withdrawal limit reached ───────────────────────────────────
+    {
+        "user_id": "USR-000025",
+        "restrictions": [
+            AccountRestriction(
+                restriction_id="RST-000025-001",
+                type=RestrictionType.withdrawal_block,
+                subtype="daily_limit_reached",
+                status=RestrictionStatus.active,
+                reason="You have reached your daily THB withdrawal limit for your current KYC tier.",
+                applied_at="2026-06-11T00:00:00Z",
+                expected_lift_at="2026-06-12T00:00:00Z",
+                can_self_resolve=True,
+                resolution_steps=(
+                    "To increase your daily withdrawal limit, upgrade your KYC tier by submitting "
+                    "your information at: https://docs.google.com/forms/d/e/"
+                    "1FAIpQLSdn9jGmWV497bWdggqlIINyFiUPCkaeMNsaEPBtvd7ltf6e4A/viewform — "
+                    "our KYC team will review and increase your tier accordingly. "
+                    "Alternatively, your current daily limit resets at midnight."
+                ),
+            )
+        ],
+    },
+
+    # ── First-time THB deposit 24-hour hold ───────────────────────────────────
+    {
+        "user_id": "USR-000029",
+        "restrictions": [
+            AccountRestriction(
+                restriction_id="RST-000029-001",
+                type=RestrictionType.withdrawal_block,
+                subtype="first_deposit_hold",
+                status=RestrictionStatus.active,
+                reason="A 24-hour security hold has been applied following your first THB deposit. All fiat and crypto withdrawals are paused until the hold expires.",
+                applied_at="2026-06-11T06:00:00Z",
+                expected_lift_at="2026-06-12T06:00:00Z",
+                can_self_resolve=False,
+            )
+        ],
+    },
+
+    # ── Monthly token trading limit reached ───────────────────────────────────
+    {
+        "user_id": "USR-000032",
+        "restrictions": [
+            AccountRestriction(
+                restriction_id="RST-000032-001",
+                type=RestrictionType.trading_block,
+                subtype="monthly_limit_reached",
+                status=RestrictionStatus.active,
+                reason="You have reached the monthly trading threshold for this token on your current KYC tier.",
+                applied_at="2026-06-11T00:00:00Z",
+                expected_lift_at="2026-07-01T00:00:00Z",
+                can_self_resolve=True,
+                resolution_steps=(
+                    "Your monthly trading limit resets automatically on the 1st of next month. "
+                    "To increase your monthly volume limit, upgrade your KYC level."
+                ),
+            )
+        ],
+    },
 
     # ── Withdrawal blocks ─────────────────────────────────────────────────────
     {
@@ -287,15 +439,17 @@ _SEED: list[dict] = [
             AccountRestriction(
                 restriction_id="RST-000013-001",
                 type=RestrictionType.login_block,
+                subtype="2fa_lost",
                 status=RestrictionStatus.active,
-                reason="Login temporarily blocked due to suspicious activity from an unrecognised location.",
+                reason="Login blocked — 2FA authenticator access lost or invalidated.",
                 applied_at="2026-03-31T06:00:00Z",
                 expected_lift_at=None,
                 can_self_resolve=True,
                 resolution_steps=(
-                    "Reset your 2FA by tapping 'Forgot authenticator?' on the login screen. "
-                    "You will need access to your registered email to complete verification. "
-                    "Login will be restored immediately after the reset."
+                    "Submit a 2FA reset request: take a selfie clearly holding your National ID, "
+                    "include a handwritten note stating your full name, account email, and "
+                    "the words '2FA Reset Request'. Send this to our support team. "
+                    "Our operations team will process the reset and notify you once complete."
                 ),
             )
         ],
@@ -502,11 +656,17 @@ _SEED: list[dict] = [
             AccountRestriction(
                 restriction_id="RST-000039-001",
                 type=RestrictionType.trading_block,
+                subtype="edd_incomplete",
                 status=RestrictionStatus.active,
-                reason="Trading blocked pending enhanced due diligence review.",
+                reason="Account functionality limited — Enhanced Due Diligence (EDD) documents were not submitted within the compliance deadline.",
                 applied_at="2026-01-21T12:00:00Z",
                 expected_lift_at=None,
-                can_self_resolve=False,
+                can_self_resolve=True,
+                resolution_steps=(
+                    "Please complete your Enhanced Due Diligence (EDD) submission as soon as possible. "
+                    "Once submitted, inform our support team and we will forward your case directly "
+                    "to the KYC team for review. Your account will be restored once KYC approves your profile."
+                ),
             )
         ],
     },
@@ -666,14 +826,17 @@ _SEED: list[dict] = [
             AccountRestriction(
                 restriction_id="RST-000076-001",
                 type=RestrictionType.login_block,
+                subtype="wrong_password",
                 status=RestrictionStatus.active,
-                reason="Login blocked due to multiple failed authentication attempts.",
+                reason="Account locked due to multiple incorrect password attempts within a short period.",
                 applied_at="2026-04-06T07:00:00Z",
                 expected_lift_at=None,
                 can_self_resolve=True,
                 resolution_steps=(
-                    "Use 'Forgot password?' on the login screen to reset your credentials. "
-                    "If you lost access to your 2FA device, tap 'Forgot authenticator?' instead."
+                    "Submit an account unlock request: take a selfie clearly holding your National ID, "
+                    "include a handwritten note stating your full name, account email, and "
+                    "the words 'Account Unlock Request'. Send this to our support team. "
+                    "Our operations team will verify your identity and unlock the account."
                 ),
             )
         ],
@@ -684,14 +847,17 @@ _SEED: list[dict] = [
             AccountRestriction(
                 restriction_id="RST-000082-001",
                 type=RestrictionType.login_block,
+                subtype="wrong_password",
                 status=RestrictionStatus.active,
-                reason="Login blocked following detection of an unrecognised device login from a new location.",
+                reason="Account locked due to multiple incorrect password attempts within a short period.",
                 applied_at="2026-04-05T22:00:00Z",
                 expected_lift_at=None,
                 can_self_resolve=True,
                 resolution_steps=(
-                    "Verify your identity via the link sent to your registered email address. "
-                    "Once verified, you will be prompted to set a new password."
+                    "Submit an account unlock request: take a selfie clearly holding your National ID, "
+                    "include a handwritten note stating your full name, account email, and "
+                    "the words 'Account Unlock Request'. Send this to our support team. "
+                    "Our operations team will verify your identity and unlock the account."
                 ),
             )
         ],
@@ -706,19 +872,28 @@ for _entry in _SEED:
     _uid = _entry["user_id"]
     _restrictions: list[AccountRestriction] = _entry["restrictions"]
     _has = len(_restrictions) > 0
+    _active = [r for r in _restrictions if r.status != RestrictionStatus.lifted]
+
     _trading_blocked = any(
         r.type in (RestrictionType.trading_block, RestrictionType.full_freeze)
-        and r.status != RestrictionStatus.lifted
-        for r in _restrictions
+        for r in _active
     )
     _trading_block_reason: str | None = None
     if _trading_blocked:
         _r = next(
-            r for r in _restrictions
+            r for r in _active
             if r.type in (RestrictionType.trading_block, RestrictionType.full_freeze)
-            and r.status != RestrictionStatus.lifted
         )
         _trading_block_reason = _r.reason
+
+    _deposit_blocked = any(
+        r.type in (RestrictionType.deposit_block, RestrictionType.full_freeze)
+        for r in _active
+    )
+    _withdrawal_blocked = any(
+        r.type in (RestrictionType.withdrawal_block, RestrictionType.full_freeze)
+        for r in _active
+    )
 
     _BY_ID[_uid] = AccountRestrictionsResponse(
         user_id=_uid,
@@ -726,6 +901,8 @@ for _entry in _SEED:
         restrictions=_restrictions,
         trading_available=not _trading_blocked,
         trading_block_reason=_trading_block_reason,
+        deposit_available=not _deposit_blocked,
+        withdrawal_available=not _withdrawal_blocked,
     )
 
 

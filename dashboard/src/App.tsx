@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import logoImg from './assets/logo.png';
+const logoImg = '/logo.png';
 import { Routes, Route, NavLink, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { PermissionProvider } from './PermissionContext';
 import type { Ticket, InboxView, StatusFilter, ChannelFilter, AgentStatus, WSEvent, Role, Notification } from './types';

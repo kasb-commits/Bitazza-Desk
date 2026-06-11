@@ -7,6 +7,8 @@ data/
 !package-lock.json
 !tsconfig*.json
 !vite.config.*
+!vercel.json
+!**/vercel.json
 !**/railway.toml
 *.csv
 node_modules/

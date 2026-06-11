@@ -1,0 +1,38 @@
+node_modules
+dashboard/node_modules
+frontend/widget/node_modules
+.venv
+".venv 2"
+".venv 3"
+".venv 4"
+__pycache__
+*.pyc
+.git
+dump.rdb
+scripts/
+ingestion/
+tests/
+uploads/
+dashboard/.vite/
+dashboard/*.mjs
+dashboard/server/uploads/
+dashboard/server/node_modules/
+/assets/
+widget_scrape/
+website/
+landing/
+*" 2"*
+*" 2."*
+* 2.js
+* 2.ts
+* 2.tsx
+* 2.py
+* 2.json
+* 2.md
+* 2.css
+* 2.sql
+* 2.toml
+* 2.html
+* 2.svg
+* 2.cjs
+* 2.node

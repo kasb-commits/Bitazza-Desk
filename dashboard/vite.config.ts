@@ -46,6 +46,9 @@ export default defineConfig({
       },
     }),
   ],
+  optimizeDeps: {
+    include: ['react-is'],
+  },
   server: {
     port: 3002,
     watch: {

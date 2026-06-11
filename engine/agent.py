@@ -72,6 +72,42 @@ def _call_with_retry(fn, max_attempts: int = 3, base_delay: float = 0.5):
 
 
 
+# ── Structured output schema ──────────────────────────────────────────────────
+# Used with response_mime_type="application/json" when function-calling is NOT
+# active (workflow ai_reply nodes, no-tool categories, and the follow-up call
+# after tool execution in legacy mode).  Gemini's decoding layer enforces
+# the schema, guaranteeing valid JSON and non-empty quick_replies.
+_RESPONSE_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {
+        "quick_replies": {
+            "type": "ARRAY",
+            "items": {"type": "STRING"},
+            "minItems": 2,
+            "maxItems": 4,
+            "description": "2-4 short customer follow-up phrases specific to THIS reply",
+        },
+        "response": {
+            "type": "STRING",
+            "description": "The agent reply text",
+        },
+        "confidence": {
+            "type": "NUMBER",
+            "description": "0.0 to 1.0 confidence in the answer",
+        },
+        "needs_human": {
+            "type": "BOOLEAN",
+            "description": "True only when escalation is warranted",
+        },
+        "resolved": {
+            "type": "BOOLEAN",
+            "description": "True when the issue is fully resolved",
+        },
+    },
+    "required": ["quick_replies", "response", "confidence", "needs_human", "resolved"],
+}
+
+
 # Fields that must never be fabricated when null — replace with explicit marker
 # before passing tool results to Gemini so the model cannot guess a reason.
 _NULL_REASON_FIELDS = {
@@ -381,6 +417,8 @@ def chat(
             platform=platform,
             consecutive_low_confidence=consecutive_low_confidence,
             category=upgrade,
+            suppress_handoff=suppress_handoff,
+            injected_account_data=injected_account_data,
             _skip_upgrade=True,
             override_language=override_language,
         )
@@ -483,6 +521,15 @@ def chat(
     # Suppress self-introductions on follow-up turns.
     if history_for_gemini:
         system_prompt += "\n\nCONTEXT: This is a follow-up message in an ongoing conversation. Do NOT introduce yourself or say your name."
+    # In workflow mode, escalation is deferred — the workflow collects info before
+    # handing off. Gemini must ALWAYS produce pills so the customer can continue
+    # the conversation even when needs_human=true.
+    if suppress_handoff:
+        system_prompt += (
+            "\n\nIMPORTANT — quick_replies override: In this context, escalation is handled "
+            "separately. You MUST always provide 2-4 quick_replies, even when needs_human=true. "
+            "Do NOT return an empty quick_replies array under any circumstance."
+        )
     gemini_history = []
     for msg in history_for_gemini:
         role = "model" if msg["role"] == "assistant" else "user"
@@ -563,10 +610,15 @@ def chat(
         if force_tool_name
         else None
     )
+    # When no tools are active, enforce structured JSON output via Gemini's
+    # response_schema so quick_replies (and the rest of the JSON) is guaranteed.
+    # Cannot combine response_mime_type with function-calling — Gemini rejects it.
+    _use_structured = not tools
     config = genai_types.GenerateContentConfig(
         system_instruction=system_prompt,
         **({"tools": tools} if tools else {}),
         **({"tool_config": tool_config} if tool_config else {}),
+        **({"response_mime_type": "application/json", "response_schema": _RESPONSE_SCHEMA} if _use_structured else {}),
         max_output_tokens=MAX_TOKENS,
     )
 
@@ -943,9 +995,12 @@ def _parse_gemini_response(raw: str, language: str) -> tuple[str, float, bool, b
         confidence = float(data.get("confidence", ESCALATION_CONFIDENCE_THRESHOLD))
         needs_human = bool(data.get("needs_human", False))
         resolved = bool(data.get("resolved", False))
+        # Filter out garbage entries the schema's minItems constraint may force
+        # (e.g. "[]", "N/A", single-char placeholders).
+        _GARBAGE_PILLS = {"[]", "n/a", "none", "null", '""', "''", "-", "."}
         quick_replies = [
             str(q) for q in data.get("quick_replies", [])
-            if isinstance(q, str) and q.strip()
+            if isinstance(q, str) and q.strip() and q.strip().lower() not in _GARBAGE_PILLS and len(q.strip()) > 2
         ][:4]
         if not response_text:
             response_text = UNABLE_TO_HELP_MESSAGES.get(language, UNABLE_TO_HELP_MESSAGES["en"])

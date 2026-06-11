@@ -161,9 +161,10 @@ def get_account_restrictions(user_id: str) -> dict:
     """
     Returns active account restrictions for the authenticated user.
     Response keys: user_id, has_restrictions, restrictions (list), trading_available,
-                   trading_block_reason.
-    Each restriction: restriction_id, type, status, reason, applied_at,
+                   trading_block_reason, deposit_available, withdrawal_available.
+    Each restriction: restriction_id, type, subtype, status, reason, applied_at,
                       expected_lift_at, can_self_resolve, resolution_steps.
+    subtype drives the specific bot response — see AccountRestriction.subtype in models.py.
     In mock mode, calls the in-process store directly to avoid HTTP self-call deadlock.
     """
     if _USE_MOCK:
@@ -171,7 +172,8 @@ def get_account_restrictions(user_id: str) -> dict:
         result = restriction_store.get_by_user_id(user_id)
         if result is None:
             return {"user_id": user_id, "has_restrictions": False, "restrictions": [],
-                    "trading_available": True, "trading_block_reason": None}
+                    "trading_available": True, "trading_block_reason": None,
+                    "deposit_available": True, "withdrawal_available": True}
         return result.model_dump(mode="json")
 
     url = f"{_USER_API_BASE}/restrictions"
@@ -329,7 +331,10 @@ TOOL_DEFINITIONS = [
             "Get any active restrictions or freezes on the authenticated user's account. "
             "Call this for ANY reported blockage — withdrawal failures, deposit issues, trading blocks, "
             "or account access problems. An active restriction is often the root cause of all of these. "
-            "Always cross-reference with get_user_profile results to explain why the restriction exists."
+            "Top-level flags: trading_available, deposit_available, withdrawal_available. "
+            "Each restriction includes a subtype field that drives the specific response: "
+            "mule_permanent, mule_reviewable, cfr_freeze, wrong_password, 2fa_lost, "
+            "edd_incomplete, daily_limit_reached, first_deposit_hold, monthly_limit_reached."
         ),
         "parameters": {"type": "object", "properties": {}},
     },

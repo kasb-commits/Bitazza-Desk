@@ -99,6 +99,8 @@ def get_restrictions(
             has_restrictions=False,
             restrictions=[],
             trading_available=True,
+            deposit_available=True,
+            withdrawal_available=True,
         )
     return result
 

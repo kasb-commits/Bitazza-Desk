@@ -161,17 +161,15 @@ function fmtDate(iso: string) {
 
 const CARD: React.CSSProperties = {
   background: 'rgba(255,255,255,0.75)',
-  border: '1px solid rgba(255,255,255,0.6)',
+  border: '1px solid #EDEDF8',
   borderRadius: 16,
   backdropFilter: 'blur(16px)',
-  border: '1px solid #EDEDF8',
 };
 
 const INNER_CARD: React.CSSProperties = {
   background: '#ffffff',
-  border: '1px solid #f0f2f5',
-  borderRadius: 12,
   border: '1px solid #EDEDF8',
+  borderRadius: 12,
 };
 
 const SECTION_LABEL: React.CSSProperties = {
@@ -650,7 +648,7 @@ export default function User360() {
             style={{
               padding: '8px 20px', fontSize: 13, fontWeight: 600, borderRadius: 10, border: 'none', cursor: searching ? 'not-allowed' : 'pointer',
               background: 'linear-gradient(135deg, #6366f1, #818cf8)', color: '#fff',
-              border: '1px solid #D3FCEA', opacity: searching ? 0.6 : 1, flexShrink: 0, transition: 'all 0.15s',
+              opacity: searching ? 0.6 : 1, flexShrink: 0, transition: 'all 0.15s',
             }}
           >
             {searching ? 'Searching…' : 'Search'}

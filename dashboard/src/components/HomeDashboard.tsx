@@ -246,7 +246,7 @@ function ChannelPie({ data }: { data: { channel: string; count: number }[] }) {
                 {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
               </Pie>
               <Tooltip
-                contentStyle={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 10, border: '1px solid #EDEDF8' }}
+                contentStyle={{ background: '#fff', border: '1px solid #EDEDF8', borderRadius: 8, fontSize: 10 }}
                 formatter={(v: number, name: string) => [`${v} (${Math.round(v / total * 100)}%)`, name]}
               />
             </PieChart>

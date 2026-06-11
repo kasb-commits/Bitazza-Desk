@@ -14,10 +14,9 @@ import { stripTags } from '../utils/richText';
 
 const CARD: React.CSSProperties = {
   background: 'rgba(255,255,255,0.75)',
-  border: '1px solid rgba(255,255,255,0.6)',
+  border: '1px solid #EDEDF8',
   borderRadius: 16,
   backdropFilter: 'blur(16px)',
-  border: '1px solid #EDEDF8',
 };
 
 const CARD_HEADER: React.CSSProperties = {
@@ -735,9 +734,9 @@ export default function SupervisorDashboard() {
               onClick={load}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 500,
-                padding: '8px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.6)',
+                padding: '8px 14px', borderRadius: 10, border: '1px solid #EDEDF8',
                 background: 'rgba(255,255,255,0.75)', backdropFilter: 'blur(12px)',
-                border: '1px solid #EDEDF8', color: '#6b7280',
+                color: '#6b7280',
                 cursor: 'pointer', transition: 'all 0.15s',
               }}
               onMouseEnter={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = '#6366f1'; }}
