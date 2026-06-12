@@ -518,19 +518,26 @@ async def send_message(request: Request, body: MessageRequest, user_id: str | No
 
     # Quick-reply pills: read admin config once per request (cheap — single DB query)
     from db.conversation_store import get_bot_config as _get_bot_config
-    from engine.quick_reply_defaults import get_curated_pills
+    from engine.quick_reply_defaults import select_curated_pills
     _cfg = _get_bot_config()
     _pills_enabled = _cfg.get("quick_replies_enabled", True)
     _pills_mode    = _cfg.get("quick_replies_mode", "ai")
     if not _pills_enabled or result.escalated or result.resolved:
         _quick_replies: list[str] = []
     elif _pills_mode == "curated":
-        _quick_replies = get_curated_pills(effective_category, result.language)
+        # Smart curated: LLM picks 2-3 from the admin's pool based on context
+        _quick_replies = select_curated_pills(
+            effective_category, result.language,
+            bot_reply=result.text or "", user_message=body.message,
+        )
     else:
-        # AI mode: use Gemini-generated pills; fall back to curated when Gemini
-        # returns empty despite being on a non-escalation, non-resolution turn.
+        # AI mode: use Gemini-generated pills; fall back to smart curated
+        # when Gemini returns empty despite being on a non-escalation turn.
         _ai_pills = getattr(result, "quick_replies", None) or []
-        _quick_replies = _ai_pills if _ai_pills else get_curated_pills(effective_category, result.language)
+        _quick_replies = _ai_pills if _ai_pills else select_curated_pills(
+            effective_category, result.language,
+            bot_reply=result.text or "", user_message=body.message,
+        )
 
     logger.info("response_sent", extra={
         "conv_id": body.conversation_id,
