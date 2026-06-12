@@ -76,7 +76,13 @@ class WorkflowRouter:
                 category_upgrade=None,
             )
 
-        workflows = get_published_workflows()
+        # Sort so exact-category/channel triggers take precedence over 'any' wildcards.
+        # Without this, a catch-all "Default AI Response" (category='any') would shadow
+        # specific workflows like "KYC Verification" (category='kyc_verification').
+        def _specificity(wf: Workflow) -> int:
+            return (2 if wf.trigger.category != "any" else 0) + (1 if wf.trigger.channel != "any" else 0)
+
+        workflows = sorted(get_published_workflows(), key=_specificity, reverse=True)
         for wf in workflows:
             if _trigger_matches(wf, message.channel, message.category):
                 result = RouterResult(
