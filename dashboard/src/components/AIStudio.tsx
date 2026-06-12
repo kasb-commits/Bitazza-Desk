@@ -665,12 +665,7 @@ function NodeConfigPanel({ node, onChange, onDelete, testStep }: ConfigPanelProp
                 value={(cfg.ai_persona as string) || ''}
                 onChange={v => onChange(node.id, { ai_persona: v || undefined })}
                 options={[
-                  { value: '',      label: 'Auto (by category)' },
-                  { value: 'Ploy',  label: 'Ploy — General Support' },
-                  { value: 'James', label: 'James — Security & 2FA' },
-                  { value: 'Mint',  label: 'Mint — KYC Verification' },
-                  { value: 'Arm',   label: 'Arm — Account & Withdrawals' },
-                  { value: 'Nook',  label: 'Nook — Fraud & Compliance' },
+                  { value: '',     label: 'Aria (default)' },
                 ]}
               />
             </FieldRow>

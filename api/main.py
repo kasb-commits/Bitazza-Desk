@@ -149,6 +149,9 @@ if settings.USE_MOCK_USER_API:
 _assets_dir = Path(__file__).parent.parent / "engine" / "assets"
 app.mount("/assets", StaticFiles(directory=_assets_dir), name="assets")
 
+_brand_dir = Path(__file__).parent.parent / "assets"
+app.mount("/brand", StaticFiles(directory=_brand_dir), name="brand")
+
 _uploads_dir = Path(__file__).parent.parent / "uploads"
 _uploads_dir.mkdir(exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=_uploads_dir), name="uploads")

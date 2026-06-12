@@ -489,7 +489,7 @@ def chat(
 
     # 6. Build messages for Gemini
     _persona = get_ai_persona(conversation_id)
-    _agent_name = _persona.get("name") or "Kai"
+    _agent_name = _persona.get("name") or "Aria"
     if user_id is None:
         system_prompt = get_guest_system_prompt(language, agent_name=_agent_name)
     else:

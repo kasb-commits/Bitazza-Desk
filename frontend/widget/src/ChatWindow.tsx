@@ -93,6 +93,11 @@ interface Props {
 const CLOSED_STATUSES = ['Closed_Resolved', 'Closed_Unresponsive'];
 
 export default function ChatWindow({ cfg, onClose }: Props) {
+  const resolveUrl = (url: string | null | undefined): string | null => {
+    if (!url) return null;
+    return url.startsWith('/') ? `${cfg.apiUrl}${url}` : url;
+  };
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -220,7 +225,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
           timestamp: m.created_at * 1000,
           agentName: m.agent_name ?? restoredAgent?.name,
           agentAvatar: m.agent_avatar ?? restoredAgent?.avatar,
-          agentAvatarUrl: m.agent_avatar_url ?? restoredAgent?.avatarUrl ?? undefined,
+          agentAvatarUrl: resolveUrl(m.agent_avatar_url ?? restoredAgent?.avatarUrl) ?? undefined,
           attachments: m.attachments?.map(a => ({ id: a.id, url: a.url, name: a.name, mimeType: a.mime_type, size: a.size })),
         }));
         setMessages(restored);
@@ -268,21 +273,22 @@ export default function ChatWindow({ cfg, onClose }: Props) {
       .then((id) => {
         setConvId(id);
         setCategoryAgent(cfg, id, 'other').then(({ agentName, agentAvatarUrl }) => {
-          const resolvedName = agentName ?? 'Ploy';
+          const resolvedName = agentName ?? 'Aria';
+          const resolvedAvatar = resolveUrl(agentAvatarUrl);
           setBotName(resolvedName);
-          setBotAvatarUrl(agentAvatarUrl || null);
-          storeSessionBotInfo(resolvedName, agentAvatarUrl || null);
+          setBotAvatarUrl(resolvedAvatar);
+          storeSessionBotInfo(resolvedName, resolvedAvatar);
           setTimeout(() => {
             const greeting = lang === 'th'
-              ? `สวัสดีค่ะ ฉันชื่อ${resolvedName}! 😊 มีอะไรให้ช่วยได้บ้างคะ?`
-              : `Hi, I'm ${resolvedName}! 😊 How can I help you today?`;
+              ? `สวัสดีค่ะ ดิฉันชื่อ ${resolvedName} เป็น AI ผู้ช่วยฝ่ายสนับสนุนค่ะ 🤖 ยินดีช่วยเหลือคุณลูกค้าในเซสชันนี้เลยนะคะ`
+              : `Hi! I'm ${resolvedName}, your AI support assistant. 🤖 I'll gladly help you on this session.`;
             setMessages((prev) => [...prev, {
-              id: 'ploy-intro',
+              id: 'aria-intro',
               role: 'assistant' as const,
               content: greeting,
               timestamp: Date.now(),
               senderName: resolvedName,
-              agentAvatarUrl: agentAvatarUrl || undefined,
+              agentAvatarUrl: resolvedAvatar || undefined,
             }]);
             setAwaitingFirstReply(false);
           }, 1200 + Math.random() * 600);
@@ -319,8 +325,8 @@ export default function ChatWindow({ cfg, onClose }: Props) {
   }
 
   const AGENT_INTRO = {
-    en: (name: string) => `Hi, I'm ${name}! 👋 Let me pull up your account details and I'll have an answer for you in just a moment.`,
-    th: (name: string) => `สวัสดีค่ะ ฉันชื่อ${name}! 👋 กำลังดึงข้อมูลบัญชีของคุณ รอสักครู่นะคะ`,
+    en: (name: string) => `Hi! I'm ${name}, your AI support assistant. 🤖 I'll gladly help you on this session.`,
+    th: (name: string) => `สวัสดีค่ะ ดิฉันชื่อ ${name} เป็น AI ผู้ช่วยฝ่ายสนับสนุนค่ะ 🤖 ยินดีช่วยเหลือคุณลูกค้าในเซสชันนี้เลยนะคะ`,
   };
 
   const selectCategory = useCallback((category: IssueCategory) => {
@@ -371,9 +377,10 @@ export default function ChatWindow({ cfg, onClose }: Props) {
       };
       trySetCategory().then(({ agentName, agentAvatarUrl }) => {
         const resolvedName = agentName ?? 'Support Agent';
+        const resolvedAvatar = resolveUrl(agentAvatarUrl);
         setBotName(resolvedName);
-        setBotAvatarUrl(agentAvatarUrl || null);
-        storeSessionBotInfo(resolvedName, agentAvatarUrl || null);
+        setBotAvatarUrl(resolvedAvatar);
+        storeSessionBotInfo(resolvedName, resolvedAvatar);
 
         // 2. After a short human-feel delay, show the agent's intro message
         //    Skip for "other" — the AI's first response will ask what they need.
@@ -520,7 +527,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
             timestamp: m.created_at * 1000,
             agentName: m.agent_name,
             agentAvatar: m.agent_avatar,
-            agentAvatarUrl: m.agent_avatar_url ?? undefined,
+            agentAvatarUrl: resolveUrl(m.agent_avatar_url) ?? undefined,
             attachments: m.attachments?.map(a => ({ id: a.id, url: a.url, name: a.name, mimeType: a.mime_type, size: a.size })),
           })),
         ]);

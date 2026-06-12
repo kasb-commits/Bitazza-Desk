@@ -13,11 +13,7 @@ function isHtml(str: string): boolean {
 }
 
 const AGENT_AVATARS: Record<string, string> = {
-  Ploy:  'https://i.pravatar.cc/150?img=47',
-  James: 'https://i.pravatar.cc/150?img=11',
-  Mint:  'https://i.pravatar.cc/150?img=49',
-  Arm:   'https://i.pravatar.cc/150?img=15',
-  Nook:  'https://i.pravatar.cc/150?img=45',
+  Aria: '/brand/logo.png',
 };
 
 function resolveAvatarUrl(name: string, url?: string | null): string | null {
