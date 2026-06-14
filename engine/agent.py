@@ -203,24 +203,24 @@ class AgentResponse:
 
 _UPGRADE_TRANSITION_MESSAGES: dict[str, dict[str, str]] = {
     "kyc_verification": {
-        "en": "For KYC and identity verification questions I'll hand you over to {specialist} — our verification specialist. They'll have our full conversation and can pull up your case directly. One moment! 🪪",
-        "th": "สำหรับเรื่อง KYC และการยืนยันตัวตน ขอส่งต่อให้ {specialist} ผู้เชี่ยวชาญด้านการยืนยันตัวตนของเรานะคะ เจ้าหน้าที่จะเห็นการสนทนาทั้งหมดและดึงข้อมูลเคสของคุณลูกค้าได้โดยตรงเลยค่ะ รอสักครู่นะคะ 🪪",
+        "en": "Got it — switching focus to your KYC verification now. Let me pull up your case details. 🪪",
+        "th": "รับทราบค่ะ กำลังเปลี่ยนโฟกัสไปที่เรื่อง KYC ของคุณลูกค้าเดี๋ยวนี้เลยค่ะ 🪪",
     },
     "withdrawal_issue": {
-        "en": "Withdrawal questions are best handled by {specialist} — our withdrawal specialist who can trace transactions directly. Passing you over now, they'll have everything we've discussed! 💸",
-        "th": "เรื่องการถอนเงินให้ {specialist} ผู้เชี่ยวชาญด้านการถอนเงินของเราจัดการดีกว่าค่ะ เจ้าหน้าที่สามารถติดตามธุรกรรมได้โดยตรงเลย กำลังส่งต่อให้เดี๋ยวนี้เลยค่ะ 💸",
+        "en": "Understood — shifting to your withdrawal issue now. I'll trace the transaction directly. 💸",
+        "th": "เข้าใจแล้วค่ะ กำลังดูเรื่องการถอนเงินของคุณลูกค้าเดี๋ยวนี้เลย จะติดตามธุรกรรมให้โดยตรงเลยค่ะ 💸",
     },
     "account_restriction": {
-        "en": "Account restriction cases need a senior specialist — let me bring in {specialist} who can investigate and take action on your account directly. They'll be right with you! 🔒",
-        "th": "เคสบัญชีถูกระงับต้องใช้ผู้เชี่ยวชาญอาวุโสค่ะ ขอให้ {specialist} มาช่วยซึ่งสามารถตรวจสอบและดำเนินการกับบัญชีของคุณได้โดยตรงเลยนะคะ 🔒",
+        "en": "On it — switching to your account restriction now. I'll investigate and check what's happening directly. 🔒",
+        "th": "รับทราบค่ะ กำลังดูเรื่องบัญชีถูกระงับของคุณลูกค้าเดี๋ยวนี้เลย จะตรวจสอบให้โดยตรงเลยค่ะ 🔒",
     },
     "deposit_issue": {
-        "en": "Deposit problems are handled by {specialist} — our deposits specialist who can trace your transaction directly. Passing you over now, they'll have everything we've discussed! 💳",
-        "th": "เรื่องการฝากเงินให้ {specialist} ผู้เชี่ยวชาญด้านการฝากเงินของเราจัดการดีกว่าค่ะ เจ้าหน้าที่สามารถติดตามธุรกรรมได้โดยตรงเลย กำลังส่งต่อให้เดี๋ยวนี้เลยค่ะ 💳",
+        "en": "Got it — focusing on your deposit issue now. I'll trace the transaction directly. 💳",
+        "th": "รับทราบค่ะ กำลังดูเรื่องการฝากเงินของคุณลูกค้าเดี๋ยวนี้เลย จะติดตามธุรกรรมให้โดยตรงเลยค่ะ 💳",
     },
     "trade_issue": {
-        "en": "For trading and order issues, let me bring in {specialist} — our trading specialist who can pull up your order history and investigate directly. One moment! 📊",
-        "th": "สำหรับปัญหาการเทรดและออเดอร์ ขอให้ {specialist} ผู้เชี่ยวชาญด้านการเทรดของเรามาช่วยค่ะ เจ้าหน้าที่สามารถดึงประวัติออเดอร์และตรวจสอบได้โดยตรงเลย รอสักครู่นะคะ 📊",
+        "en": "Switching to your trading issue now — I'll pull up your order history and investigate directly. 📊",
+        "th": "กำลังดูเรื่องการเทรดของคุณลูกค้าเดี๋ยวนี้เลยค่ะ จะดึงประวัติออเดอร์และตรวจสอบให้โดยตรงเลยค่ะ 📊",
     },
 }
 
@@ -428,8 +428,8 @@ def chat(
         upgraded_result.agent_avatar_url = specialist["avatar_url"]
         # Build the handoff notice from the current (outgoing) agent — category-specific
         _transition_templates = _UPGRADE_TRANSITION_MESSAGES.get(upgrade, {})
-        _transition_template = _transition_templates.get(language) or _transition_templates.get("en", "Let me connect you with {specialist} who can help with this directly!")
-        upgraded_result.transition_message = _transition_template.format(specialist=specialist["name"])
+        _transition_template = _transition_templates.get(language) or _transition_templates.get("en", "Got it — switching focus now to help you with this directly!")
+        upgraded_result.transition_message = _transition_template
         return upgraded_result
 
     # 3b. Check explicit escalation request before calling API
