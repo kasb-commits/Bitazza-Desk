@@ -17,7 +17,6 @@ FRESHDESK_SUBDOMAIN: str = os.environ["FRESHDESK_SUBDOMAIN"]
 
 # Database
 DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://user:password@localhost:5432/csbot")
-CHROMA_PATH: str = os.getenv("CHROMA_PATH", "./data/chroma")
 
 # Environment
 ENV: str = os.getenv("ENV", "development")  # set to "production" in prod

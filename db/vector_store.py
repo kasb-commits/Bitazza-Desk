@@ -1,22 +1,24 @@
 """
-Vector store abstraction over ChromaDB.
+Vector store backed by pgvector (PostgreSQL).
 
 Embedding model: Gemini text-embedding-001 (3072-dim, semantic).
 Falls back to word-hash embedding if GEMINI_API_KEY is unavailable.
 
 Gemini cosine distances: <0.35 = strong match, <0.55 = relevant.
-"""
-try:
-    import chromadb
-    from chromadb import EmbeddingFunction, Documents, Embeddings
-    _CHROMA_AVAILABLE = True
-except ImportError:
-    _CHROMA_AVAILABLE = False
 
-import hashlib, logging, math, re, os, time
+Table: vector_embeddings (created by migration 015_pgvector.sql)
+"""
+import hashlib, json, logging, math, re, time
+from contextlib import contextmanager
+
+import psycopg2
+import psycopg2.extras
+
+from config import settings
 
 logger = logging.getLogger(__name__)
-from config.settings import CHROMA_PATH
+
+DATABASE_URL = settings.DATABASE_URL
 
 # ── Gemini embedding ──────────────────────────────────────────────────────────
 
@@ -25,6 +27,7 @@ _EMBED_BATCH  = 20   # Gemini embedding API batch size limit
 _EMBED_RPM    = 1500 # requests-per-minute quota; batch of 20 = 75 batches/min max
 
 _gemini_client = None
+
 
 def _get_gemini_client():
     global _gemini_client
@@ -43,22 +46,27 @@ def _get_gemini_client():
 
 
 def _gemini_embed_batch(texts: list[str]) -> list[list[float]] | None:
-    """Call Gemini embedding API for a batch of texts. Returns None on failure."""
+    """
+    Embed a list of texts via Gemini embedContent (one call per text).
+    Passing a single-item list to the SDK avoids batchEmbedContents,
+    which is restricted on some API keys/IPs.
+    Returns None on any failure — caller falls back to word-hash.
+    """
     client = _get_gemini_client()
     if client is None:
         return None
     try:
-        result = client.models.embed_content(
-            model=_EMBED_MODEL,
-            contents=texts,
-        )
-        return [e.values for e in result.embeddings]
+        results = []
+        for text in texts:
+            r = client.models.embed_content(model=_EMBED_MODEL, contents=[text])
+            results.append(list(r.embeddings[0].values))
+        return results
     except Exception as exc:
         logger.warning("Gemini embed_content failed: %s — falling back to word-hash", exc)
         return None
 
 
-# ── Word-hash fallback embedding (unchanged) ──────────────────────────────────
+# ── Word-hash fallback embedding ──────────────────────────────────────────────
 
 _DIM = 3072  # Match Gemini dim so collections stay compatible if we switch mid-run
 
@@ -91,111 +99,230 @@ def _word_embed(text: str) -> list[float]:
     return [x / norm for x in vec]
 
 
-# ── ChromaDB embedding function ───────────────────────────────────────────────
-
-if _CHROMA_AVAILABLE:
-    class _GeminiEmbedFn(EmbeddingFunction):
-        """
-        Calls Gemini embedding API in batches.
-        Falls back to word-hash per-document if the API is unavailable.
-        """
-        def __call__(self, input: Documents) -> Embeddings:
-            results: list[list[float]] = [[] for _ in input]
-            # Process in batches
-            for start in range(0, len(input), _EMBED_BATCH):
-                batch = list(input[start:start + _EMBED_BATCH])
-                vecs = _gemini_embed_batch(batch)
-                if vecs is not None:
-                    for i, vec in enumerate(vecs):
-                        results[start + i] = list(vec)
-                else:
-                    # Fallback: word-hash for each doc in failed batch
-                    for i, doc in enumerate(batch):
-                        results[start + i] = _word_embed(doc)
-                # Small delay to stay within RPM quota when processing many docs
-                if start + _EMBED_BATCH < len(input):
-                    time.sleep(0.05)
-            return results
-
-    _embed_fn = _GeminiEmbedFn()
-else:
-    _embed_fn = None
-
-_client = None
+def _embed_one(text: str) -> list[float]:
+    """Single-text embedding with word-hash fallback."""
+    result = _gemini_embed_batch([text])
+    return result[0] if result else _word_embed(text)
 
 
-# ── ChromaDB client & collection ──────────────────────────────────────────────
-
-def get_client():
-    global _client
-    if not _CHROMA_AVAILABLE:
-        raise RuntimeError("chromadb not installed. Run: pip install chromadb")
-    if _client is None:
-        path = os.environ.get("CHROMA_PATH") or CHROMA_PATH
-        _client = chromadb.PersistentClient(path=path)
-    return _client
+def _vec_to_sql(vec: list[float]) -> str:
+    """Convert a float list to the pgvector literal string '[0.1,0.2,...]'."""
+    return "[" + ",".join(map(str, vec)) + "]"
 
 
-def get_collection(name: str = "knowledge_base"):
-    return get_client().get_or_create_collection(
-        name=name,
-        embedding_function=_embed_fn,
-        metadata={"hnsw:space": "cosine"},
-    )
+# ── DB connection ─────────────────────────────────────────────────────────────
+
+@contextmanager
+def _conn():
+    conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        logger.exception("DB transaction failed — rolling back")
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+# ── Where-clause translator ───────────────────────────────────────────────────
+
+def _translate_where(where: dict) -> tuple[str, list]:
+    """
+    Translate a subset of ChromaDB where-clause syntax to SQL fragments.
+    Supports $eq, $ne, $in on top-level keys.
+    Keys named 'doc_type' map to the native column; others map to metadata JSONB.
+    Returns (sql_fragment, params_list).
+    """
+    clauses, params = [], []
+    for key, condition in where.items():
+        col = "doc_type" if key == "doc_type" else f"metadata->>'{key}'"
+        if isinstance(condition, dict):
+            op, val = next(iter(condition.items()))
+            if op == "$eq":
+                clauses.append(f"{col} = %s")
+                params.append(val)
+            elif op == "$ne":
+                clauses.append(f"({col} IS NULL OR {col} != %s)")
+                params.append(val)
+            elif op == "$in":
+                ph = ",".join(["%s"] * len(val))
+                clauses.append(f"{col} IN ({ph})")
+                params.extend(val)
+        else:
+            clauses.append(f"{col} = %s")
+            params.append(condition)
+    return (" AND ".join(clauses) if clauses else "TRUE"), params
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def upsert_documents(docs: list[dict], collection_name: str = "knowledge_base") -> None:
-    """docs: list of {id, text, metadata}"""
-    col = get_collection(collection_name)
-    metadatas = [d.get("metadata") or {"_": "1"} for d in docs]
-    col.upsert(
-        ids=[d["id"] for d in docs],
-        documents=[d["text"] for d in docs],
-        metadatas=metadatas,
-    )
+    """
+    docs: list of {id, text, metadata}
+    Embeds each document and upserts into vector_embeddings.
+    """
+    if not docs:
+        return
+
+    texts = [d["text"] for d in docs]
+
+    # Batch-embed in groups of _EMBED_BATCH
+    embeddings: list[list[float]] = []
+    for start in range(0, len(texts), _EMBED_BATCH):
+        batch = texts[start:start + _EMBED_BATCH]
+        vecs = _gemini_embed_batch(batch)
+        if vecs is not None:
+            embeddings.extend(vecs)
+        else:
+            embeddings.extend(_word_embed(t) for t in batch)
+        if start + _EMBED_BATCH < len(texts):
+            time.sleep(0.05)
+
+    with _conn() as conn:
+        cur = conn.cursor()
+        for doc, vec in zip(docs, embeddings):
+            meta = doc.get("metadata") or {}
+            doc_type = meta.get("doc_type")
+            cur.execute(
+                """
+                INSERT INTO vector_embeddings
+                    (external_id, collection, content, embedding, doc_type, metadata)
+                VALUES (%s, %s, %s, %s::vector, %s, %s)
+                ON CONFLICT (collection, external_id) DO UPDATE SET
+                    content   = EXCLUDED.content,
+                    embedding = EXCLUDED.embedding,
+                    doc_type  = EXCLUDED.doc_type,
+                    metadata  = EXCLUDED.metadata
+                """,
+                (
+                    doc["id"],
+                    collection_name,
+                    doc["text"],
+                    _vec_to_sql(vec),
+                    doc_type,
+                    json.dumps(meta),
+                ),
+            )
 
 
-def query(text: str, n_results: int = 5, collection_name: str = "knowledge_base",
-          where: dict | None = None) -> list[dict]:
-    """Returns top-n chunks with text and metadata. Optionally filter by metadata via ChromaDB where clause."""
-    col = get_collection(collection_name)
-    query_kwargs: dict = {"query_texts": [text], "n_results": n_results}
-    if where:
-        query_kwargs["where"] = where
-    results = col.query(**query_kwargs)
-    chunks = []
-    for i, doc in enumerate(results["documents"][0]):
-        chunks.append({
-            "text": doc,
-            "metadata": results["metadatas"][0][i],
-            "distance": results["distances"][0][i] if results.get("distances") else None,
-        })
-    return chunks
+def query(
+    text: str,
+    n_results: int = 5,
+    collection_name: str = "knowledge_base",
+    where: dict | None = None,
+) -> list[dict]:
+    """
+    Embeds text and returns top-n nearest chunks with metadata and distance.
+    Optionally filters by metadata via a ChromaDB-style where dict.
+    """
+    vec_str = _vec_to_sql(_embed_one(text))
+    where_sql, where_params = _translate_where(where) if where else ("TRUE", [])
 
+    sql = f"""
+        SELECT content, metadata, doc_type,
+               embedding <=> %s::vector AS distance
+        FROM vector_embeddings
+        WHERE collection = %s
+          AND {where_sql}
+          AND embedding IS NOT NULL
+        ORDER BY embedding <=> %s::vector
+        LIMIT %s
+    """
+    params = [vec_str, collection_name] + where_params + [vec_str, n_results]
 
-def delete_by_metadata(filter_key: str, filter_value: str, collection_name: str = "knowledge_base") -> int:
-    """Delete all chunks whose metadata[filter_key] == filter_value. Returns count deleted."""
-    if not _CHROMA_AVAILABLE:
-        return 0
     try:
-        col = get_collection(collection_name)
-        results = col.get(where={filter_key: {"$eq": filter_value}})
-        ids = results.get("ids") or []
-        if ids:
-            col.delete(ids=ids)
-        return len(ids)
+        with _conn() as conn:
+            cur = conn.cursor()
+            cur.execute(sql, params)
+            rows = cur.fetchall()
     except Exception:
-        logger.exception("Failed to delete_by_metadata %s=%s", filter_key, filter_value)
+        logger.exception("Vector query failed — returning no chunks")
+        return []
+
+    results = []
+    for row in rows:
+        meta = row["metadata"] if isinstance(row["metadata"], dict) else {}
+        if row["doc_type"]:
+            meta = {**meta, "doc_type": row["doc_type"]}
+        results.append({
+            "text": row["content"],
+            "metadata": meta,
+            "distance": float(row["distance"]) if row["distance"] is not None else None,
+        })
+    return results
+
+
+def delete_by_metadata(
+    filter_key: str,
+    filter_value: str,
+    collection_name: str = "knowledge_base",
+) -> int:
+    """Delete all chunks where metadata[filter_key] == filter_value. Returns count deleted."""
+    try:
+        with _conn() as conn:
+            cur = conn.cursor()
+            if filter_key == "doc_type":
+                cur.execute(
+                    "DELETE FROM vector_embeddings WHERE collection = %s AND doc_type = %s",
+                    (collection_name, filter_value),
+                )
+            else:
+                cur.execute(
+                    "DELETE FROM vector_embeddings WHERE collection = %s AND metadata->>%s = %s",
+                    (collection_name, filter_key, filter_value),
+                )
+            return cur.rowcount
+    except Exception:
+        logger.exception("delete_by_metadata failed for %s=%s", filter_key, filter_value)
         return 0
 
 
 def collection_count(collection_name: str = "knowledge_base") -> int:
-    if not _CHROMA_AVAILABLE:
-        return 0
+    """Return total number of chunks in the collection."""
     try:
-        return get_collection(collection_name).count()
+        with _conn() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT COUNT(*) AS n FROM vector_embeddings WHERE collection = %s",
+                (collection_name,),
+            )
+            row = cur.fetchone()
+            return int(row["n"]) if row else 0
     except Exception:
-        logger.exception("Failed to count collection '%s' — returning 0", collection_name)
+        logger.exception("collection_count failed — returning 0")
         return 0
+
+
+def get_chunks_by_item(item_id: int) -> list[dict]:
+    """
+    Return all indexed text chunks for a knowledge item, ordered by chunk_index.
+    Used by the /api/knowledge/{item_id}/chunks endpoint.
+    """
+    try:
+        with _conn() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT content, metadata
+                FROM vector_embeddings
+                WHERE collection = 'knowledge_base'
+                  AND metadata->>'knowledge_item_id' = %s
+                ORDER BY (metadata->>'chunk_index')::int ASC
+                """,
+                (str(item_id),),
+            )
+            rows = cur.fetchall()
+    except Exception:
+        logger.exception("get_chunks_by_item failed for item_id=%s", item_id)
+        return []
+
+    chunks = []
+    for i, row in enumerate(rows):
+        meta = row["metadata"] if isinstance(row["metadata"], dict) else {}
+        chunks.append({
+            "index": meta.get("chunk_index", i),
+            "text": row["content"],
+        })
+    return chunks

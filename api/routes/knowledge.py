@@ -25,7 +25,7 @@ from db.conversation_store import (
     get_knowledge_item,
     delete_knowledge_item,
 )
-from db.vector_store import upsert_documents, delete_by_metadata
+from db.vector_store import upsert_documents, delete_by_metadata, get_chunks_by_item
 
 logger = logging.getLogger(__name__)
 
@@ -262,17 +262,7 @@ def get_chunks(item_id: int, _agent_id: str = Depends(get_user_id)):
     if not item:
         raise HTTPException(status_code=404, detail="Knowledge item not found")
     try:
-        from db.vector_store import get_collection
-        col = get_collection()
-        results = col.get(
-            where={"knowledge_item_id": {"$eq": str(item_id)}},
-            include=["documents", "metadatas"],
-        )
-        chunks = [
-            {"index": meta.get("chunk_index", i), "text": doc}
-            for i, (doc, meta) in enumerate(zip(results["documents"], results["metadatas"]))
-        ]
-        chunks.sort(key=lambda c: c["index"])
+        chunks = get_chunks_by_item(item_id)
         return {"item_id": item_id, "chunks": chunks}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc

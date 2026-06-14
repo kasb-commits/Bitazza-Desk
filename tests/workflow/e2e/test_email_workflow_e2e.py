@@ -15,7 +15,7 @@ from unittest.mock import MagicMock, AsyncMock, patch
 
 @pytest.fixture
 def client():
-    with patch("db.vector_store.chromadb"):
+    with patch("db.vector_store._conn"):
         from api.main import app
         from fastapi.testclient import TestClient
         return TestClient(app)
