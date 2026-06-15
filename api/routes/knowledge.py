@@ -11,11 +11,12 @@ automatically picks it up when answering customer queries.
 """
 import io
 import logging
+import os
 import uuid
 
 import requests as _requests
 from bs4 import BeautifulSoup
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from pydantic import BaseModel
 
 from api.middleware.auth import get_user_id, get_optional_user_id
@@ -266,6 +267,88 @@ def get_chunks(item_id: int, _agent_id: str = Depends(get_optional_user_id)):
         return {"item_id": item_id, "chunks": chunks}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+# ── Migrate ChromaDB → pgvector (one-off admin) ───────────────────────────────
+
+@router.post("/admin/migrate-from-chroma")
+def migrate_from_chroma(request: Request):
+    """
+    One-off endpoint: reads all docs from ChromaDB and upserts into vector_embeddings.
+    Protected by INTERNAL_SERVICE_TOKEN (Authorization: Bearer <token>).
+    Safe to call multiple times — uses ON CONFLICT DO UPDATE.
+    """
+    from config import settings as _cfg
+
+    # Auth: require INTERNAL_SERVICE_TOKEN
+    auth = request.headers.get("Authorization", "")
+    token = auth.removeprefix("Bearer ").strip()
+    if not _cfg.INTERNAL_SERVICE_TOKEN or token != _cfg.INTERNAL_SERVICE_TOKEN:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    chroma_path = _cfg.CHROMA_PATH if hasattr(_cfg, "CHROMA_PATH") else os.environ.get("CHROMA_PATH", "./data/chroma")
+
+    if not os.path.isdir(chroma_path):
+        raise HTTPException(
+            status_code=422,
+            detail=f"ChromaDB path not found: {chroma_path!r} — volume may be empty or path wrong",
+        )
+
+    try:
+        import chromadb as _chromadb
+    except ImportError:
+        raise HTTPException(status_code=500, detail="chromadb package not installed on this server")
+
+    try:
+        chroma_client = _chromadb.PersistentClient(path=chroma_path)
+        col = chroma_client.get_collection("knowledge_base")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Could not open ChromaDB collection: {exc}")
+
+    total = col.count()
+    if total == 0:
+        return {"migrated": 0, "skipped": 0, "message": "ChromaDB collection is empty — no data to recover"}
+
+    # Page through ChromaDB
+    PAGE = 500
+    all_docs: list[dict] = []
+    offset = 0
+    while True:
+        result = col.get(limit=PAGE, offset=offset, include=["documents", "metadatas"])
+        ids       = result.get("ids", [])
+        documents = result.get("documents", [])
+        metadatas = result.get("metadatas", [])
+        if not ids:
+            break
+        for chroma_id, text, meta in zip(ids, documents, metadatas):
+            if text and text.strip():
+                all_docs.append({"id": chroma_id, "text": text, "metadata": meta or {}})
+        offset += len(ids)
+        if len(ids) < PAGE:
+            break
+
+    skipped = total - len(all_docs)
+
+    # Upsert in batches of 20 (Gemini embedding batch limit)
+    BATCH = 20
+    migrated = 0
+    errors: list[str] = []
+    for start in range(0, len(all_docs), BATCH):
+        batch = all_docs[start : start + BATCH]
+        try:
+            upsert_documents(batch)
+            migrated += len(batch)
+        except Exception as exc:
+            logger.exception("migrate-from-chroma: batch %d–%d failed", start, start + BATCH)
+            errors.append(str(exc))
+
+    logger.info("migrate-from-chroma: %d migrated, %d skipped empty, %d errors", migrated, skipped, len(errors))
+    return {
+        "chroma_total": total,
+        "migrated": migrated,
+        "skipped_empty": skipped,
+        "errors": errors[:10],
+    }
 
 
 # ── Delete ────────────────────────────────────────────────────────────────────
