@@ -269,6 +269,149 @@ def get_chunks(item_id: int, _agent_id: str = Depends(get_optional_user_id)):
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+# ── Bulk blog crawl ───────────────────────────────────────────────────────────
+
+class BulkBlogRequest(BaseModel):
+    index_url: str
+    base_url: str = ""          # inferred from index_url if empty
+    article_path_prefix: str = "/blog/"  # only follow links containing this
+
+@router.post("/admin/bulk-ingest-blog")
+def bulk_ingest_blog(body: BulkBlogRequest, request: Request):
+    """
+    Crawl a blog index page, find all article links, and ingest each one.
+    Protected by INTERNAL_SERVICE_TOKEN.
+    Returns a summary of what was ingested / skipped / failed.
+    """
+    from config import settings as _cfg
+    import time as _time
+
+    auth = request.headers.get("Authorization", "")
+    token = auth.removeprefix("Bearer ").strip()
+    if not _cfg.INTERNAL_SERVICE_TOKEN or token != _cfg.INTERNAL_SERVICE_TOKEN:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    index_url = body.index_url.strip()
+    base_url = body.base_url.strip() or "/".join(index_url.split("/")[:3])
+    prefix = body.article_path_prefix
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+    }
+
+    # Fetch index page
+    try:
+        resp = _requests.get(index_url, timeout=20, headers=headers)
+        resp.raise_for_status()
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Failed to fetch index: {exc}")
+
+    soup = BeautifulSoup(resp.text, "html.parser")
+
+    # Collect all article links
+    article_urls: set[str] = set()
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        if prefix in href:
+            if href.startswith("http"):
+                full = href
+            elif href.startswith("/"):
+                full = base_url + href
+            else:
+                continue
+            # Skip the index page itself
+            if full.rstrip("/") == index_url.rstrip("/"):
+                continue
+            article_urls.add(full.split("?")[0].split("#")[0])
+
+    if not article_urls:
+        return {"error": "No article links found — the page structure may require JavaScript rendering", "index_url": index_url}
+
+    # Get already-indexed URLs to skip duplicates
+    from db.conversation_store import list_knowledge_items
+    existing = {item["source_ref"] for item in list_knowledge_items()}
+
+    results = {"ingested": [], "skipped_duplicate": [], "failed": []}
+
+    for url in sorted(article_urls):
+        if url in existing:
+            results["skipped_duplicate"].append(url)
+            continue
+
+        try:
+            page = _requests.get(url, timeout=20, headers=headers)
+            page.raise_for_status()
+        except Exception as exc:
+            logger.warning("bulk-ingest-blog: fetch failed %s — %s", url, exc)
+            results["failed"].append({"url": url, "reason": str(exc)})
+            continue
+
+        page_soup = BeautifulSoup(page.text, "html.parser")
+        for tag in page_soup.find_all(["script", "style", "nav", "footer", "header", "aside"]):
+            tag.decompose()
+
+        title_tag = page_soup.find("title") or page_soup.find("h1")
+        title = title_tag.get_text(strip=True) if title_tag else url
+        body_text = page_soup.get_text(separator="\n", strip=True)
+
+        if not body_text.strip():
+            results["failed"].append({"url": url, "reason": "no readable content"})
+            continue
+
+        chunks = _chunk_text(body_text)
+        if not chunks:
+            results["failed"].append({"url": url, "reason": "chunking produced nothing"})
+            continue
+
+        from db.conversation_store import create_knowledge_item
+        item = create_knowledge_item(
+            title=title[:255],
+            source_type="url",
+            source_ref=url,
+            chunk_count=len(chunks),
+            created_by=None,
+        )
+        item_id = str(item["id"])
+
+        docs = [
+            {
+                "id": f"kb_{item_id}_{i}",
+                "text": chunk,
+                "metadata": {
+                    "knowledge_item_id": item_id,
+                    "source": url,
+                    "source_type": "url",
+                    "title": title[:255],
+                    "chunk_index": i,
+                },
+            }
+            for i, chunk in enumerate(chunks)
+        ]
+        try:
+            upsert_documents(docs)
+            results["ingested"].append({"url": url, "title": title[:80], "chunks": len(chunks)})
+            logger.info("bulk-ingest-blog: ingested %s (%d chunks)", url, len(chunks))
+        except Exception as exc:
+            logger.exception("bulk-ingest-blog: upsert failed %s", url)
+            results["failed"].append({"url": url, "reason": str(exc)})
+
+        _time.sleep(0.5)
+
+    return {
+        "summary": {
+            "found": len(article_urls),
+            "ingested": len(results["ingested"]),
+            "skipped_duplicate": len(results["skipped_duplicate"]),
+            "failed": len(results["failed"]),
+        },
+        "ingested": results["ingested"],
+        "failed": results["failed"],
+        "skipped_duplicate": results["skipped_duplicate"],
+    }
+
+
 # ── Migrate ChromaDB → pgvector (one-off admin) ───────────────────────────────
 
 @router.post("/admin/migrate-from-chroma")
