@@ -24,6 +24,7 @@ ENV: str = os.getenv("ENV", "development")  # set to "production" in prod
 # Auth
 JWT_SECRET: str = os.getenv("JWT_SECRET", "dev-secret-change-in-prod")
 JWT_ALGORITHM: str = "HS256"
+INTERNAL_SERVICE_TOKEN: str = os.getenv("INTERNAL_SERVICE_TOKEN", "")
 
 # Escalation
 ESCALATION_CONFIDENCE_THRESHOLD: float = float(os.getenv("ESCALATION_CONFIDENCE_THRESHOLD", "0.6"))
