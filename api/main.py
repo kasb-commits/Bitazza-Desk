@@ -91,6 +91,8 @@ async def lifespan(app: FastAPI):
         extra={"env": os.getenv("RAILWAY_ENVIRONMENT", "local")},
     )
     init_db()
+    from db.vector_store import run_migrations as _run_vs_migrations
+    _run_vs_migrations()
     asyncio.create_task(start_auto_transition_loop())
     asyncio.create_task(_email_safety_net_loop())
     asyncio.create_task(start_report_scheduler_loop())

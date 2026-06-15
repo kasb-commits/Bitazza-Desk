@@ -126,6 +126,19 @@ def _conn():
         conn.close()
 
 
+def run_migrations() -> None:
+    """Apply idempotent schema migrations (safe to call on every startup)."""
+    import os
+    sql_path = os.path.join(os.path.dirname(__file__), "migrations", "015_pgvector.sql")
+    try:
+        with _conn() as conn:
+            cur = conn.cursor()
+            cur.execute(open(sql_path).read())
+        logger.info("vector_store migrations applied OK")
+    except Exception:
+        logger.exception("vector_store migration failed")
+
+
 # ── Where-clause translator ───────────────────────────────────────────────────
 
 def _translate_where(where: dict) -> tuple[str, list]:
