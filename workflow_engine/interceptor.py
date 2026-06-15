@@ -148,7 +148,31 @@ def workflow_interceptor(
                 workflow=route_result.matched_workflow,
                 message=message,
             )
-        return _execution_to_agent_response(execution)
+        result = _execution_to_agent_response(execution)
+
+        # If the workflow completed a turn without producing any reply and without
+        # escalating, fall back to the AI agent so the customer always gets a response.
+        # This covers workflow paths that run condition/account_lookup/set_variable
+        # nodes with no send_reply or ai_reply between them — e.g. the password_2fa_reset
+        # flow that paused at wait_for_reply then resumed through a silent branch.
+        # The AI agent will either answer from the KB / account tools or escalate.
+        if not result.text and not result.escalated and not result.resolved:
+            logger.warning(
+                "workflow_no_reply_fallback: conv=%s category=%s — routing to AI agent",
+                conversation_id,
+                message.category,
+            )
+            return legacy_agent_chat(
+                conversation_id=conversation_id,
+                user_id=user_id,
+                user_message=user_message,
+                platform=platform,
+                category=category,
+                consecutive_low_confidence=consecutive_low_confidence,
+                override_language=override_language,
+            )
+
+        return result
 
     except Exception:
         logger.exception(

@@ -480,15 +480,19 @@ async def send_message(request: Request, body: MessageRequest, user_id: str | No
         assign_ai_persona(body.conversation_id, specialist["name"], specialist["avatar"], specialist["avatar_url"])
         update_ticket_category(body.conversation_id, result.upgraded_category)
 
-    # Guard: if the workflow engine produced no reply (e.g. a resume path that only
-    # ran condition/account_lookup/set_variable nodes with no send_reply or ai_reply),
-    # output_reply stays None and becomes "" in interceptor.py. Suppress the empty
-    # bubble rather than persisting it — the customer already saw the prior message.
+    # Last-resort safety net: the workflow_no_reply_fallback in interceptor.py should
+    # have routed to the AI agent before we ever reach here with an empty reply.
+    # If this fires it means both the workflow AND the AI agent returned nothing —
+    # log as an error so it surfaces in monitoring, then return nothing rather than
+    # persist an empty bubble.
     if not result.text:
-        logger.warning(
-            "empty_bot_reply suppressed",
+        logger.error(
+            "empty_bot_reply_unexpected: workflow fallback should have prevented this",
             extra={"conv_id": body.conversation_id, "category": effective_category},
         )
+        if _ticket_id and not _already_escalated and not result.escalated:
+            update_ticket_status(_ticket_id, "pending_customer")
+            asyncio.create_task(emit_ticket_event(_ticket_id, "status_change", {"status": "Pending_Customer"}))
         conversation_id_var.reset(_token_conv)
         return MessageResponse(reply=None, language=result.language or "en", escalated=result.escalated)
 

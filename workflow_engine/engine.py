@@ -315,8 +315,11 @@ class WorkflowExecutionEngine:
                 category = execution.variables.get("category")
                 language = execution.variables.get("language", "en")
                 handoff  = build_handoff_message(category, language)
-                suffix   = f"\n\n{handoff}"
-                execution.output_reply = (execution.output_reply or "") + suffix
+                execution.output_reply = (
+                    f"{execution.output_reply}\n\n{handoff}"
+                    if execution.output_reply
+                    else handoff
+                )
                 status = "Escalated" if execution.channel == "email" else "pending_human"
                 ticket_id = get_ticket_id_by_conversation(execution.conversation_id)
                 if ticket_id:

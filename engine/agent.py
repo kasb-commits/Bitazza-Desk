@@ -173,7 +173,7 @@ def _is_account_specific_category(category: str | None) -> bool:
 
 
 class AgentResponse:
-    def __init__(self, text: str, language: str, escalated: bool = False,
+    def __init__(self, text: str | None, language: str, escalated: bool = False,
                  escalation_reason: str = "", ticket_id: str | None = None,
                  agent_name: str | None = None, agent_avatar: str | None = None,
                  agent_avatar_url: str | None = None, resolved: bool = False,
