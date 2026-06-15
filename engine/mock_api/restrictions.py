@@ -48,7 +48,7 @@ _SEED: list[dict] = [
                 status=RestrictionStatus.active,
                 reason="Withdrawal temporarily blocked pending identity re-verification.",
                 applied_at="2026-03-28T10:00:00Z",
-                expected_lift_at="2026-04-07T10:00:00Z",
+                expected_lift_at="2026-08-01T10:00:00Z",
                 can_self_resolve=True,
                 resolution_steps=(
                     "Please update your ID document in the KYC section of your profile. "

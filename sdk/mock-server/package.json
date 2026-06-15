@@ -1,0 +1,14 @@
+{
+  "name": "@bitazza/csbot-mock-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mock API + WebSocket server for SDK development and testing",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "start:port": "node server.js --port=8001"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

@@ -196,3 +196,35 @@ class TestSubtypeDispatch:
             "Should mention EDD requirements"
         assert "submit" in text or "complete" in text or "kyc" in text, \
             "Should instruct what to do next"
+
+    def test_overdue_expected_lift_at_escalates(self):
+        """
+        USR-000019 has a deposit_block with expected_lift_at=2026-04-03 — well in the past.
+        The overdue-date rule in the base system prompt must cause the bot to:
+          1. NOT quote 2026-04-03 as an upcoming resolution date
+          2. Acknowledge the date has already passed
+          3. Escalate (needs_human=true) so a specialist can investigate
+        """
+        r = run_three_turns(
+            "USR-000019",
+            "My deposit is not working",
+            "I still cannot deposit, when will this be fixed?",
+        )
+        text = r.text.lower()
+        print(f"\n[overdue_lift_date] response:\n{r.text}\n")
+
+        # Must NOT present the past date as a future expectation
+        assert "april 3" not in text and "apr 3" not in text and "april 3, 2026" not in text, \
+            "Must not quote the overdue date as an upcoming resolution"
+
+        # Must acknowledge it has passed / still active
+        overdue_signals = [
+            "passed", "already", "still", "has not", "hasn't", "no longer",
+            "ผ่านมา", "ยังคง", "ยังไม่",  # Thai equivalents
+        ]
+        assert any(s in text for s in overdue_signals), \
+            f"Response must acknowledge the expected lift date has passed. Got:\n{r.text}"
+
+        # Must escalate — the rule sets needs_human=true for overdue restrictions
+        assert r.escalated is True, \
+            f"Bot must escalate when expected_lift_at is in the past. Got escalated=False.\nResponse:\n{r.text}"

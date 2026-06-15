@@ -1,0 +1,46 @@
+{
+  "name": "@bitazza/csbot-react-native-gl",
+  "version": "1.0.0",
+  "private": true,
+  "description": "React Native CS Bot widget \u2014 Bitazza GL (EN + multi-language)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "src/assets"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest --passWithNoTests"
+  },
+  "dependencies": {
+    "@bitazza/csbot-core": "*"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-native": ">=0.73",
+    "@react-native-async-storage/async-storage": ">=1.23"
+  },
+  "optionalDependencies": {
+    "expo-av": "*",
+    "expo-linear-gradient": "*",
+    "expo-localization": "*"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "@types/react": ">=18",
+    "@types/react-native": ">=0.73",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.0",
+    "@types/jest": "^29.5.14"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^@bitazza/csbot-core$": "<rootDir>/../core/src/index.ts",
+      "^@bitazza/csbot-react-native-gl$": "<rootDir>/src/index.ts"
+    }
+  }
+}

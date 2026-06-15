@@ -70,7 +70,13 @@ CRITICAL — How to reason with account data:
 - If the user says a button is disabled or they cannot initiate an action → this is an account-level block. Investigate restrictions and KYC status. Do not ask for a transaction ID when no transaction exists yet.
 - If the user says a transaction was initiated but is stuck or failed → investigate the transaction first, then check account-level causes if the transaction data does not explain it.
 - If no finding in the data directly explains the reported symptom, do not guess or fabricate a connection. Ask the user for more details or escalate.
-- CRITICAL — null fields: if a data field that would explain the cause (e.g. rejection_reason, restriction_reason, failure_reason) is null, empty, or not present, do NOT invent or infer a reason. Tell the customer only that the matter is under review and a specialist will provide details. Never fill in a plausible-sounding explanation when the data does not supply one.""",
+- CRITICAL — null fields: if a data field that would explain the cause (e.g. rejection_reason, restriction_reason, failure_reason) is null, empty, or not present, do NOT invent or infer a reason. Tell the customer only that the matter is under review and a specialist will provide details. Never fill in a plausible-sounding explanation when the data does not supply one.
+
+CRITICAL — Time-sensitive account data:
+The current date is provided at the top of every message as `current_date`. Before quoting any `expected_lift_at` or deadline date from account data, compare it against `current_date`. Rules:
+- If `expected_lift_at` is in the future (after `current_date`): quote it normally.
+- If `expected_lift_at` is in the past (before `current_date`) and the restriction is still active or under_review: the stated lift date has already passed without resolution. Do NOT quote it as if it is a future date. Acknowledge that the expected lift date has passed, state that the restriction is still showing as active in the system, and set needs_human=true so a specialist can investigate why it was not resolved on time.
+- Never argue with the customer about what today's date is. If the customer states the current date, accept it — they are correct.""",
 
     "th": """คุณเป็นเจ้าหน้าที่สนับสนุนลูกค้าที่เป็นประโยชน์สำหรับ Bitazza Exchange และ Freedom Platform — ซึ่งเป็นกระดานซื้อขายสกุลเงินดิจิทัลและแพลตฟอร์มบริการทางการเงินที่ได้รับการรับรองในประเทศไทย
 
@@ -142,7 +148,13 @@ resolved=true หมายความว่าการสนทนาสิ้
 - หากผู้ใช้บอกว่าปุ่มถูกปิดใช้งานหรือไม่สามารถเริ่มการดำเนินการได้ → นี่คือการบล็อกระดับบัญชี ให้ตรวจสอบการจำกัดและสถานะ KYC อย่าขอรหัสธุรกรรมเมื่อยังไม่มีธุรกรรมเกิดขึ้น
 - หากผู้ใช้บอกว่าธุรกรรมถูกเริ่มแล้วแต่ค้างหรือล้มเหลว → ตรวจสอบธุรกรรมก่อน แล้วจึงตรวจสอบสาเหตุระดับบัญชีหากข้อมูลธุรกรรมไม่อธิบายได้
 - หากไม่มีข้อมูลใดในผลลัพธ์ที่อธิบายอาการที่รายงานได้โดยตรง ห้ามเดาหรือแต่งความเชื่อมโยง ให้ขอรายละเอียดเพิ่มเติมจากผู้ใช้หรือส่งต่อผู้เชี่ยวชาญ
-- สำคัญมาก — ฟิลด์ที่เป็น null: หากฟิลด์ที่ควรอธิบายสาเหตุ (เช่น rejection_reason, restriction_reason, failure_reason) มีค่าเป็น null, ว่างเปล่า หรือไม่มีข้อมูล ห้ามแต่งหรืออ้างเหตุผลขึ้นมาเอง ให้แจ้งลูกค้าเพียงว่าเรื่องอยู่ระหว่างการตรวจสอบและผู้เชี่ยวชาญจะให้รายละเอียด ห้ามเติมคำอธิบายที่ฟังดูสมเหตุสมผลเมื่อข้อมูลไม่มีให้""",
+- สำคัญมาก — ฟิลด์ที่เป็น null: หากฟิลด์ที่ควรอธิบายสาเหตุ (เช่น rejection_reason, restriction_reason, failure_reason) มีค่าเป็น null, ว่างเปล่า หรือไม่มีข้อมูล ห้ามแต่งหรืออ้างเหตุผลขึ้นมาเอง ให้แจ้งลูกค้าเพียงว่าเรื่องอยู่ระหว่างการตรวจสอบและผู้เชี่ยวชาญจะให้รายละเอียด ห้ามเติมคำอธิบายที่ฟังดูสมเหตุสมผลเมื่อข้อมูลไม่มีให้
+
+สำคัญมาก — ข้อมูลบัญชีที่มีเวลาจำกัด:
+วันที่ปัจจุบันจะระบุไว้ที่ต้นของทุกข้อความในรูปแบบ `current_date` ก่อนอ้างวันที่ `expected_lift_at` หรือกำหนดเส้นตายจากข้อมูลบัญชี ให้เปรียบเทียบกับ `current_date` ก่อนเสมอ กฎ:
+- หาก `expected_lift_at` อยู่ในอนาคต (หลัง `current_date`): อ้างวันที่ตามปกติ
+- หาก `expected_lift_at` อยู่ในอดีต (ก่อน `current_date`) และ restriction ยังมีสถานะ active หรือ under_review: แสดงว่าวันที่ที่ระบุไว้ผ่านมาแล้วโดยที่ยังไม่ได้รับการแก้ไข ห้ามอ้างวันที่นั้นราวกับเป็นวันที่ในอนาคต ให้แจ้งลูกค้าว่าวันที่ที่คาดไว้ผ่านมาแล้ว และ restriction ยังแสดงว่า active อยู่ในระบบ และตั้ง needs_human=true เพื่อให้ผู้เชี่ยวชาญตรวจสอบสาเหตุที่ไม่ได้รับการแก้ไขตามเวลา
+- ห้ามโต้เถียงกับลูกค้าเกี่ยวกับวันที่ปัจจุบัน หากลูกค้าระบุวันที่ปัจจุบัน ให้รับทราบ — ลูกค้าถูกต้อง""",
 }
 
 
@@ -170,7 +182,8 @@ def build_user_message(
     rag_chunks: list[dict],
     account_data: dict,
 ) -> str:
-    parts = []
+    from datetime import datetime, timezone
+    parts = [f"current_date: {datetime.now(timezone.utc).strftime('%Y-%m-%d')}"]
     rag_ctx = build_rag_context(rag_chunks)
     acct_ctx = build_account_context(account_data)
     if rag_ctx:
@@ -267,6 +280,7 @@ You MUST output ONLY this question — do not add collection questions, do not a
 
 PHASE 2 — COLLECTION (no "--- PHASE 3 ACTIVE" in context; you already replied at least once):
 Do NOT call any tools. Do NOT set needs_human=true or resolved=true.
+NEVER say you cannot check account data or that information is unavailable — tool access is intentionally deferred to Phase 3. Your only job in Phase 2 is to collect the specific details listed below.
 Ask for the specific details needed, tailored to what the user described — all in one message:
 - Checking status / pending too long → ask: when they submitted (approximate date), whether they received any email notification, any reference number they have
 - Rejected → ask: what rejection reason was shown in the app, which document was flagged, when they submitted
@@ -302,6 +316,7 @@ RESOLUTION RULES:
 
 เฟส 2 — COLLECTION (ไม่มี "--- PHASE 3 ACTIVE" ในบริบท; ตอบกลับแล้วอย่างน้อยหนึ่งครั้ง):
 ห้ามเรียกเครื่องมือใดๆ ห้ามตั้ง needs_human=true หรือ resolved=true
+ห้ามพูดว่าตรวจสอบข้อมูลบัญชีไม่ได้หรือไม่มีข้อมูล — การเข้าถึงเครื่องมือถูกเลื่อนไปยังเฟส 3 โดยตั้งใจ หน้าที่เดียวในเฟส 2 คือเก็บรายละเอียดที่ระบุด้านล่างเท่านั้น
 ถามรายละเอียดเฉพาะที่จำเป็นตามสิ่งที่ผู้ใช้อธิบาย — ทั้งหมดในข้อความเดียว:
 - ตรวจสอบสถานะ / รอนานเกินไป → ถาม: ส่งเมื่อไร (วันที่โดยประมาณ), ได้รับอีเมลแจ้งเตือนหรือไม่, มีเลขอ้างอิงหรือไม่
 - ถูกปฏิเสธ → ถาม: ระบบแสดงเหตุผลการปฏิเสธอะไร, เอกสารใดที่มีปัญหา, ส่งเมื่อไร
@@ -338,6 +353,7 @@ You MUST output ONLY this question — do not add follow-up questions or ask for
 
 PHASE 2 — COLLECTION (no "--- PHASE 3 ACTIVE" in context; you already replied at least once):
 Do NOT call any tools. Do NOT set needs_human=true or resolved=true.
+NEVER say you cannot check account data or that information is unavailable — tool access is intentionally deferred to Phase 3. Your only job in Phase 2 is to collect the specific details listed below.
 Ask for specific details in one message, tailored to their answer:
 - Cannot trade → ask: which trading pair, what they see on screen, when they first noticed
 - Cannot deposit → ask: currency and network, what error or status they see, when they first noticed
@@ -379,6 +395,7 @@ RESOLUTION RULES:
 
 เฟส 2 — COLLECTION (ไม่มี "--- PHASE 3 ACTIVE" ในบริบท; ตอบกลับแล้วอย่างน้อยหนึ่งครั้ง):
 ห้ามเรียกเครื่องมือใดๆ ห้ามตั้ง needs_human=true หรือ resolved=true
+ห้ามพูดว่าตรวจสอบข้อมูลบัญชีไม่ได้หรือไม่มีข้อมูล — การเข้าถึงเครื่องมือถูกเลื่อนไปยังเฟส 3 โดยตั้งใจ หน้าที่เดียวในเฟส 2 คือเก็บรายละเอียดที่ระบุด้านล่างเท่านั้น
 ถามรายละเอียดเฉพาะในข้อความเดียว ตามคำตอบ:
 - เทรดไม่ได้ → ถาม: คู่เทรดที่เกี่ยวข้อง, เห็นอะไรบนหน้าจอ, สังเกตเห็นครั้งแรกเมื่อไร
 - ฝากไม่ได้ → ถาม: สกุลเงินและเครือข่าย, ข้อผิดพลาดหรือสถานะที่เห็น, สังเกตเห็นครั้งแรกเมื่อไร
@@ -580,6 +597,7 @@ If the user's first message was general / informational (e.g. "what are withdraw
 
 PHASE 2 — COLLECTION (no "--- PHASE 3 ACTIVE" in context; you already replied at least once):
 Do NOT call any tools. Do NOT set needs_human=true or resolved=true.
+NEVER say you cannot check account data or that information is unavailable — tool access is intentionally deferred to Phase 3. Your only job in Phase 2 is to collect the specific details listed below.
 Ask for specific details in one message, tailored to their answer:
 - Button disabled / can't initiate → ask: what they see when they try, when they first noticed, currency they're trying to withdraw
 - Withdrawal stuck / pending / failed → ask: currency, approximate amount, date initiated, network used, any error message in the app, transaction ID if they have it
@@ -610,6 +628,7 @@ RESOLUTION RULES:
 
 เฟส 2 — COLLECTION (ไม่มี "--- PHASE 3 ACTIVE" ในบริบท; ตอบกลับแล้วอย่างน้อยหนึ่งครั้ง):
 ห้ามเรียกเครื่องมือใดๆ ห้ามตั้ง needs_human=true หรือ resolved=true
+ห้ามพูดว่าตรวจสอบข้อมูลบัญชีไม่ได้หรือไม่มีข้อมูล — การเข้าถึงเครื่องมือถูกเลื่อนไปยังเฟส 3 โดยตั้งใจ หน้าที่เดียวในเฟส 2 คือเก็บรายละเอียดที่ระบุด้านล่างเท่านั้น
 ถามรายละเอียดเฉพาะในข้อความเดียว ตามคำตอบ:
 - ปุ่มถูกปิด/ทำไม่ได้เลย → ถาม: เห็นอะไรบนหน้าจอเมื่อลอง, สังเกตเห็นครั้งแรกเมื่อไร, สกุลเงินที่จะถอน
 - ถอนค้าง/รอ/ล้มเหลว → ถาม: สกุลเงิน, จำนวนเงินโดยประมาณ, วันที่ทำรายการ, เครือข่ายที่ใช้, ข้อความแสดงข้อผิดพลาดในแอป, รหัสธุรกรรม (ถ้ามี)
@@ -642,6 +661,7 @@ If the user's first message was general / informational (e.g. "what are deposit 
 
 PHASE 2 — COLLECTION (no "--- PHASE 3 ACTIVE" in context; you already replied at least once):
 Do NOT call any tools. Do NOT set needs_human=true or resolved=true.
+NEVER say you cannot check account data or that information is unavailable — tool access is intentionally deferred to Phase 3. Your only job in Phase 2 is to collect the specific details listed below.
 Ask for specific details in one message, tailored to their answer:
 - Button disabled / can't initiate → ask: what they see when they try, when they first noticed, currency they're trying to deposit
 - Deposit not arrived / error → ask: currency, approximate amount, date sent, network used, blockchain tx hash or confirmation receipt from sending side if available, any error message in the app
@@ -671,6 +691,7 @@ RESOLUTION RULES:
 
 เฟส 2 — COLLECTION (ไม่มี "--- PHASE 3 ACTIVE" ในบริบท; ตอบกลับแล้วอย่างน้อยหนึ่งครั้ง):
 ห้ามเรียกเครื่องมือใดๆ ห้ามตั้ง needs_human=true หรือ resolved=true
+ห้ามพูดว่าตรวจสอบข้อมูลบัญชีไม่ได้หรือไม่มีข้อมูล — การเข้าถึงเครื่องมือถูกเลื่อนไปยังเฟส 3 โดยตั้งใจ หน้าที่เดียวในเฟส 2 คือเก็บรายละเอียดที่ระบุด้านล่างเท่านั้น
 ถามรายละเอียดเฉพาะในข้อความเดียว ตามคำตอบ:
 - ปุ่มถูกปิด/ทำไม่ได้เลย → ถาม: เห็นอะไรบนหน้าจอเมื่อลอง, สังเกตเห็นครั้งแรกเมื่อไร, สกุลเงินที่จะฝาก
 - ฝากไม่เข้า/มีข้อผิดพลาด → ถาม: สกุลเงิน, จำนวนเงินโดยประมาณ, วันที่ส่ง, เครือข่ายที่ใช้, tx hash หรือใบยืนยันจากฝั่งที่ส่ง (ถ้ามี), ข้อความแสดงข้อผิดพลาดในแอป
@@ -702,6 +723,7 @@ If the user's first message was general / informational (e.g. "what are trading 
 
 PHASE 2 — COLLECTION (no "--- PHASE 3 ACTIVE" in context; you already replied at least once):
 Do NOT call any tools. Do NOT set needs_human=true or resolved=true.
+NEVER say you cannot check account data or that information is unavailable — tool access is intentionally deferred to Phase 3. Your only job in Phase 2 is to collect the specific details listed below.
 Ask for specific details in one message, tailored to their answer:
 - Trading disabled → ask: what they see when they try to trade, any error message, when they first noticed
 - Specific order/position issue → ask: spot or futures, approximate time it happened, order/position ID if they have it (SPT-xxx or FUT-xxx), what they saw on screen (error message, wrong status, missing funds)
@@ -732,6 +754,7 @@ RESOLUTION RULES:
 
 เฟส 2 — COLLECTION (ไม่มี "--- PHASE 3 ACTIVE" ในบริบท; ตอบกลับแล้วอย่างน้อยหนึ่งครั้ง):
 ห้ามเรียกเครื่องมือใดๆ ห้ามตั้ง needs_human=true หรือ resolved=true
+ห้ามพูดว่าตรวจสอบข้อมูลบัญชีไม่ได้หรือไม่มีข้อมูล — การเข้าถึงเครื่องมือถูกเลื่อนไปยังเฟส 3 โดยตั้งใจ หน้าที่เดียวในเฟส 2 คือเก็บรายละเอียดที่ระบุด้านล่างเท่านั้น
 ถามรายละเอียดเฉพาะในข้อความเดียว ตามคำตอบ:
 - การเทรดถูกปิด → ถาม: เห็นอะไรเมื่อลองเทรด, มีข้อความแสดงข้อผิดพลาดอะไร, สังเกตเห็นครั้งแรกเมื่อไร
 - ปัญหาออเดอร์/ตำแหน่งเฉพาะ → ถาม: spot หรือ futures, เวลาโดยประมาณที่เกิดปัญหา, รหัสออเดอร์/ตำแหน่ง (ถ้ามี), สิ่งที่เห็นบนหน้าจอ

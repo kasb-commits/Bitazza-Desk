@@ -1,0 +1,40 @@
+.claude/
+claude-skills/
+node_modules/
+dashboard/node_modules/
+frontend/widget/node_modules/
+.venv*
+__pycache__/
+*.pyc
+.DS_Store
+uploads/
+dump.rdb
+dashboard/dist/
+frontend/widget/dist/
+dashboard/.vite/
+frontend/widget/.vite/
+widget_scrape/
+widget_scrape.zip
+landing/
+seeds/
+scripts/simulation_scenarios.py
+scripts/simulate_tickets.py
+scripts/simulation_config.py
+scripts/trace_agent.py
+scripts/validate_quick_reply_pills.py
+*\ 2/
+*\ 2.py
+*\ 2.js
+*\ 2.ts
+*\ 2.tsx
+*\ 2.sql
+*\ 2.md
+*\ 2.json
+*\ 2.toml
+*\ 2.css
+*\ 3.py
+*\ 4.py
+=1.0.0\ 3
+SDK_SCOPE.md
+dashboard_design.md
+start_server.sh
