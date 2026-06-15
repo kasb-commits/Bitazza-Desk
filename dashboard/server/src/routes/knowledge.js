@@ -106,8 +106,9 @@ router.get('/:id/chunks', async (req, res) => {
   if (isNaN(id)) return res.status(400).json({ error: 'Invalid id' });
 
   try {
-    // Do not forward the dashboard JWT — Python uses its own auth (dev fallback: dev_user)
-    const pyRes = await fetch(`${PYTHON_API}/api/knowledge/${id}/chunks`);
+    const pyRes = await fetch(`${PYTHON_API}/api/knowledge/${id}/chunks`, {
+      headers: { 'X-Internal-Token': process.env.INTERNAL_SERVICE_TOKEN || '' },
+    });
     const data = await pyRes.json();
     if (!pyRes.ok) {
       console.error('[knowledge] chunks python error:', pyRes.status, data);
