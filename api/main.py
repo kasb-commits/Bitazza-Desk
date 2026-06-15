@@ -91,8 +91,11 @@ async def lifespan(app: FastAPI):
         extra={"env": os.getenv("RAILWAY_ENVIRONMENT", "local")},
     )
     init_db()
-    from db.vector_store import run_migrations as _run_vs_migrations
+    from db.vector_store import run_migrations as _run_vs_migrations, collection_count, reindex_all_kb
     _run_vs_migrations()
+    if collection_count() == 0:
+        _startup_logger.info("vector_embeddings empty — starting background reindex")
+        asyncio.create_task(asyncio.to_thread(reindex_all_kb))
     asyncio.create_task(start_auto_transition_loop())
     asyncio.create_task(_email_safety_net_loop())
     asyncio.create_task(start_report_scheduler_loop())

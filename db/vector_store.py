@@ -308,6 +308,108 @@ def collection_count(collection_name: str = "knowledge_base") -> int:
         return 0
 
 
+
+def reindex_all_kb() -> None:
+    """
+    Re-ingest all knowledge_items from Postgres into vector_embeddings.
+    Called on startup when the table is empty (e.g. first deploy after
+    migration). Safe to call at any time — uses upsert, no duplicates.
+    """
+    import os
+    import requests as _requests
+    from bs4 import BeautifulSoup
+
+    _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    def _fetch_url(url: str) -> tuple[str, str]:
+        resp = _requests.get(url, timeout=20, headers={"User-Agent": "CSBot-Reingest/1.0"})
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        for tag in soup.find_all(["script", "style", "nav", "footer", "header", "aside"]):
+            tag.decompose()
+        title_tag = soup.find("title") or soup.find("h1")
+        title = title_tag.get_text(strip=True) if title_tag else url
+        return title, soup.get_text(separator="\n", strip=True)
+
+    def _chunk(text: str) -> list[str]:
+        from api.routes.knowledge import _chunk_text as _ct
+        return _ct(text)
+
+    def _ingest_one(item: dict) -> str:
+        item_id, title = item["id"], item["title"]
+        source_type, source_ref = item["source_type"], item["source_ref"]
+
+        local_path = os.path.join(_root, source_ref) if source_ref else None
+        is_local = local_path and os.path.isfile(local_path)
+
+        if is_local:
+            try:
+                body = open(local_path, "r", encoding="utf-8").read()
+            except Exception as exc:
+                logger.error("reindex FAIL item %d (%s): %s", item_id, title, exc)
+                return "fail"
+        elif source_type == "url":
+            if not source_ref:
+                return "manual"
+            try:
+                _, body = _fetch_url(source_ref)
+            except Exception as exc:
+                logger.error("reindex FAIL item %d (%s) fetch: %s", item_id, title, exc)
+                return "fail"
+        else:
+            logger.info("reindex MANUAL item %d (%s) — re-upload via dashboard", item_id, title)
+            return "manual"
+
+        chunks = _chunk(body)
+        if not chunks:
+            return "manual"
+
+        docs = [
+            {
+                "id": f"kb_{item_id}_{i}",
+                "text": chunk,
+                "metadata": {
+                    "knowledge_item_id": str(item_id),
+                    "source": source_ref,
+                    "source_type": source_type,
+                    "title": title[:255],
+                    "chunk_index": i,
+                },
+            }
+            for i, chunk in enumerate(chunks)
+        ]
+        upsert_documents(docs)
+        with _conn() as conn:
+            conn.cursor().execute(
+                "UPDATE knowledge_items SET chunk_count = %s WHERE id = %s",
+                (len(chunks), item_id),
+            )
+        logger.info("reindex OK item %d (%s) — %d chunks", item_id, title, len(chunks))
+        return "ok"
+
+    try:
+        with _conn() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT id, title, source_type, source_ref FROM knowledge_items ORDER BY id")
+            items = cur.fetchall()
+    except Exception:
+        logger.exception("reindex_all_kb: failed to fetch knowledge_items")
+        return
+
+    if not items:
+        logger.info("reindex_all_kb: no knowledge_items found")
+        return
+
+    logger.info("reindex_all_kb: ingesting %d items…", len(items))
+    counts = {"ok": 0, "fail": 0, "manual": 0}
+    for item in items:
+        counts[_ingest_one(dict(item))] += 1
+    logger.info(
+        "reindex_all_kb done — %d ingested, %d failed, %d need manual re-upload",
+        counts["ok"], counts["fail"], counts["manual"],
+    )
+
+
 def get_chunks_by_item(item_id: int) -> list[dict]:
     """
     Return all indexed text chunks for a knowledge item, ordered by chunk_index.
