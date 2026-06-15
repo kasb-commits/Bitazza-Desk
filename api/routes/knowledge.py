@@ -18,7 +18,7 @@ from bs4 import BeautifulSoup
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel
 
-from api.middleware.auth import get_user_id
+from api.middleware.auth import get_user_id, get_optional_user_id
 from db.conversation_store import (
     create_knowledge_item,
     list_knowledge_items,
@@ -256,7 +256,7 @@ def get_knowledge_items(_agent_id: str = Depends(get_user_id)):
 # ── Preview chunks ────────────────────────────────────────────────────────────
 
 @router.get("/{item_id}/chunks")
-def get_chunks(item_id: int, _agent_id: str = Depends(get_user_id)):
+def get_chunks(item_id: int, _agent_id: str = Depends(get_optional_user_id)):
     """Return all indexed text chunks for a knowledge item."""
     item = get_knowledge_item(item_id)
     if not item:
