@@ -45,7 +45,7 @@ def _execution_to_agent_response(execution) -> AgentResponse:
     # paused before reaching EscalateNode — preventing status downgrades to Pending_Customer.
     escalation_reason = execution.variables.get("escalation_reason", "")
     return AgentResponse(
-        text=execution.output_reply or "",
+        text=execution.output_reply or None,
         language=execution.variables.get("language", "en"),
         escalated=execution.escalated,
         escalation_reason=escalation_reason,

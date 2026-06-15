@@ -480,6 +480,18 @@ async def send_message(request: Request, body: MessageRequest, user_id: str | No
         assign_ai_persona(body.conversation_id, specialist["name"], specialist["avatar"], specialist["avatar_url"])
         update_ticket_category(body.conversation_id, result.upgraded_category)
 
+    # Guard: if the workflow engine produced no reply (e.g. a resume path that only
+    # ran condition/account_lookup/set_variable nodes with no send_reply or ai_reply),
+    # output_reply stays None and becomes "" in interceptor.py. Suppress the empty
+    # bubble rather than persisting it — the customer already saw the prior message.
+    if not result.text:
+        logger.warning(
+            "empty_bot_reply suppressed",
+            extra={"conv_id": body.conversation_id, "category": effective_category},
+        )
+        conversation_id_var.reset(_token_conv)
+        return MessageResponse(reply=None, language=result.language or "en", escalated=result.escalated)
+
     # Persist assistant reply — include confidence so server-side counter can read it
     _reply_meta: dict = {
         "escalated": result.escalated,
