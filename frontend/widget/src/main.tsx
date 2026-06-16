@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import Widget from './Widget';
 import type { CSBotConfig } from './types';
+import { initWidgetSession } from './api';
 import './index.css';
 
 let _apiBase = '';
@@ -89,6 +90,40 @@ async function getDevToken(apiUrl: string): Promise<DevTokenResult> {
   }
 }
 
+const BOOTSTRAP_MSG_TYPE = 'csbot_bootstrap';
+const BOOTSTRAP_WAIT_MS = 8000;
+
+/**
+ * Bitazza Exchange handoff (Phase 2): when embedded as an iframe, the parent web
+ * app posts the single-use bootstrap token after load. We validate event.origin
+ * against allowedParentOrigins (when provided) before trusting any message — a
+ * bootstrap from an unknown origin is dropped. Resolves null on timeout so the
+ * caller can fall back. Also announces 'csbot_ready' so a parent that waits for
+ * readiness knows when to post.
+ */
+function waitForBootstrapMessage(allowedOrigins?: string[]): Promise<string | null> {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (val: string | null) => {
+      if (done) return;
+      done = true;
+      window.removeEventListener('message', onMessage);
+      clearTimeout(timer);
+      resolve(val);
+    };
+    const onMessage = (event: MessageEvent) => {
+      if (allowedOrigins && allowedOrigins.length > 0 && !allowedOrigins.includes(event.origin)) return;
+      const data = event.data;
+      if (data && data.type === BOOTSTRAP_MSG_TYPE && typeof data.token === 'string') {
+        finish(data.token);
+      }
+    };
+    const timer = setTimeout(() => finish(null), BOOTSTRAP_WAIT_MS);
+    window.addEventListener('message', onMessage);
+    try { window.parent.postMessage({ type: 'csbot_ready' }, '*'); } catch { /* ignore */ }
+  });
+}
+
 async function mount() {
   const rawCfg: CSBotConfig = (window as any).CSBotConfig ?? {
     platform: 'web',
@@ -112,17 +147,37 @@ async function mount() {
   if (forceGuest) {
     rawCfg.guestMode = true;
   } else if (!rawCfg.token) {
-    try {
-      const result = await getDevToken(rawCfg.apiUrl);
-      rawCfg.token = result.token;
-      rawCfg.tokenExpiresAt = result.expiresAt;
-      rawCfg.onTokenRefresh = async () => {
-        const r = await getDevToken(rawCfg.apiUrl);
-        rawCfg.tokenExpiresAt = r.expiresAt;
-        return r.token;
-      };
-    } catch (e) {
-      console.warn('[csbot-dev] could not fetch mock token, falling back to unauthenticated', e);
+    // Bitazza Exchange handoff: turn a single-use bootstrap into our session JWT.
+    //   1) bootstrap provided synchronously on the config, or
+    //   2) bootstrap delivered async via postMessage from the parent (iframe embed).
+    // Falls back to the dev mock-token flow when no bootstrap is available.
+    let bootstrap = rawCfg.wstBootstrap;
+    if (!bootstrap && window.parent !== window) {
+      bootstrap = (await waitForBootstrapMessage(rawCfg.allowedParentOrigins)) ?? undefined;
+    }
+    if (bootstrap) {
+      try {
+        const session = await initWidgetSession(bootstrap, rawCfg.apiUrl);
+        rawCfg.token = session.token;
+        rawCfg.tokenExpiresAt = session.tokenExpiresAt;
+      } catch (e) {
+        console.error('[csbot] bootstrap exchange failed', e);
+        sendClientLog({ level: 'error', event: 'bootstrap_exchange_failed', message: e instanceof Error ? e.message : String(e) });
+      }
+    } else {
+      // Dev fallback (unchanged): mint a mock token. No-op in prod (/mock absent).
+      try {
+        const result = await getDevToken(rawCfg.apiUrl);
+        rawCfg.token = result.token;
+        rawCfg.tokenExpiresAt = result.expiresAt;
+        rawCfg.onTokenRefresh = async () => {
+          const r = await getDevToken(rawCfg.apiUrl);
+          rawCfg.tokenExpiresAt = r.expiresAt;
+          return r.token;
+        };
+      } catch (e) {
+        console.warn('[csbot-dev] could not fetch mock token, falling back to unauthenticated', e);
+      }
     }
   }
 

@@ -16,6 +16,7 @@ from config import settings
 
 # ── User/KYC API config ──────────────────────────────────────────────────────
 _USE_MOCK = settings.USE_MOCK_USER_API
+_USE_EXCHANGE = settings.USE_EXCHANGE_API   # real Bitazza Exchange auth+KYC path (gates ONLY profile/KYC)
 _USER_API_BASE = settings.USER_API_BASE_URL
 _USER_API_KEY = settings.USER_API_KEY
 
@@ -78,6 +79,22 @@ def _user_api_get(param: str, value: str) -> dict:
         return {"error": str(e)}
 
 
+def _map_kyc_response(data: dict) -> dict:
+    """
+    Normalize a Bitazza Exchange get-kyc payload to get_user_profile's contract.
+    The Exchange shape already matches (user_id, first_name, last_name, email,
+    phone, tier, region, kyc{status, rejection_reason, reviewed_at}); we only
+    stringify user_id (it arrives as an int) and guarantee a kyc sub-object so
+    get_kyc_status's `.get("kyc")` keeps working. Errors pass through untouched.
+    """
+    if not data or "error" in data:
+        return data
+    if "user_id" in data:
+        data["user_id"] = str(data["user_id"])
+    data.setdefault("kyc", {})
+    return data
+
+
 # ── Public tool functions (called by agent.py) ──────────────────────────────
 
 def get_user_profile(user_id: str) -> dict:
@@ -88,6 +105,10 @@ def get_user_profile(user_id: str) -> dict:
     Response keys: user_id, first_name, last_name, email, phone, tier,
                    kyc.status, kyc.rejection_reason, kyc.reviewed_at
     """
+    if _USE_EXCHANGE:
+        # Real Bitazza Exchange path — fetch via the stored downstream token.
+        from engine import exchange_client
+        return _map_kyc_response(exchange_client.get_kyc(user_id))
     return _user_api_get("user_id", user_id)
 
 

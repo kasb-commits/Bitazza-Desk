@@ -26,6 +26,7 @@ from api.routes.notifications import router as notifications_router
 from api.routes.uploads import router as uploads_router
 from api.routes.announcements import router as announcements_router
 from api.routes.logs import router as logs_router
+from api.routes.widget_session import router as widget_session_router
 from db.conversation_store import init_db
 from engine.auto_transitions import start_auto_transition_loop
 from engine.report_sender import start_report_scheduler_loop
@@ -143,6 +144,7 @@ app.include_router(notifications_router)
 app.include_router(uploads_router, prefix="/api/uploads", tags=["uploads"])
 app.include_router(announcements_router)
 app.include_router(logs_router)
+app.include_router(widget_session_router)  # Bitazza Exchange: POST /widget/session/init (real auth path)
 
 # Mount mock User/KYC API and token issuer only in development
 if settings.USE_MOCK_USER_API:

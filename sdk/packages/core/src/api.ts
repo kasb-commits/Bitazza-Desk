@@ -40,6 +40,34 @@ async function ensureFreshToken(cfg: CSBotSDKConfig): Promise<void> {
   return _refreshPromise;
 }
 
+// ─── Bitazza Exchange bootstrap → session JWT ──────────────────────────────────
+// Exchanges a single-use wstb_* bootstrap for our own session token and stores it
+// on the config. Guarded by a singleton promise so the single-use bootstrap is
+// consumed exactly once even under StrictMode double-invoke / re-render. No-op if
+// a token is already present or no bootstrap was supplied. Throws on failure so
+// the caller can surface a clear error (the bootstrap is spent and can't be retried).
+let _bootstrapPromise: Promise<void> | null = null;
+
+export async function exchangeBootstrapToken(cfg: CSBotSDKConfig): Promise<void> {
+  if (cfg.token || !cfg.wstBootstrap) return;
+  if (_bootstrapPromise) return _bootstrapPromise;
+  _bootstrapPromise = (async () => {
+    const res = await fetch(`${cfg.apiUrl}/widget/session/init`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wst_bootstrap: cfg.wstBootstrap }),
+    });
+    if (!res.ok) {
+      sendClientLog(cfg.apiUrl, { level: 'error', event: 'bootstrap_exchange_failed', status: res.status });
+      throw new Error(`bootstrap exchange failed: ${res.status}`);
+    }
+    const data = await res.json();
+    cfg.token = data.token;
+    cfg.tokenExpiresAt = Date.now() + (data.expires_in as number) * 1000;
+  })().finally(() => { _bootstrapPromise = null; });
+  return _bootstrapPromise;
+}
+
 // ─── Start / session ─────────────────────────────────────────────────────────
 
 let _startPromise: Promise<string> | null = null;

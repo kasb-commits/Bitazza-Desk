@@ -10,7 +10,7 @@ import {
   startConversation, sendMessage, setCategoryAgent, greetConversation,
   fetchHistory, fetchCustomerTickets, fetchOpenTicket, fetchAnnouncements,
   emergencyEscalate, uploadAttachment, submitCsat as apiSubmitCsat,
-  sendClientLog, HistoryMessage,
+  exchangeBootstrapToken, sendClientLog, HistoryMessage,
 } from './api';
 import { ConversationSocket } from './ws';
 
@@ -97,6 +97,17 @@ export function useConversation(
     let cancelled = false;
 
     const init = async () => {
+      // Bitazza Exchange: exchange a single-use bootstrap for our session JWT
+      // before any authenticated call. Singleton-guarded; no-op without a bootstrap.
+      if (cfg.wstBootstrap && !cfg.token) {
+        try {
+          await exchangeBootstrapToken(cfg);
+        } catch {
+          if (!cancelled) setError('Could not start secure session. Please reopen the chat.');
+          return;
+        }
+      }
+
       const existing = await getStoredSession(storage, cfg.sessionTtlMs);
 
       if (existing) {

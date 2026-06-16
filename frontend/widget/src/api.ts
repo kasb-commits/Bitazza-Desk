@@ -14,6 +14,27 @@ function getHeaders(cfg: CSBotConfig): HeadersInit {
   return h;
 }
 
+// ── Bitazza Exchange bootstrap → session JWT ─────────────────────────────────
+// Exchanges a single-use wstb_* bootstrap for our own session token. The
+// downstream wstd_* token stays server-side; we only ever see this JWT.
+export async function initWidgetSession(
+  wstBootstrap: string,
+  apiUrl: string,
+): Promise<{ token: string; userId: string; tokenExpiresAt: number }> {
+  const res = await fetch(`${apiUrl}/widget/session/init`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ wst_bootstrap: wstBootstrap }),
+  });
+  if (!res.ok) throw new Error(`widget session init failed: ${res.status}`);
+  const data = await res.json();
+  return {
+    token: data.token as string,
+    userId: String(data.user_id),
+    tokenExpiresAt: Date.now() + (data.expires_in as number) * 1000,
+  };
+}
+
 // ── Proactive token refresh ──────────────────────────────────────────────────
 // Checks if the token is within 60 s of expiry and refreshes it before the
 // request fires.  Uses a singleton promise to dedup concurrent callers.
@@ -396,6 +417,7 @@ export async function sendMessage(
   consecutiveLowConfidence = 0,
   category?: string,
   attachmentIds?: string[],
+  language?: 'en' | 'th',
 ): Promise<SendResult> {
   await ensureFreshToken(cfg);
   const res = await fetch(`${cfg.apiUrl}/chat/message`, {
@@ -405,6 +427,7 @@ export async function sendMessage(
       conversation_id: conversationId,
       message,
       consecutive_low_confidence: consecutiveLowConfidence,
+      ...(language ? { language } : {}),
       ...(category ? { category } : {}),
       ...(attachmentIds?.length ? { attachment_ids: attachmentIds } : {}),
     }),

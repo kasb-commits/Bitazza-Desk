@@ -10,6 +10,7 @@ export interface CSBotSDKConfig {
   token?: string;
   tokenExpiresAt?: number;           // ms since epoch
   onTokenRefresh?: () => Promise<string>;
+  wstBootstrap?: string;             // Bitazza Exchange single-use bootstrap (wstb_*); exchanged for a session JWT
   primaryColor?: string;             // hex, default '#1a56db'
   lang?: SupportedLanguage;
   supportedLanguages: SupportedLanguage[];

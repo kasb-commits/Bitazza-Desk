@@ -85,6 +85,8 @@ export interface CSBotConfig {
   token?: string;        // JWT from host app, optional
   tokenExpiresAt?: number; // ms since epoch — when token expires
   onTokenRefresh?: () => Promise<string>; // host app provides; called when token nears expiry
+  wstBootstrap?: string; // Bitazza Exchange single-use bootstrap (wstb_*); exchanged for a session JWT
+  allowedParentOrigins?: string[]; // origins allowed to postMessage the bootstrap (iframe security)
   primaryColor?: string; // hex, default #00CE80 (Primary/GL/700)
   lang?: 'en' | 'th';   // override auto-detect
   guestMode?: boolean;   // true = skip token fetch, show GuestIdentityForm

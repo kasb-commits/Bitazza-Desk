@@ -49,6 +49,14 @@ USE_MOCK_USER_API: bool = os.getenv("USE_MOCK_USER_API", "true").lower() == "tru
 USER_API_BASE_URL: str = os.getenv("USER_API_BASE_URL", "http://localhost:8000")
 USER_API_KEY: str = os.getenv("USER_API_KEY", "mock-dev-token")
 
+# Bitazza Exchange — Widget Session (auth + KYC).
+# Gates ONLY the auth + KYC path; USE_MOCK_USER_API still controls every other
+# account tool (restrictions, deposits, balances, ...). Default off = mock behaviour.
+USE_EXCHANGE_API: bool = os.getenv("USE_EXCHANGE_API", "false").lower() == "true"
+EXCHANGE_BE_BASE_URL: str = os.getenv("EXCHANGE_BE_BASE_URL", "")  # e.g. https://gateway.bitazza-staging.com
+WIDGET_HMAC_SECRET: str = os.getenv("WIDGET_HMAC_SECRET", "")      # shared HMAC secret — set in env only
+WIDGET_CLIENT_ID: str = os.getenv("WIDGET_CLIENT_ID", "")          # X-Client-Id value
+
 # Freedom / Bitazza internal APIs
 FREEDOM_API_URL: str = os.getenv("FREEDOM_API_URL", "")
 BITAZZA_API_URL: str = os.getenv("BITAZZA_API_URL", "")
