@@ -74,6 +74,27 @@ class AiReplyNode:
                          "transactions", "deposits", "trading")
         injected = {k: ctx.variables[k] for k in _ACCOUNT_KEYS if k in ctx.variables}
 
+        # ── Fallback KYC lookup ───────────────────────────────────────────────
+        # If the workflow is handling kyc_verification but no account_lookup node
+        # ran before this ai_reply (so "kyc" is absent from variables), fetch the
+        # KYC status directly. Only do this after the first bot reply — on the
+        # first turn the overlay instructs Gemini to ask triage questions, not
+        # resolve immediately, so injecting data early would skip that phase.
+        if (category == "kyc_verification"
+                and "kyc" not in injected
+                and ctx.user_id
+                and not ctx.dry_run):
+            try:
+                from db.conversation_store import has_successful_bot_reply
+                if has_successful_bot_reply(ctx.conversation_id):
+                    from engine.account_tools import get_kyc_status
+                    injected["kyc"] = get_kyc_status(user_id=ctx.user_id)
+                    logger.debug("ai_reply: auto-fetched KYC data for conv %s",
+                                 ctx.conversation_id)
+            except Exception:
+                logger.debug("ai_reply: KYC auto-fetch failed for conv %s",
+                             ctx.conversation_id)
+
         # ── Delegate to engine ────────────────────────────────────────────────
         response = engine_chat(
             conversation_id=ctx.conversation_id,

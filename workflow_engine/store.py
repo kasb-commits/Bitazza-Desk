@@ -295,6 +295,28 @@ def get_active_execution(conversation_id: str, conn=None) -> "WorkflowExecution 
         return None
 
 
+def abandon_active_execution(conversation_id: str, conn=None) -> None:
+    """Mark any non-terminal execution for this conversation as ABANDONED.
+    Called when the user switches issue category mid-conversation so the next
+    message starts a fresh workflow instead of resuming the old one.
+    """
+    from workflow_engine.models import ExecutionStatus
+    active = get_active_execution(conversation_id, conn=conn)
+    if active is None:
+        return
+    try:
+        update_execution_status(
+            execution_id=active.id,
+            status=ExecutionStatus.ABANDONED,
+        )
+        logger.info(
+            "abandon_active_execution: abandoned %s for conversation %s",
+            active.id, conversation_id,
+        )
+    except Exception:
+        logger.exception("abandon_active_execution failed for %s", conversation_id)
+
+
 def set_execution_trigger_token(execution_id: str, token: str, conn=None) -> None:
     c = conn or get_connection()
     waiting_for = f"external_trigger:{token}"

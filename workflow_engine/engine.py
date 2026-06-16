@@ -302,9 +302,16 @@ class WorkflowExecutionEngine:
 
             current_node_id = result.next_node_id
 
-        # Safety net: if the ai_reply node triggered escalation but the workflow
-        # designer omitted an escalate node, still send the handoff message and
-        # update the ticket status so the conversation isn't silently dropped.
+        # Safety net: if escalation was signalled but no escalate node ran.
+        # Two signals are checked:
+        #   execution.escalated — set by EscalateNode via escalated_final output
+        #   variables["escalated"] — set by ai_reply when Gemini returns needs_human=True
+        # Without this second check, a workflow that lacks a chk_esc condition
+        # node after ai_reply would silently drop the escalation — the bot would
+        # say "I'll connect you" but the ticket status would never update.
+        _ai_signalled_escalation = execution.variables.get("escalated", False)
+        if _ai_signalled_escalation and not execution.escalated:
+            execution.escalated = True
         if execution.escalated and not escalate_node_ran:
             try:
                 from engine.prompt_templates import build_handoff_message

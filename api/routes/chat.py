@@ -178,6 +178,14 @@ def set_category(body: SetCategoryRequest, user_id: str | None = Depends(get_opt
         new_label = _CATEGORY_LABEL.get(body.category, body.category.replace("_", " ").title())
         add_message(body.conversation_id, "system",
                     f"── Customer switched topic: {old_label} → {new_label} ──")
+        # Abandon the old workflow execution so the next message starts the new
+        # category's workflow fresh instead of resuming the previous one.
+        try:
+            from workflow_engine.store import abandon_active_execution
+            abandon_active_execution(body.conversation_id)
+        except Exception:
+            logger.warning("set_category: failed to abandon active execution for %s",
+                           body.conversation_id)
     agent = pick_agent(body.category)
     assign_ai_persona(body.conversation_id, agent["name"], agent["avatar"], agent["avatar_url"])
     update_ticket_category(body.conversation_id, body.category)
