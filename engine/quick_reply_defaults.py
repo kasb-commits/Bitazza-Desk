@@ -73,13 +73,11 @@ CURATED_QUICK_REPLIES: dict[str, dict[str, list[str]]] = {
         "en": [
             "I forgot my password",
             "I lost my 2FA device",
-            "I can't receive the OTP",
             "I'm still locked out",
         ],
         "th": [
             "ลืมรหัสผ่าน",
             "ไม่มีอุปกรณ์ 2FA แล้ว",
-            "ไม่ได้รับ OTP",
             "ยังเข้าบัญชีไม่ได้",
         ],
     },

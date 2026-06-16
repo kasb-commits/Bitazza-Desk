@@ -592,7 +592,7 @@ export default function ChatWindow({ cfg, onClose }: Props) {
       lastFailedText.current = '';
       const activeCategory = category ?? selectedCategory ?? undefined;
       const attachmentIds = attachmentsSnapshot.map(a => a.id);
-      const result = await sendMessage(cfg, convId, trimmed, consecutiveLow, activeCategory, attachmentIds.length ? attachmentIds : undefined);
+      const result = await sendMessage(cfg, convId, trimmed, consecutiveLow, activeCategory, attachmentIds.length ? attachmentIds : undefined, lang);
       setLang(result.language as 'en' | 'th');
 
       // reply is null when a human is already handling — suppress the bot bubble entirely
