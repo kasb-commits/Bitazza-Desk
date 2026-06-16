@@ -175,6 +175,63 @@ const TEMPLATES = [
   },
 ];
 
+// ── Auto-layout ─────────────────────────────────────────────────────────────────
+// Workflows seeded/inserted in engine format ({id, kind, config}) carry no canvas
+// coordinates. Without positions every node defaults to the same point and the graph
+// collapses into a single visible node. Derive a layered layout from the edge graph
+// so these render faithfully. Loops (back-edges) are handled — a node keeps the level
+// from the first time it's reached.
+function autoLayoutPositions(
+  nodes: { id: string }[],
+  edges: { source?: string; target?: string }[],
+): Map<string, { x: number; y: number }> {
+  const X_GAP = 240, Y_GAP = 150, X0 = 120, Y0 = 40;
+  const childrenOf = new Map<string, string[]>();
+  const indeg = new Map<string, number>();
+  nodes.forEach(n => { childrenOf.set(n.id, []); indeg.set(n.id, 0); });
+  edges.forEach(e => {
+    if (e.source && e.target && childrenOf.has(e.source) && indeg.has(e.target)) {
+      childrenOf.get(e.source)!.push(e.target);
+      indeg.set(e.target, indeg.get(e.target)! + 1);
+    }
+  });
+
+  // Roots = no incoming edge; fall back to the first node if the graph is fully cyclic.
+  let roots = nodes.filter(n => indeg.get(n.id) === 0).map(n => n.id);
+  if (roots.length === 0 && nodes.length) roots = [nodes[0].id];
+
+  const level = new Map<string, number>();
+  const queue: string[] = [];
+  roots.forEach(r => { level.set(r, 0); queue.push(r); });
+  while (queue.length) {
+    const id = queue.shift()!;
+    const lvl = level.get(id)!;
+    for (const c of childrenOf.get(id) ?? []) {
+      if (!level.has(c)) { level.set(c, lvl + 1); queue.push(c); }
+    }
+  }
+
+  // Place any disconnected nodes in trailing levels so nothing overlaps.
+  let maxLvl = 0;
+  level.forEach(v => { if (v > maxLvl) maxLvl = v; });
+  nodes.forEach(n => { if (!level.has(n.id)) { maxLvl += 1; level.set(n.id, maxLvl); } });
+
+  const byLevel = new Map<number, string[]>();
+  nodes.forEach(n => {
+    const lvl = level.get(n.id)!;
+    if (!byLevel.has(lvl)) byLevel.set(lvl, []);
+    byLevel.get(lvl)!.push(n.id);
+  });
+
+  const pos = new Map<string, { x: number; y: number }>();
+  byLevel.forEach((ids, lvl) => {
+    ids.forEach((id, i) => {
+      pos.set(id, { x: X0 + i * X_GAP, y: Y0 + lvl * Y_GAP });
+    });
+  });
+  return pos;
+}
+
 // ── Node catalog ──────────────────────────────────────────────────────────────
 
 interface NodeSpec {
@@ -1595,6 +1652,14 @@ export default function AIStudio() {
     const rawNodes = (typeof wf.nodes_json === 'string' ? JSON.parse(wf.nodes_json) : wf.nodes_json) ?? [];
     const rawEdges = (typeof wf.edges_json === 'string' ? JSON.parse(wf.edges_json) : wf.edges_json) ?? [];
 
+    // Engine-format workflows ({id, kind, config}) carry no canvas coordinates. If no
+    // node has a stored position, derive a layered layout from the edges so the graph
+    // renders faithfully instead of collapsing all nodes onto the same point.
+    const needsLayout = rawNodes.length > 0 && rawNodes.every((n: Record<string, unknown>) => !n.position);
+    const layout = needsLayout
+      ? autoLayoutPositions(rawNodes as { id: string }[], rawEdges as { source?: string; target?: string }[])
+      : null;
+
     // Normalize nodes: support both canvas format (type/data) and engine format (kind/config)
     const canvasNodes: Node<NodeData>[] = rawNodes.map((n: Record<string, unknown>) => {
       const kind  = (n.kind || n.type) as NodeKind;
@@ -1603,7 +1668,7 @@ export default function AIStudio() {
       return {
         id:       n.id as string,
         type:     kind,
-        position: (n.position as { x: number; y: number }) || { x: 100, y: 100 },
+        position: (n.position as { x: number; y: number }) || layout?.get(n.id as string) || { x: 100, y: 100 },
         data: {
           kind,
           label: (data?.label as string) || (cfg.label as string) || NODE_SPECS[kind]?.label || kind,
