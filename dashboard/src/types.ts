@@ -309,6 +309,9 @@ export interface AuthUser {
 
 export type KnowledgeSourceType = 'url' | 'pdf' | 'docx';
 
+export type KnowledgeStatus = 'ACTIVE' | 'ARCHIVED' | 'PROCESSING' | 'FAILED';
+export type CitationsSource = 'pending' | 'ai' | 'manual';
+
 export interface KnowledgeItem {
   id: number;
   title: string;
@@ -317,6 +320,17 @@ export interface KnowledgeItem {
   chunk_count: number;
   created_by: number | null;
   created_at: number; // unix seconds
+  // Versioning
+  status: KnowledgeStatus;
+  version_number: number;
+  parent_id: number | null;
+  change_notes: string | null;
+  // Citations
+  citation_categories: string[];
+  citation_keywords: string[];
+  coverage_score: number | null;
+  citations_generated_at: number | null;
+  citations_source: CitationsSource;
 }
 
 export interface NotificationChannelConfig {

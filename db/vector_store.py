@@ -374,6 +374,7 @@ def reindex_all_kb() -> None:
                     "source_type": source_type,
                     "title": title[:255],
                     "chunk_index": i,
+                    "status": "ACTIVE",
                 },
             }
             for i, chunk in enumerate(chunks)
@@ -390,7 +391,10 @@ def reindex_all_kb() -> None:
     try:
         with _conn() as conn:
             cur = conn.cursor()
-            cur.execute("SELECT id, title, source_type, source_ref FROM knowledge_items ORDER BY id")
+            # Only reindex ACTIVE items — ARCHIVED versions must not be re-introduced
+            cur.execute(
+                "SELECT id, title, source_type, source_ref FROM knowledge_items WHERE status = 'ACTIVE' ORDER BY id"
+            )
             items = cur.fetchall()
     except Exception:
         logger.exception("reindex_all_kb: failed to fetch knowledge_items")

@@ -332,6 +332,51 @@ export const api = {
   getKnowledgeChunks: (id: number) =>
     req<{ item_id: number; chunks: { index: number; text: string }[] }>(`/api/knowledge/${id}/chunks`),
 
+  updateKnowledgeCitations: (id: number, categories: string[], keywords: string[]) =>
+    req<KnowledgeItem>(`/api/knowledge/${id}/citations`, {
+      method: 'PATCH',
+      body: JSON.stringify({ categories, keywords }),
+    }),
+
+  getKnowledgeVersions: (id: number) =>
+    req<{ versions: KnowledgeItem[] }>(`/api/knowledge/${id}/versions`).then(r => r.versions),
+
+  overrideKnowledgeWithFile: (id: number, file: File, changeNotes?: string) => {
+    const token = getToken();
+    const form = new FormData();
+    form.append('file', file);
+    if (changeNotes) form.append('change_notes', changeNotes);
+    return fetch(`${API}/api/knowledge/${id}/override`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    }).then(async r => {
+      if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error((b as { detail?: string }).detail ?? `${r.status}`); }
+      return r.json() as Promise<KnowledgeItem>;
+    });
+  },
+
+  overrideKnowledgeWithUrl: (id: number, url: string, changeNotes?: string) => {
+    const token = getToken();
+    const form = new FormData();
+    form.append('url', url);
+    if (changeNotes) form.append('change_notes', changeNotes);
+    return fetch(`${API}/api/knowledge/${id}/override`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    }).then(async r => {
+      if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error((b as { detail?: string }).detail ?? `${r.status}`); }
+      return r.json() as Promise<KnowledgeItem>;
+    });
+  },
+
+  classifyAllKnowledge: () =>
+    req<{ total_pending: number; classified: number; failed: number }>(
+      '/api/knowledge/admin/classify-all',
+      { method: 'POST' },
+    ),
+
   // Notifications
   getNotifications: () =>
     req<Notification[]>('/api/notifications'),

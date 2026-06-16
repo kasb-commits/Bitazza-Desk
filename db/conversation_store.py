@@ -1380,6 +1380,18 @@ def delete_role(name: str) -> None:
 
 # ── Knowledge Base ─────────────────────────────────────────────────────────────
 
+_KB_COLUMNS = """
+    id, title, source_type, source_ref, chunk_count, created_by,
+    EXTRACT(EPOCH FROM created_at)::bigint AS created_at,
+    status, version_number, parent_id, superseded_by, change_notes,
+    EXTRACT(EPOCH FROM updated_at)::bigint AS updated_at,
+    citation_categories, citation_keywords, coverage_score,
+    EXTRACT(EPOCH FROM citations_generated_at)::bigint AS citations_generated_at,
+    citations_source, citations_edited_by,
+    EXTRACT(EPOCH FROM citations_edited_at)::bigint AS citations_edited_at
+"""
+
+
 def create_knowledge_item(title: str, source_type: str, source_ref: str | None, chunk_count: int, created_by: str | None) -> dict:
     # created_by must be a valid UUID; fall back to NULL for non-UUID values (e.g. dev fallback)
     import uuid as _uuid
@@ -1389,33 +1401,33 @@ def create_knowledge_item(title: str, source_type: str, source_ref: str | None, 
         creator_id = None
     with _conn() as conn:
         cur = conn.cursor()
-        cur.execute("""
+        cur.execute(f"""
             INSERT INTO knowledge_items (title, source_type, source_ref, chunk_count, created_by)
             VALUES (%s, %s, %s, %s, %s)
-            RETURNING id, title, source_type, source_ref, chunk_count, created_by,
-                      EXTRACT(EPOCH FROM created_at)::bigint AS created_at
+            RETURNING {_KB_COLUMNS}
         """, (title, source_type, source_ref, chunk_count, creator_id))
         return dict(cur.fetchone())
 
 
 def list_knowledge_items() -> list[dict]:
+    """Return all ACTIVE knowledge items ordered newest first."""
     with _conn() as conn:
         cur = conn.cursor()
-        cur.execute("""
-            SELECT id, title, source_type, source_ref, chunk_count, created_by,
-                   EXTRACT(EPOCH FROM created_at)::bigint AS created_at
+        cur.execute(f"""
+            SELECT {_KB_COLUMNS}
             FROM knowledge_items
+            WHERE status = 'ACTIVE'
             ORDER BY created_at DESC
         """)
         return [dict(r) for r in cur.fetchall()]
 
 
 def get_knowledge_item(item_id: int) -> dict | None:
+    """Return a single knowledge item by id (any status)."""
     with _conn() as conn:
         cur = conn.cursor()
-        cur.execute("""
-            SELECT id, title, source_type, source_ref, chunk_count, created_by,
-                   EXTRACT(EPOCH FROM created_at)::bigint AS created_at
+        cur.execute(f"""
+            SELECT {_KB_COLUMNS}
             FROM knowledge_items WHERE id = %s
         """, (item_id,))
         row = cur.fetchone()
@@ -1427,6 +1439,164 @@ def delete_knowledge_item(item_id: int) -> bool:
         cur = conn.cursor()
         cur.execute("DELETE FROM knowledge_items WHERE id = %s", (item_id,))
         return cur.rowcount > 0
+
+
+# ── Citation helpers ──────────────────────────────────────────────────────────
+
+def update_knowledge_item_citations(
+    item_id: int,
+    categories: list[str],
+    keywords: list[str],
+    score: float | None,
+) -> None:
+    """Persist AI-generated citations. Skips items already manually edited."""
+    import json as _json
+    with _conn() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE knowledge_items
+            SET citation_categories    = %s,
+                citation_keywords      = %s,
+                coverage_score         = %s,
+                citations_generated_at = NOW(),
+                citations_source       = 'ai'
+            WHERE id = %s
+              AND citations_source != 'manual'
+        """, (categories, keywords, score, item_id))
+
+
+def update_knowledge_item_citations_manual(
+    item_id: int,
+    categories: list[str],
+    keywords: list[str],
+    edited_by: str | None,
+) -> None:
+    """Persist agent-edited citations and lock them against AI overwrite."""
+    import uuid as _uuid
+    try:
+        editor_id = str(_uuid.UUID(edited_by)) if edited_by else None
+    except (ValueError, AttributeError):
+        editor_id = None
+    with _conn() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE knowledge_items
+            SET citation_categories  = %s,
+                citation_keywords    = %s,
+                coverage_score       = NULL,
+                citations_source     = 'manual',
+                citations_edited_by  = %s,
+                citations_edited_at  = NOW()
+            WHERE id = %s
+        """, (categories, keywords, editor_id, item_id))
+
+
+def get_all_knowledge_source_refs() -> set[str]:
+    """Return all source_refs regardless of status — used for deduplication."""
+    with _conn() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT source_ref FROM knowledge_items WHERE source_ref IS NOT NULL")
+        return {row["source_ref"] for row in cur.fetchall()}
+
+
+# ── Versioning helpers ────────────────────────────────────────────────────────
+
+def create_knowledge_item_version(
+    root_id: int,
+    version_number: int,
+    title: str,
+    source_type: str,
+    source_ref: str | None,
+    chunk_count: int,
+    created_by: str | None,
+    change_notes: str | None,
+) -> dict:
+    """Insert a new version row with status='PROCESSING'. parent_id = root_id."""
+    import uuid as _uuid
+    try:
+        creator_id = str(_uuid.UUID(created_by)) if created_by else None
+    except (ValueError, AttributeError):
+        creator_id = None
+    with _conn() as conn:
+        cur = conn.cursor()
+        cur.execute(f"""
+            INSERT INTO knowledge_items
+                (title, source_type, source_ref, chunk_count, created_by,
+                 status, version_number, parent_id, change_notes)
+            VALUES (%s, %s, %s, %s, %s, 'PROCESSING', %s, %s, %s)
+            RETURNING {_KB_COLUMNS}
+        """, (title, source_type, source_ref, chunk_count, creator_id,
+              version_number, root_id, change_notes))
+        return dict(cur.fetchone())
+
+
+def activate_knowledge_version(new_id: int, old_id: int) -> None:
+    """
+    Atomically archive the old version and activate the new one.
+
+    Operation order is critical (plan §G6):
+      1. ARCHIVE old  → removes old entry from partial unique index
+      2. ACTIVE  new  → inserts new entry into partial unique index
+    Both happen in a single transaction. Reversing the order would fire the
+    unique constraint because two ACTIVE rows for the same root would briefly exist.
+    """
+    with _conn() as conn:
+        cur = conn.cursor()
+        # Step 1: archive old (removes it from the partial unique index)
+        cur.execute("""
+            UPDATE knowledge_items
+            SET status = 'ARCHIVED', superseded_by = %s, updated_at = NOW()
+            WHERE id = %s
+        """, (new_id, old_id))
+        # Step 2: activate new (adds it to the partial unique index — no conflict now)
+        cur.execute("""
+            UPDATE knowledge_items
+            SET status = 'ACTIVE', updated_at = NOW()
+            WHERE id = %s
+        """, (new_id,))
+
+
+def fail_knowledge_version(item_id: int) -> None:
+    """Mark a PROCESSING version as FAILED (ingestion error path)."""
+    with _conn() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE knowledge_items
+            SET status = 'FAILED', updated_at = NOW()
+            WHERE id = %s
+        """, (item_id,))
+
+
+def get_knowledge_item_family(root_id: int) -> list[dict]:
+    """Return all versions in a document chain, ordered by version_number ASC."""
+    with _conn() as conn:
+        cur = conn.cursor()
+        cur.execute(f"""
+            SELECT {_KB_COLUMNS}
+            FROM knowledge_items
+            WHERE id = %s OR parent_id = %s
+            ORDER BY version_number ASC
+        """, (root_id, root_id))
+        return [dict(r) for r in cur.fetchall()]
+
+
+def delete_knowledge_item_chain(root_id: int) -> list[int]:
+    """
+    Hard-delete a document and its entire version history.
+    Returns the list of deleted item IDs (so callers can clean up vector chunks).
+    All deletes happen in a single transaction.
+    """
+    with _conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id FROM knowledge_items WHERE id = %s OR parent_id = %s",
+            (root_id, root_id),
+        )
+        ids = [row["id"] for row in cur.fetchall()]
+        if ids:
+            placeholders = ",".join(["%s"] * len(ids))
+            cur.execute(f"DELETE FROM knowledge_items WHERE id IN ({placeholders})", ids)
+        return ids
 
 
 def log_ai_draft(

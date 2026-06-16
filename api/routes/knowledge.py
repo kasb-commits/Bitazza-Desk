@@ -16,17 +16,27 @@ import uuid
 
 import requests as _requests
 from bs4 import BeautifulSoup
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile, File
 from pydantic import BaseModel
 
+from fastapi import BackgroundTasks
 from api.middleware.auth import get_user_id, get_optional_user_id
 from db.conversation_store import (
     create_knowledge_item,
     list_knowledge_items,
     get_knowledge_item,
     delete_knowledge_item,
+    update_knowledge_item_citations,
+    update_knowledge_item_citations_manual,
+    get_all_knowledge_source_refs,
+    create_knowledge_item_version,
+    activate_knowledge_version,
+    fail_knowledge_version,
+    get_knowledge_item_family,
+    delete_knowledge_item_chain,
 )
 from db.vector_store import upsert_documents, delete_by_metadata, get_chunks_by_item
+from engine.kb_classifier import classify_kb_item
 
 logger = logging.getLogger(__name__)
 
@@ -88,8 +98,27 @@ class AddUrlRequest(BaseModel):
     url: str
 
 
+def _classify_and_persist(item_id: int, title: str, chunks: list[str]) -> None:
+    """Background task: classify a KB item and persist citation metadata."""
+    try:
+        result = classify_kb_item(item_id, title, chunks)
+        update_knowledge_item_citations(
+            item_id,
+            result["categories"],
+            result["keywords"],
+            result["coverage_score"],
+        )
+        logger.info("KB classifier: item %d classified — %s", item_id, result["categories"])
+    except Exception:
+        logger.exception("KB classifier: failed for item %d", item_id)
+
+
 @router.post("/url")
-def add_url(body: AddUrlRequest, agent_id: str = Depends(get_user_id)):
+def add_url(
+    body: AddUrlRequest,
+    background_tasks: BackgroundTasks,
+    agent_id: str = Depends(get_user_id),
+):
     """Scrape a URL, chunk its content, and store in the vector DB."""
     url = body.url.strip()
     if not url.startswith(("http://", "https://")):
@@ -140,6 +169,7 @@ def add_url(body: AddUrlRequest, agent_id: str = Depends(get_user_id)):
                 "source_type": "url",
                 "title": title[:255],
                 "chunk_index": i,
+                "status": "ACTIVE",
             },
         }
         for i, chunk in enumerate(chunks)
@@ -150,13 +180,18 @@ def add_url(body: AddUrlRequest, agent_id: str = Depends(get_user_id)):
         logger.exception("Vector upsert failed for knowledge item %s", item_id)
         raise HTTPException(status_code=500, detail=f"Vector store error: {exc}") from exc
 
+    background_tasks.add_task(_classify_and_persist, item["id"], title, chunks)
     return item
 
 
 # ── File upload ingestion ─────────────────────────────────────────────────────
 
 @router.post("/upload")
-async def upload_file(file: UploadFile = File(...), agent_id: str = Depends(get_user_id)):
+async def upload_file(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    agent_id: str = Depends(get_user_id),
+):
     """Upload a PDF or DOCX file, extract its text, and store in the vector DB."""
     filename = file.filename or ""
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
@@ -232,6 +267,7 @@ async def upload_file(file: UploadFile = File(...), agent_id: str = Depends(get_
                 "source_type": ext,
                 "title": title[:255],
                 "chunk_index": i,
+                "status": "ACTIVE",
             },
         }
         for i, chunk in enumerate(chunks)
@@ -242,6 +278,7 @@ async def upload_file(file: UploadFile = File(...), agent_id: str = Depends(get_
         logger.exception("Vector upsert failed for knowledge item %s", item_id)
         raise HTTPException(status_code=500, detail=f"Vector store error: {exc}") from exc
 
+    background_tasks.add_task(_classify_and_persist, item["id"], title, chunks)
     return item
 
 
@@ -329,9 +366,9 @@ def bulk_ingest_blog(body: BulkBlogRequest, request: Request):
     if not article_urls:
         return {"error": "No article links found — the page structure may require JavaScript rendering", "index_url": index_url}
 
-    # Get already-indexed URLs to skip duplicates
-    from db.conversation_store import list_knowledge_items
-    existing = {item["source_ref"] for item in list_knowledge_items()}
+    # Get already-indexed URLs to skip duplicates — must check all statuses (including ARCHIVED)
+    # so that archived blog URLs from previous override cycles are not re-ingested.
+    existing = get_all_knowledge_source_refs()
 
     results = {"ingested": [], "skipped_duplicate": [], "failed": []}
 
@@ -365,7 +402,6 @@ def bulk_ingest_blog(body: BulkBlogRequest, request: Request):
             results["failed"].append({"url": url, "reason": "chunking produced nothing"})
             continue
 
-        from db.conversation_store import create_knowledge_item
         item = create_knowledge_item(
             title=title[:255],
             source_type="url",
@@ -385,6 +421,7 @@ def bulk_ingest_blog(body: BulkBlogRequest, request: Request):
                     "source_type": "url",
                     "title": title[:255],
                     "chunk_index": i,
+                    "status": "ACTIVE",
                 },
             }
             for i, chunk in enumerate(chunks)
@@ -498,13 +535,236 @@ def migrate_from_chroma(request: Request):
 
 @router.delete("/{item_id}", status_code=204)
 def delete_item(item_id: int, _agent_id: str = Depends(get_user_id)):
-    """Delete a knowledge item and all its vector chunks."""
+    """Delete a knowledge item and its entire version chain (all versions + all chunks)."""
     item = get_knowledge_item(item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Knowledge item not found")
 
-    # Remove all chunks from vector store
-    deleted = delete_by_metadata("knowledge_item_id", str(item_id))
-    logger.info("Deleted %d vector chunks for knowledge item %d", deleted, item_id)
+    if item.get("status") == "ARCHIVED":
+        raise HTTPException(status_code=409, detail="Cannot delete an archived version directly. Delete the active version to remove the entire chain.")
 
-    delete_knowledge_item(item_id)
+    root_id = item.get("parent_id") or item_id
+    deleted_ids = delete_knowledge_item_chain(root_id)
+    logger.info("Deleted knowledge item chain root=%d — %d versions removed", root_id, len(deleted_ids))
+
+
+# ── Citations PATCH ───────────────────────────────────────────────────────────
+
+class CitationsPatchRequest(BaseModel):
+    categories: list[str]
+    keywords: list[str]
+
+
+@router.patch("/{item_id}/citations")
+def patch_citations(
+    item_id: int,
+    body: CitationsPatchRequest,
+    agent_id: str = Depends(get_user_id),
+):
+    """Manually override AI-generated citations for a KB item. Locks the item against reclassification."""
+    item = get_knowledge_item(item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Knowledge item not found")
+    if item.get("status") != "ACTIVE":
+        raise HTTPException(status_code=409, detail="Cannot edit citations on a non-active version")
+
+    update_knowledge_item_citations_manual(item_id, body.categories, body.keywords, agent_id)
+    updated = get_knowledge_item(item_id)
+    return updated
+
+
+# ── Version history ───────────────────────────────────────────────────────────
+
+@router.get("/{item_id}/versions")
+def get_versions(item_id: int, _agent_id: str = Depends(get_user_id)):
+    """Return the full version history for a KB document family."""
+    item = get_knowledge_item(item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Knowledge item not found")
+    root_id = item.get("parent_id") or item_id
+    versions = get_knowledge_item_family(root_id)
+    return {"versions": versions}
+
+
+# ── Version override ──────────────────────────────────────────────────────────
+
+@router.post("/{item_id}/override")
+async def override_knowledge_item(
+    item_id: int,
+    background_tasks: BackgroundTasks,
+    url: str = Form(default=""),
+    change_notes: str = Form(default=""),
+    file: UploadFile | None = File(default=None),
+    agent_id: str = Depends(get_user_id),
+):
+    """
+    Replace a KB item with a new version (URL or file).
+    The old version is atomically archived only after the new one is successfully ingested.
+    If any step fails after the new DB row is created, it is marked FAILED and the old
+    version stays ACTIVE.
+    """
+    # Step 1 — load and validate the current active item
+    old_item = get_knowledge_item(item_id)
+    if not old_item:
+        raise HTTPException(status_code=404, detail="Knowledge item not found")
+    if old_item.get("status") != "ACTIVE":
+        raise HTTPException(status_code=409, detail="Only ACTIVE items can be overridden")
+
+    # Step 2 — resolve root_id for the version chain
+    root_id: int = old_item.get("parent_id") or old_item["id"]
+
+    # Step 3 — compute next version number
+    family = get_knowledge_item_family(root_id)
+    next_version = max((v["version_number"] for v in family), default=1) + 1
+
+    # Step 4 — create new DB row with status=PROCESSING
+    new_item = create_knowledge_item_version(
+        root_id=root_id,
+        version_number=next_version,
+        title=old_item["title"],
+        source_type=old_item["source_type"],
+        source_ref=old_item.get("source_ref"),
+        chunk_count=0,
+        created_by=agent_id,
+        change_notes=change_notes,
+    )
+    new_id: int = new_item["id"]
+
+    try:
+        # Step 5 — ingest content (URL or file)
+        if file and file.filename:
+            filename = file.filename or ""
+            ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+            content_type = (file.content_type or "").lower()
+            is_pdf = ext == "pdf" or "pdf" in content_type
+            is_docx = ext == "docx" or "wordprocessingml" in content_type
+            if not (is_pdf or is_docx):
+                raise HTTPException(status_code=422, detail="Only PDF and DOCX files are supported")
+
+            raw = await file.read()
+            buf = io.BytesIO(raw)
+            text = ""
+            if is_pdf:
+                try:
+                    import pypdf
+                    reader = pypdf.PdfReader(buf)
+                    text = "\n\n".join(p.extract_text() or "" for p in reader.pages if (p.extract_text() or "").strip())
+                except Exception as exc:
+                    raise HTTPException(status_code=422, detail=f"Could not read PDF: {exc}") from exc
+            elif is_docx:
+                try:
+                    import docx
+                    doc = docx.Document(buf)
+                    text = "\n\n".join(p.text for p in doc.paragraphs if p.text.strip())
+                except Exception as exc:
+                    raise HTTPException(status_code=422, detail=f"Could not read DOCX: {exc}") from exc
+            if not text.strip():
+                raise HTTPException(status_code=422, detail="No readable text found in the uploaded file")
+            source_ref = filename
+            title = filename.rsplit(".", 1)[0].replace("_", " ").replace("-", " ")
+        elif url:
+            url = url.strip()
+            if not url.startswith(("http://", "https://")):
+                raise HTTPException(status_code=422, detail="URL must start with http:// or https://")
+            try:
+                resp = _requests.get(url, timeout=15, headers={"User-Agent": "CSBot/1.0"})
+                resp.raise_for_status()
+            except Exception as exc:
+                raise HTTPException(status_code=422, detail=f"Failed to fetch URL: {exc}") from exc
+            soup = BeautifulSoup(resp.text, "html.parser")
+            for tag in soup.find_all(["script", "style", "nav", "footer", "header", "aside"]):
+                tag.decompose()
+            title_tag = soup.find("title") or soup.find("h1")
+            title = title_tag.get_text(strip=True) if title_tag else url
+            text = soup.get_text(separator="\n", strip=True)
+            if not text.strip():
+                raise HTTPException(status_code=422, detail="No readable content found at URL")
+            source_ref = url
+        else:
+            raise HTTPException(status_code=422, detail="Provide either a file upload or a url field")
+
+        chunks = _chunk_text(text)
+        if not chunks:
+            raise HTTPException(status_code=422, detail="Could not extract any text from the provided content")
+
+        # Step 6 — upsert new chunks with status=ACTIVE in metadata
+        new_id_str = str(new_id)
+        docs = [
+            {
+                "id": f"kb_{new_id_str}_{i}",
+                "text": chunk,
+                "metadata": {
+                    "knowledge_item_id": new_id_str,
+                    "source": source_ref,
+                    "source_type": old_item["source_type"],
+                    "title": title[:255],
+                    "chunk_index": i,
+                    "status": "ACTIVE",
+                },
+            }
+            for i, chunk in enumerate(chunks)
+        ]
+        upsert_documents(docs)
+
+        # Step 7 — atomically archive old, activate new, mark old chunks ARCHIVED
+        activate_knowledge_version(new_id, item_id)
+
+    except HTTPException:
+        fail_knowledge_version(new_id)
+        raise
+    except Exception as exc:
+        fail_knowledge_version(new_id)
+        logger.exception("Override failed for item %d (new version %d)", item_id, new_id)
+        raise HTTPException(status_code=500, detail=f"Override failed: {exc}") from exc
+
+    # Step 8 — schedule citation classification for new version
+    background_tasks.add_task(_classify_and_persist, new_id, title[:255], chunks)
+
+    # Step 9 — return the new active item
+    return get_knowledge_item(new_id)
+
+
+# ── Admin: classify-all ───────────────────────────────────────────────────────
+
+@router.post("/admin/classify-all")
+def admin_classify_all(_agent_id: str = Depends(get_user_id)):
+    """
+    Backfill citation metadata for all KB items that have no categories yet.
+    Processes: citations_source='pending' OR (citations_source='ai' with empty categories).
+    Skips: manually edited items (citations_source='manual').
+    """
+
+    import psycopg2
+    import psycopg2.extras
+    from config import settings as _cfg
+    from db.vector_store import get_chunks_by_item as _get_chunks
+
+    try:
+        conn = psycopg2.connect(_cfg.DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+        cur = conn.cursor()
+        cur.execute(
+            """SELECT id, title FROM knowledge_items
+               WHERE status = 'ACTIVE'
+                 AND citations_source != 'manual'
+                 AND (citations_source = 'pending'
+                      OR (citations_source = 'ai' AND (citation_categories IS NULL OR citation_categories = '{}')))"""
+        )
+        pending = cur.fetchall()
+        conn.close()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"DB error: {exc}") from exc
+
+    classified = 0
+    failed = 0
+    for row in pending:
+        try:
+            chunks_data = _get_chunks(row["id"])
+            chunks = [c["text"] for c in chunks_data]
+            result = classify_kb_item(row["id"], row["title"], chunks)
+            update_knowledge_item_citations(row["id"], result["categories"], result["keywords"], result["coverage_score"])
+            classified += 1
+        except Exception:
+            logger.exception("admin_classify_all: failed for item %d", row["id"])
+            failed += 1
+
+    return {"total_pending": len(pending), "classified": classified, "failed": failed}

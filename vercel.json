@@ -1,0 +1,8 @@
+{
+  "experimentalServices": {
+    "server": {
+      "entrypoint": "dashboard/server",
+      "routePrefix": "/"
+    }
+  }
+}
